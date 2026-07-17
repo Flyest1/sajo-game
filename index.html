@@ -251,6 +251,21 @@ const SKILLS = {
   bingbaek:   {name:'빙백은침',     cost:9,  mult:1.4, hit:15, poison:true, desc:'맹독 은침. 위력 140% + 중독(3턴 지속 피해)'},
   yongsang:   {name:'용상반야공',   cost:13, mult:2.0, hit:5,  desc:'금륜법왕의 밀종 신공. 위력 200%'},
   chwihon:    {name:'최혼장',       cost:9,  mult:1.6, hit:10, desc:'곽도의 음험한 장법. 위력 160%'},
+  /* ── 10~14장(의천도룡기) 확장 무공 ── */
+  taegeuk:    {name:'태극권',       cost:10, mult:1.6, hit:25, desc:'유능제강의 무당 권법. 위력 160%, 명중 대폭 상승'},
+  geongon:    {name:'건곤대나이',   cost:13, mult:1.9, hit:10, desc:'명교 진산 심법. 위력 190%'},
+  taegeukgeom:{name:'태극검',       cost:11, mult:1.8, hit:20, desc:'장삼봉이 창안한 검법. 위력 180%, 명중 상승'},
+  bido:       {name:'비도술',       cost:8,  mult:1.5, hit:20, desc:'조민의 암기 투척. 위력 150%, 명중 상승'},
+  hyeonmyeong:{name:'현명신장',     cost:10, mult:1.5, hit:10, poison:true, desc:'빙독을 심는 음한 장법. 위력 150% + 중독(빙독)'},
+  honwon:     {name:'혼원벽력수',   cost:12, mult:1.9, hit:5,  desc:'성곤의 강맹한 수법. 위력 190%'},
+  /* ── 15~19장(천룡팔부) 확장 무공 ── */
+  yukmaek:    {name:'육맥신검',     cost:13, mult:2.0, hit:15, desc:'무형의 검기를 쏘는 대리단씨 절학. 위력 200%'},
+  cheonsan:   {name:'천산절매수',   cost:11, mult:1.8, hit:15, desc:'천산동모 전승의 수법. 위력 180%'},
+  bukmyeong:  {name:'북명진기',     cost:9,  healPow:10, heal:true, desc:'심후한 내공으로 아군을 치료 (내공 + 10 회복)'},
+  dujeon:     {name:'두전성이',     cost:12, mult:1.8, hit:10, desc:'상대의 힘을 되돌리는 모용가 절기. 위력 180%'},
+  hwayeom:    {name:'화염도',       cost:12, mult:1.9, hit:10, desc:'구마지의 무형 도기. 위력 190%'},
+  hwagong:    {name:'화공대법',     cost:10, mult:1.5, hit:10, poison:true, desc:'성수파의 극독 공부. 위력 150% + 중독'},
+  yulim:      {name:'어림창법',     cost:10, mult:1.7, hit:10, desc:'대요 황실의 창술. 위력 170%'},
 };
 
 /* ── 캐릭터 정의 ──
@@ -303,6 +318,23 @@ const CHARS = {
   syn:{name:'소용녀', cls:'고묘파 전인', type:'경', range:[1], skills:['oknyeo'],
       base:[30,8,12,6,10,14,13,6,28], grow:[60,35,60,30,55,65,65],
       pt:{skin:'#f9e2c8',hair:'maiden',hc:'#1e1a16',robe:'#e8e4da',female:true,mouth:'firm'}},
+  /* ── 10~14장(의천도룡기) 확장 아군 ── */
+  jmk:{name:'장무기', cls:'명교 교주', type:'내', range:[1], skills:['taegeuk'],
+      base:[36,11,15,9,11,12,12,6,32], grow:[70,45,65,45,55,55,55],
+      pt:{skin:'#f0cba4',hair:'long',hc:'#241c14',robe:'#7d4a3a',mouth:'firm'}},
+  jomin:{name:'조민', cls:'여양왕부 군주', type:'경', range:[1,2], skills:['bido'],
+      base:[26,7,10,5,8,12,12,6,24], grow:[55,30,55,30,50,60,65],
+      pt:{skin:'#f7dcbc',hair:'maiden',hc:'#241a12',robe:'#8a5a7a',female:true,extra:'hairpin',mouth:'smirk'}},
+  jsam:{name:'장삼봉', cls:'무당 조사', type:'내', range:[1,2], skills:['taegeukgeom'], guest:true,
+      base:[38,10,16,10,13,11,13,5,34], grow:[60,35,65,45,60,45,60],
+      pt:{skin:'#eec6a0',hair:'daoist',hc:'#d8d2c6',robe:'#c9c4b4',beard:'long',bc:'#d8d2c6',mouth:'smile'}},
+  /* ── 15~19장(천룡팔부) 확장 아군 ── */
+  dy:{name:'단예', cls:'대리국 왕자', type:'내', range:[1,2], skills:['yukmaek'],
+      base:[30,6,15,6,11,13,11,6,34], grow:[60,25,70,30,60,60,55],
+      pt:{skin:'#f4d2ac',hair:'scholar',hc:'#241c14',robe:'#5a7ab0',mouth:'smile'}},
+  hj:{name:'허죽', cls:'영취궁주', type:'내', range:[1], skills:['cheonsan','bukmyeong'],
+      base:[34,9,14,8,11,11,10,5,34], grow:[70,40,65,45,55,50,50],
+      pt:{skin:'#ecc39a',hair:'bald',hc:'#333',robe:'#8a8060',mouth:'smile'}},
   /* 적군 */
   dj:{name:'도적', cls:'초원의 낭인', type:'외', range:[1], skills:[],
       base:[18,6,2,3,1,5,4,5,10], grow:[],
@@ -368,11 +400,50 @@ const CHARS = {
   mgs:{name:'몽골 궁수', cls:'초원의 명사수', type:'경', range:[2], skills:[],
       base:[22,7,3,4,3,8,7,5,10], grow:[],
       pt:{skin:'#dcae86',hair:'band',hc:'#3a2e22',robe:'#55604f',mouth:'frown'}},
+  /* ── 10~14장(의천도룡기) 확장 적군 ── */
+  hbo:{name:'학필옹', cls:'현명이로(鶴)', type:'내', range:[1,2], skills:['hyeonmyeong'],
+      base:[40,10,13,9,10,10,10,5,28], grow:[],
+      pt:{skin:'#e0c0a0',hair:'scholar',hc:'#b8b2a6',robe:'#3a4a6a',beard:'goatee',bc:'#b8b2a6',brow:'fierce',mouth:'frown'}},
+  njg:{name:'녹장객', cls:'현명이로(鹿)', type:'내', range:[1,2], skills:['hyeonmyeong'],
+      base:[44,11,14,10,11,11,10,5,30], grow:[],
+      pt:{skin:'#d8b088',hair:'daoist',hc:'#8f8578',robe:'#4a5a3a',beard:'must',bc:'#8f8578',brow:'fierce',mouth:'frown'}},
+  sgon:{name:'성곤', cls:'혼원벽력수', type:'외', range:[1], skills:['honwon'],
+      base:[48,13,9,11,9,11,11,5,30], grow:[],
+      pt:{skin:'#d8a878',hair:'bald',hc:'#333',robe:'#6b5a4a',beard:'stub',bc:'#4a4038',brow:'fierce',extra:'scar',mouth:'frown'}},
+  ydg:{name:'육대파 검수', cls:'조종당한 무인', type:'경', range:[1], skills:[],
+      base:[26,8,5,5,5,9,8,5,12], grow:[],
+      pt:{skin:'#e2b088',hair:'band',hc:'#3a2e22',robe:'#5a6a7a',mouth:'frown'}},
+  /* ── 15~19장(천룡팔부) 확장 적군 ── */
+  myb:{name:'모용복', cls:'고소모용가 공자', type:'경', range:[1], skills:['dujeon'],
+      base:[44,12,12,9,10,13,12,6,30], grow:[],
+      pt:{skin:'#f2d4ae',hair:'topknot',hc:'#241c14',robe:'#9aa0b8',extra:'hairpin',mouth:'smirk'}},
+  gmj:{name:'구마지', cls:'토번 국사', type:'내', range:[1,2], skills:['hwayeom'],
+      base:[42,9,15,9,12,11,11,5,32], grow:[],
+      pt:{skin:'#d8a878',hair:'bald',hc:'#333',robe:'#a05a2a',brow:'fierce',mouth:'smile'}},
+  jcc:{name:'정춘추', cls:'성수노괴', type:'내', range:[1,2], skills:['hwagong'],
+      base:[46,9,14,9,12,10,10,5,32], grow:[],
+      pt:{skin:'#e0c0a0',hair:'daoist',hc:'#c8c2b4',robe:'#4a6a4a',beard:'long',bc:'#c8c2b4',brow:'fierce',mouth:'frown'}},
+  ssj:{name:'성수파 제자', cls:'독공의 무리', type:'내', range:[1], skills:[],
+      base:[24,6,8,4,6,8,7,5,12], grow:[],
+      pt:{skin:'#d9b088',hair:'band',hc:'#3a2e22',robe:'#5a6a5a',mouth:'frown'}},
+  myg:{name:'모용가 가신', cls:'참합장 무사', type:'경', range:[1], skills:[],
+      base:[27,9,5,5,5,10,8,5,12], grow:[],
+      pt:{skin:'#e2b088',hair:'band',hc:'#2e2620',robe:'#8a90a8',mouth:'frown'}},
+  gdb:{name:'거란 무사', cls:'대요 정예병', type:'외', range:[1], skills:[],
+      base:[28,10,4,7,4,8,6,5,10], grow:[],
+      pt:{skin:'#dcae86',hair:'helm',hc:'#4a443c',robe:'#6a4a3a',mouth:'frown'}},
+  gds:{name:'거란 궁수', cls:'대요 사수', type:'경', range:[2], skills:[],
+      base:[23,7,3,4,3,9,7,5,10], grow:[],
+      pt:{skin:'#dcae86',hair:'band',hc:'#3a2e22',robe:'#7a5a40',mouth:'frown'}},
+  yyh:{name:'야율홍기', cls:'대요 황제', type:'외', range:[1], skills:['yulim'],
+      base:[52,13,10,12,10,11,11,5,30], grow:[],
+      pt:{skin:'#e0b088',hair:'band',hc:'#2e2620',robe:'#b08a2a',beard:'must',bc:'#2e2620',brow:'fierce',mouth:'firm'}},
 };
 
 /* ── 적측 인물 목록 (대화 화면 이름색 판정용) ── */
 const ENEMY_IDS = new Set(['mcp','jhp','dj','msa','gs','hth','yjs','yjo','plh','stc','ygang','sab','ogg','oyb',
-  'imsu','hnp','sap','grb','gwd','mgb','mgs']);
+  'imsu','hnp','sap','grb','gwd','mgb','mgs','hbo','njg','sgon','ydg',
+  'myb','gmj','jcc','ssj','myg','gdb','gds','yyh']);
 
 /* ── 대화 헬퍼: [화자id|null, 좌우, 대사] ── */
 function D(s, side, t){ return {s:s, side:side, t:t}; }
@@ -774,18 +845,439 @@ const CHAPTERS = [
     D('yg','L','강호의 별들이 오늘 가장 밝게 빛났군. — 후일, 또 다른 이야기에서 만납시다.'),
   ],
 },
+{
+  no:10, title:'제10장  무당산의 바람',
+  joins:['jmk'],
+  map:[
+    "mmm........mmm",
+    "mm....hh....mm",
+    "m.....hh.....m",
+    "..m........m..",
+    ".....rr.......",
+    "....rr....f...",
+    "...rr...f....m",
+    "m..rr.......mm",
+    "mm.rr....f.mmm",
+    "mmmrr.....mmmm",
+  ],
+  spawns:[[3,8],[4,8],[3,9],[4,9],[2,8],[5,8],[6,8],[7,8],[3,7],[4,7],[5,7],[8,8]],
+  enemies:[
+    {cid:'mgb', x:4, y:1}, {cid:'mgb', x:9, y:1}, {cid:'mgb', x:5, y:2}, {cid:'mgb', x:8, y:2},
+    {cid:'mgs', x:5, y:3}, {cid:'mgs', x:8, y:3},
+    {cid:'hbo', x:6, y:0, boss:true, wait:2},
+  ],
+  win:{type:'boss', boss:'hbo', text:'학필옹 격퇴'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('양양 대첩으로부터 얼마 후. 신조가 이끄는 안개 낀 뱃길 끝에서, 일행은 낯선 시대에 닿았다.'),
+    D('hy','L','이 산세… 무당산(武當山)이에요. 그런데 어딘가 이상해요. 우리가 알던 강호보다… 백 년은 뒤인 것 같아요.'),
+    D('sb','L','시공의 인연이 또 우리를 불렀군. 이번엔 어떤 싸움이 기다리고 있으려나.'),
+    D('jmk','L','거기 계신 분들! 조심하십시오! 몽골 조정의 고수들이 무당산을 덮쳤습니다!'),
+    D('hbo','R','현명이로(玄冥二老)의 학필옹이다. 장삼봉의 목을 가지러 왔다. 방해하는 자는 현명신장의 빙독을 맛보리라.'),
+    D('jmk','L','저는 장무기라 합니다. 태사부님은 제가 지킵니다! …여러분, 도와주시겠습니까?'),
+    D('gj','L','협을 행하는 데 시대가 무슨 상관이겠나! 갑시다!'),
+  ],
+  post:[
+    D('hbo','R','크윽, 빙독이 통하지 않는 고수들이라니…! 녹 아우에게 알려야…! (학필옹은 산 아래로 사라졌다)'),
+    D('jmk','L','감사합니다! 태사부님께서 여러분을 꼭 뵙고 싶다 하십니다.'),
+    N('무당산 정상에서, 백세의 도인 장삼봉이 일행을 맞이했다. — 장무기가 동료가 되었다!'),
+    D('hy','L','명교와 육대파가 광명정에서 크게 부딪친대요. 그 뒤에 성곤(成崑)이라는 자의 그림자가 어른거려요.'),
+    N('일행은 서역 곤륜, 광명정으로 향한다—'),
+  ],
+},
+{
+  no:11, title:'제11장  광명정의 진실',
+  joins:[],
+  map:[
+    "mm###....###mm",
+    "m..#......#..m",
+    "m............m",
+    "..f........f..",
+    "......hh......",
+    "......hh......",
+    ".f..........f.",
+    "m............m",
+    "mm..........mm",
+    "mmmm......mmmm",
+  ],
+  spawns:[[6,8],[7,8],[5,8],[8,8],[6,9],[7,9],[4,8],[9,8],[5,9],[8,9],[6,7],[7,7]],
+  enemies:[
+    {cid:'ydg', x:4, y:2}, {cid:'ydg', x:9, y:2}, {cid:'ydg', x:5, y:1}, {cid:'ydg', x:8, y:1},
+    {cid:'sgon', x:6, y:1, boss:true, wait:1},
+  ],
+  reinforce:[
+    {turn:3, msg:'조종당한 육대파 검수들이 몰려온다!', units:[{cid:'ydg',x:5,y:0},{cid:'ydg',x:8,y:0}]},
+  ],
+  win:{type:'boss', boss:'sgon', text:'성곤 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  learn:[{cid:'jmk', skill:'geongon'}],
+  pre:[
+    N('서역 곤륜산맥, 명교 총단 광명정(光明頂). 육대파의 깃발이 산을 에워쌌다.'),
+    D('sgon','R','크크… 명교도, 육대파도, 서로 물어뜯다 함께 스러져라. 이 성곤의 대업을 위하여.'),
+    D('jmk','L','당신이 성곤! 사부님의 원수… 모든 비극의 원흉이 당신이었군요!'),
+    D('yg','L','이간계로 강호를 피로 물들이는 자라… 어느 시대에나 저런 무리는 있군.'),
+    D('hy','L','조종당한 육대파 검수들은 가급적 다치지 않게… 성곤만 잡으면 돼요!'),
+    D('gj','L','갑시다! 진실을 광명 아래 드러냅시다!'),
+  ],
+  post:[
+    D('sgon','R','이럴 수가… 내 계획이… 크윽, 두고 보자! 소림에서 끝을 내주마! (성곤은 지하 비도로 달아났다)'),
+    D('jmk','L','싸움 속에서… 건곤대나이 심법의 마지막 층이 몸에 익었습니다! 여러분 덕분입니다.'),
+    N('장무기는 건곤대나이를 터득했다! (장무기에게 새 무공이 추가되었습니다)'),
+    D('jmk','L','그런데… 몽골 조정의 군주 조민이 육대파 고수들을 만안사 탑에 가뒀다는 소식입니다.'),
+    N('일행은 대도(大都) 만안사로 향한다—'),
+  ],
+},
+{
+  no:12, title:'제12장  만안사 탑의 결전',
+  joins:[],
+  map:[
+    "##############",
+    "#....#..#....#",
+    "#.hh.#..#.hh.#",
+    "#....#rr#....#",
+    "#....#rr#....#",
+    "#............#",
+    "#.####..####.#",
+    "#....#..#....#",
+    "#.....rr.....#",
+    "######rr######",
+  ],
+  spawns:[[6,8],[7,8],[5,8],[8,8],[4,8],[9,8],[3,8],[10,8],[2,8],[11,8],[6,9],[7,9]],
+  enemies:[
+    {cid:'mgb', x:6, y:1}, {cid:'mgb', x:2, y:4}, {cid:'mgb', x:11, y:4},
+    {cid:'mgs', x:6, y:4}, {cid:'mgs', x:7, y:3},
+    {cid:'hbo', x:4, y:2, wait:1},
+    {cid:'njg', x:9, y:2, boss:true, wait:2},
+  ],
+  reinforce:[
+    {turn:3, msg:'왕부의 근위병이 들이닥친다!', units:[{cid:'mgb',x:2,y:1},{cid:'mgb',x:11,y:1}]},
+  ],
+  win:{type:'boss', boss:'njg', text:'녹장객 격퇴'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('대도 만안사(萬安寺). 십삼층 보탑에 육대파의 고수들이 갇혀 있다.'),
+    D('jomin','R','어머, 쥐새끼들이 몰려왔네? 나는 여양왕부의 군주, 조민. …그쪽의 곤란한 얼굴, 구경할 만하겠는걸.'),
+    D('jmk','L','조 낭자! 육대파 어르신들을 풀어주시오. 이건 강호의 일, 조정이 낄 일이 아니오!'),
+    D('jomin','R','강호의 일? 후훗, 천하가 다 대원(大元)의 것인데? …현명이로, 손님 대접을 해드려라.'),
+    D('njg','R','녹장객이 왔다. 형님의 빚, 이자까지 쳐서 받아주마. 현명신장의 빙독, 이번엔 피할 수 있겠느냐.'),
+    D('hy','L','탑에 불이 붙기 전에 구해내야 해요! 서둘러요!'),
+  ],
+  post:[
+    D('njg','R','형님, 이놈들은 괴물이오…! 퇴각이다, 퇴각! (현명이로는 어둠 속으로 사라졌다)'),
+    D('jomin','R','…계획이 다 틀어졌잖아. 장무기, 너… 어째서 적인 나까지 불길 속에서 구해준 거야?'),
+    D('jmk','L','불길 속에 있으면 적이고 아군이고 없소. 사람이 먼저요.'),
+    D('jomin','R','…바보. 그런 바보 같은 소리를 하니까… 흥, 기억해두겠어.'),
+    N('육대파의 고수들이 구출되었다. 소림사에서 영웅대회가 열린다는 소식이 강호에 퍼진다—'),
+  ],
+},
+{
+  no:13, title:'제13장  소림 영웅대회',
+  joins:['jomin'],
+  map:[
+    "ff..........ff",
+    ".....hh.......",
+    "..............",
+    "...#......#...",
+    "..............",
+    ".....rr.......",
+    "..f..rr...f...",
+    "......rr......",
+    ".hh...rr...hh.",
+    "..............",
+  ],
+  spawns:[[6,8],[7,8],[5,8],[8,8],[6,9],[7,9],[4,8],[9,8],[5,9],[8,9],[6,7],[7,7]],
+  enemies:[
+    {cid:'sap', x:3, y:1}, {cid:'sap', x:10, y:1}, {cid:'sap', x:5, y:2},
+    {cid:'ydg', x:2, y:2}, {cid:'ydg', x:11, y:2},
+    {cid:'mgb', x:8, y:2}, {cid:'mgb', x:4, y:3},
+    {cid:'sgon', x:6, y:2, boss:true, boost:1.15, wait:1},
+  ],
+  reinforce:[
+    {turn:2, msg:'성곤의 잔당이 난입한다!', units:[{cid:'sap',x:1,y:0},{cid:'sap',x:12,y:0}]},
+    {turn:4, msg:'몽골 무사들이 들이닥친다!', units:[{cid:'mgb',x:6,y:0},{cid:'mgb',x:7,y:0}]},
+  ],
+  win:{type:'boss', boss:'sgon', text:'성곤 최후의 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('숭산 소림사. 영웅대회의 날, 천하 군웅이 모여들었다.'),
+    D('jomin','L','…나도 간다. 아버지와 오라버니를 등지는 길이라 해도, 내 마음이 가는 곳은 정해졌으니까.'),
+    D('jmk','L','조 낭자… 정말 괜찮겠소?'),
+    D('jomin','L','민민특목이가 아니라, 그냥 조민이야. 앞으로는. …자, 성곤의 최후를 보러 가자.'),
+    D('sgon','R','크하하! 마침 잘 왔다! 오늘 이 소림에서, 명교와 너희 모두를 묻어주마!'),
+    D('sb','L','승려의 탈을 쓴 원흉이라… 내 시대에도 그런 자가 있었지. 이번엔 놓치지 않는다.'),
+    D('gj','L','모두, 마지막까지 방심은 금물입니다!'),
+  ],
+  post:[
+    D('sgon','R','나의… 대업이… 이런 애송이들에게… (성곤은 무공을 잃고 쓰러졌다)'),
+    D('jmk','L','끝났군요… 사부님의 원수를, 드디어…!'),
+    D('yg','L','아직이오. 몽골 대군이 무당산으로 향했다는 급보요. 현명이로가 선봉이라 하오.'),
+    D('jomin','L','아버지가 움직인 거야. …가자. 이번엔 내가 길을 안내할게.'),
+    N('최후의 결전을 위해, 일행은 무당산으로 돌아간다—'),
+  ],
+},
+{
+  no:14, title:'제14장  무당산 대결전',
+  joins:['jsam'],
+  map:[
+    "..............",
+    "..f........f..",
+    "....m....m....",
+    "..............",
+    "mmm..m..m..mmm",
+    "mm..........mm",
+    "m....hh......m",
+    "..m........m..",
+    "m...rr...f...m",
+    "mm..rr......mm",
+  ],
+  spawns:[[4,8],[5,8],[4,9],[5,9],[3,8],[6,8],[7,8],[8,8],[3,7],[4,7],[5,7],[6,7]],
+  enemies:[
+    {cid:'mgb', x:3, y:1}, {cid:'mgb', x:10, y:1}, {cid:'mgb', x:5, y:2}, {cid:'mgb', x:8, y:2},
+    {cid:'mgs', x:2, y:2}, {cid:'mgs', x:11, y:2},
+    {cid:'hbo', x:5, y:1, boost:1.15},
+    {cid:'njg', x:7, y:0, boss:true, boost:1.15, wait:3},
+  ],
+  reinforce:[
+    {turn:3, msg:'몽골군 제2진이 산문을 넘는다!', units:[{cid:'mgb',x:1,y:0},{cid:'mgb',x:12,y:0},{cid:'mgs',x:5,y:0}]},
+    {turn:5, msg:'몽골군 최후의 파도가 밀려온다!', units:[{cid:'mgb',x:2,y:0},{cid:'mgb',x:11,y:0},{cid:'mgs',x:8,y:0}]},
+  ],
+  win:{type:'boss', boss:'njg', text:'현명이로 격파 (녹장객)'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('무당산. 산문 아래로 몽골 대군의 창칼이 숲을 이뤘다.'),
+    D('jsam','L','백 년을 살았어도 이런 대군은 처음 보는구려. 허허… 노도(老道)도 오늘은 검을 들어야겠소.'),
+    D('jmk','L','태사부님! 위험합니다!'),
+    D('jsam','L','무기야, 태극(太極)은 흐름이다. 대군의 흐름도, 결국 물길처럼 돌려보낼 수 있느니라.'),
+    D('njg','R','현명이로가 두 번의 빚을 갚으러 왔다! 이번엔 둘이 함께다. 각오해라!'),
+    D('hbo','R','빙독의 진정한 무서움을 뼛속까지 새겨주마!'),
+    D('gj','L','양양에서도, 무당에서도 — 지켜야 할 것은 같습니다. 모두, 최후의 일전입니다!'),
+  ],
+  post:[
+    D('njg','R','괴, 괴물 같은 놈들… 형님, 퇴각이오! (현명이로는 대군과 함께 물러갔다)'),
+    D('jsam','L','허허, 훌륭하도다. 그대들의 협의(俠義)는 시대를 넘어 빛나는구려.'),
+    D('jmk','L','여러분… 이 은혜, 잊지 않겠습니다. 명교는 앞으로 백성을 위한 길을 걷겠습니다.'),
+    D('jomin','L','무기, 나 이제 갈 곳이 없어졌는데… 책임질 거지?'),
+    D('jmk','L','무, 물론이오! …여러분, 부디 어느 시대에서든 강녕하시길!'),
+    D('hy','L','또 하나의 이야기가 막을 내렸네요. 오라버니, 우리의 강호는… 아직 끝나지 않았죠?'),
+    D('gj','L','그럼. 협이 있는 한, 강호는 계속된다 — !'),
+  ],
+},
+{
+  no:15, title:'제15장  강남의 기연',
+  joins:['dy'],
+  map:[
+    "wwww......wwww",
+    "ww...hh.....ww",
+    "w....hh......w",
+    "..rrrrrrrrr...",
+    "..r.......r...",
+    "..r..ww...r...",
+    "..r..ww...r...",
+    "..rrrrrrrrr...",
+    "w.....hh.....w",
+    "wwww......wwww",
+  ],
+  spawns:[[2,4],[2,5],[2,6],[2,3],[3,3],[2,7],[3,7],[4,3],[4,7],[1,4],[1,5],[1,6]],
+  enemies:[
+    {cid:'ssj', x:8, y:2}, {cid:'ssj', x:9, y:4}, {cid:'ssj', x:9, y:6}, {cid:'ssj', x:10, y:3},
+    {cid:'gmj', x:11, y:5, boss:true, wait:2},
+  ],
+  win:{type:'boss', boss:'gmj', text:'구마지 격퇴'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('무당산의 결전 후. 시공의 안개가 다시 일행을 감쌌다 — 이번에 닿은 곳은, 북송의 강남.'),
+    D('sb','L','…이 하늘, 이 바람. 틀림없다. 여기는 내가 살던 시대, 나의 강호다!'),
+    D('hy','L','소봉 대협의 시대… 그럼 이번 이야기의 주인공은 대협이시네요.'),
+    D('dy','L','사, 살려주시오! 소생은 대리국의 단예라 하오. 이상한 자들이 자꾸만 쫓아와서…'),
+    D('ssj','R','성수파의 명이다! 그 몸에 깃든 신공을 내놓아라! 순순히 오면 아프게는 안 해주지!'),
+    D('gmj','R','아미타불… 소승은 토번의 구마지라 하오. 공자의 육맥신검에 관심이 많소이다. 함께 가주셔야겠소.'),
+    D('dy','L','싫소이다!! 여러분, 부디 도와주시오! 은혜는 대리 왕실의 이름으로 갚겠소!'),
+    D('sb','L','하하! 재미있는 녀석이군. 좋다, 이 소봉이 맡지!'),
+  ],
+  post:[
+    D('gmj','R','아미타불… 오늘은 인연이 아닌 모양이군. 소실산에서 다시 뵙지요. (구마지는 표연히 사라졌다)'),
+    D('dy','L','감사하오! 소생, 여러분과 의형제… 아니, 평생의 벗이 되고 싶소!'),
+    D('sb','L','거참 성급한 녀석. …허나 싫지 않군. 하하하!'),
+    N('단예가 동료가 되었다! 일행은 소봉의 발자취를 따라 고소(姑蘇)로 향한다—'),
+  ],
+},
+{
+  no:16, title:'제16장  연자오의 모용가',
+  joins:[],
+  map:[
+    "wwwwwwwwwwwwww",
+    "ww..........ww",
+    "w..hh..hh....w",
+    "w............w",
+    ".....ff.......",
+    "..f........f..",
+    "w............w",
+    "w..hh...hh...w",
+    "ww..........ww",
+    "wwwwwwwwwwwwww",
+  ],
+  spawns:[[3,8],[4,8],[2,8],[5,8],[6,8],[7,8],[2,7],[6,7],[7,7],[8,8],[9,8],[10,8]],
+  enemies:[
+    {cid:'myg', x:4, y:1}, {cid:'myg', x:9, y:1}, {cid:'myg', x:5, y:2}, {cid:'myg', x:10, y:2},
+    {cid:'myb', x:7, y:1, boss:true, wait:1},
+  ],
+  reinforce:[
+    {turn:3, msg:'모용가의 가신들이 달려온다!', units:[{cid:'myg',x:2,y:1},{cid:'myg',x:11,y:1}]},
+  ],
+  win:{type:'boss', boss:'myb', text:'모용복 격퇴'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('고소 연자오(燕子塢). 참합장(參合莊)의 주인, 모용복의 장원.'),
+    D('myb','R','북교봉 남모용(北喬峰 南慕容) — 그 이름을 나란히 하던 개방의 옛 방주가 직접 찾아올 줄이야.'),
+    D('sb','L','모용 공자. 강호에 도는 흉흉한 소문, 그대의 "두전성이"가 얽혀 있다 들었다. 진상을 밝히러 왔다.'),
+    D('myb','R','대연(大燕) 재건의 대업에 방해가 되는 자는… 누구든 지워질 뿐. 상대해주지, 교봉!'),
+    D('dy','L','왕 낭자의 사촌 오라버니라 하여 좋게 보려 했건만… 어쩔 수 없구려!'),
+  ],
+  post:[
+    D('myb','R','크윽… 대업이… 나의 대연이…! 두고 보자! (모용복은 호수 저편으로 사라졌다)'),
+    D('sb','L','명성만 못한 자였군. …다음은 표묘봉이다. 기괴한 바둑판에 고수들이 갇혔다는 소문이 있다.'),
+    N('일행은 표묘봉 영취궁으로 향한다—'),
+  ],
+},
+{
+  no:17, title:'제17장  표묘봉 진롱기국',
+  joins:['hj'],
+  map:[
+    "mmmm......mmmm",
+    "mm..........mm",
+    "m....mm......m",
+    "...m......m...",
+    ".....hh.......",
+    ".....hh.......",
+    "..m........m..",
+    "m............m",
+    "mm..........mm",
+    "mmmm......mmmm",
+  ],
+  spawns:[[6,8],[7,8],[5,8],[8,8],[6,9],[7,9],[4,8],[9,8],[5,9],[8,9],[6,7],[7,7]],
+  enemies:[
+    {cid:'ssj', x:4, y:2}, {cid:'ssj', x:9, y:2}, {cid:'ssj', x:5, y:3}, {cid:'ssj', x:8, y:3}, {cid:'ssj', x:3, y:1},
+    {cid:'jcc', x:6, y:1, boss:true, wait:1},
+  ],
+  reinforce:[
+    {turn:3, msg:'성수파의 제자들이 독무를 뚫고 나타난다!', units:[{cid:'ssj',x:5,y:0},{cid:'ssj',x:8,y:0}]},
+  ],
+  win:{type:'boss', boss:'jcc', text:'정춘추 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('표묘봉 영취궁. 진롱기국(珍瓏棋局)을 풀어낸 것은, 뜻밖에도 이름 없는 소림의 젊은 승려였다.'),
+    D('hj','L','소, 소승은 허죽이라 합니다. 어쩌다 보니 바둑을 풀었고… 어쩌다 보니 칠십 년 내공을 받았고… 어쩌다 보니…'),
+    D('sb','L','하하하! 어쩌다 보니 고수가 되었단 말이냐! 마음에 든다. 결의하자 — 나 소봉, 그리고 단예와 함께 삼형제다!'),
+    D('dy','L','좋소, 좋소! 오늘부터 우리는 생사를 함께하는 형제요!'),
+    D('jcc','R','성수노괴 정춘추가 왔다… 영취궁의 힘도, 네놈들의 목숨도 전부 이 몸의 것이다. 화공대법의 독을 받아라!'),
+    D('hj','L','정춘추! 사문의 원수…! 형님들, 소제가 앞장서겠습니다!'),
+  ],
+  post:[
+    D('jcc','R','내 독이… 통하지 않다니… 성수파는 불멸이다…! (정춘추는 독무 속으로 도망쳤다)'),
+    D('hj','L','해냈습니다, 형님들! …그런데 소실산에서 영웅대회가 열린다는데, 불길한 소문이 함께 돌고 있습니다.'),
+    N('허죽이 동료가 되었다! 삼형제는 나란히 소실산으로 향한다—'),
+  ],
+},
+{
+  no:18, title:'제18장  소실산 대전',
+  joins:[],
+  map:[
+    "##############",
+    "#....#..#....#",
+    "#.hh......hh.#",
+    "#............#",
+    "#..f......f..#",
+    "#............#",
+    "#.hh......hh.#",
+    "#.....rr.....#",
+    "#.....rr.....#",
+    "######rr######",
+  ],
+  spawns:[[6,8],[7,8],[5,8],[8,8],[6,7],[7,7],[4,8],[9,8],[5,7],[8,7],[3,8],[10,8]],
+  enemies:[
+    {cid:'ssj', x:3, y:1}, {cid:'ssj', x:10, y:1},
+    {cid:'myg', x:6, y:4}, {cid:'myg', x:8, y:4},
+    {cid:'gmj', x:4, y:2, boost:1.1, wait:1},
+    {cid:'myb', x:7, y:1, boss:true, boost:1.15, wait:1},
+  ],
+  reinforce:[
+    {turn:3, msg:'모용가와 성수파의 잔당이 몰려든다!', units:[{cid:'ssj',x:2,y:1},{cid:'myg',x:11,y:1}]},
+  ],
+  win:{type:'boss', boss:'myb', text:'모용복 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('소실산 소림사. 천하 군웅이 모인 자리에, 음모의 그림자가 드리운다.'),
+    D('myb','R','기다리고 있었다, 교봉. 오늘 이 자리에서 너를 꺾고, 대연 재건의 발판으로 삼겠다!'),
+    D('gmj','R','아미타불. 소승도 약속대로 왔소이다. 육맥신검과 항룡의 장법, 오늘 모두 시험해 보겠소.'),
+    D('sb','L','좋다! 강호에 씌워진 오명도, 안문관의 진실도 — 오늘 전부 끝장을 내주마!'),
+    D('gj','L','소봉 대협의 시대의 싸움, 우리도 함께합니다!'),
+  ],
+  post:[
+    D('myb','R','어째서냐… 어째서 하늘은 모용가를 버리는가…! (모용복은 실성한 듯 웃으며 사라졌다)'),
+    D('gmj','R','아미타불… 소승, 오늘 크게 깨달았소이다. 집착이 곧 고(苦)였구려. (구마지는 합장하고 떠났다)'),
+    D('sb','L','…끝났군. 아니, 아직 하나 남았다. 안문관(雁門關) — 모든 것이 시작된 곳.'),
+    N('요나라 대군이 남하한다는 봉화가 오른다. 일행은 안문관으로—'),
+  ],
+},
+{
+  no:19, title:'제19장  안문관 최후의 결전',
+  joins:[],
+  map:[
+    "..............",
+    "...f......f...",
+    "..............",
+    "m....m..m....m",
+    "mm..........mm",
+    "#####.rr.#####",
+    "m.....rr.....m",
+    "m..hh.rr.hh..m",
+    "mm....rr....mm",
+    "mmm...rr...mmm",
+  ],
+  spawns:[[6,6],[7,6],[5,6],[8,6],[6,7],[7,7],[6,8],[7,8],[5,7],[8,7],[4,6],[9,6]],
+  enemies:[
+    {cid:'gdb', x:4, y:1}, {cid:'gdb', x:9, y:1}, {cid:'gdb', x:3, y:2}, {cid:'gdb', x:10, y:2},
+    {cid:'gds', x:5, y:2}, {cid:'gds', x:8, y:2},
+    {cid:'yyh', x:6, y:0, boss:true, wait:3},
+  ],
+  reinforce:[
+    {turn:3, msg:'대요군 제2진이 협곡을 넘는다!', units:[{cid:'gdb',x:1,y:0},{cid:'gdb',x:12,y:0},{cid:'gds',x:5,y:0}]},
+    {turn:5, msg:'대요군 제3진이 밀려온다!', units:[{cid:'gdb',x:2,y:0},{cid:'gdb',x:11,y:0},{cid:'gds',x:8,y:0}]},
+    {turn:7, msg:'대요군 최후의 돌격!', units:[{cid:'gdb',x:0,y:1},{cid:'gdb',x:13,y:1}]},
+  ],
+  win:{type:'survive', turns:9, boss:'yyh', text:'9턴 방어 (야율홍기 격파 시 즉시 승리)'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('안문관. 소봉의 운명이 시작된 관문 앞에, 대요(大遼)의 대군이 새까맣게 늘어섰다.'),
+    D('yyh','R','짐은 대요의 황제 야율홍기다. 교봉, 아니 소봉. 짐의 아우여 — 마지막으로 묻겠다. 송을 칠 선봉이 되어라.'),
+    D('sb','L','폐하. 신은 거란인이오. 허나 그 창끝이 무고한 백성을 향한다면 — 신은 폐하의 적이 될 수밖에 없소.'),
+    D('yyh','R','…그런가. 그렇다면 역적이다. 전군, 관문을 부수어라!'),
+    D('dy','L','형님! 대리국의 단예, 형님과 함께 싸우겠소!'),
+    D('hj','L','소제도입니다, 형님!'),
+    D('gj','L','북송의 하늘 아래, 협의 이름으로! 아홉 턴만 버티면 관문의 원군이 도착합니다!'),
+  ],
+  post:[
+    D('yyh','R','…물러난다. 짐이 살아 있는 한, 다시는 송의 국경을 넘지 않겠다. …잘 있거라, 나의 아우여.'),
+    D('sb','L','…폐하께 감사를. 그리고 형제들, 벗들이여 — 고맙다. 이 소봉, 이제야 마음의 짐을 내려놓는다.'),
+    D('dy','L','형님…! 울지 마시오, 소제가 다 눈물이 나잖소!'),
+    D('hj','L','삼형제의 인연은 시공이 갈라놓아도 변치 않습니다!'),
+    D('hy','L','이제… 모든 시대의 이야기가 하나로 이어졌네요. 사조삼부곡, 그리고 천룡팔부까지.'),
+    D('gj','L','강호의 별들이 모두 모였다. — 이것이 진정한 영웅집결이다!'),
+    N('그리고 전설은 계속된다… 타이틀의 「영웅집결 무한 모드」에서 무한의 파도에 도전하세요!'),
+  ],
+},
 ];
 
 /* 엔딩 문구 */
 const ENDING = [
-  '— 大團圓 · 전 9장 완결 —',
-  '사조영웅전: 강호의 별, 아홉 장의 여정을 모두 마치셨습니다!',
+  '— 大團圓 · 전 19장 완결 —',
+  '사조삼부곡과 천룡팔부, 네 시대의 여정을 모두 마치셨습니다!',
   '',
-  '곽정과 황용은 양양을 지키는 대협이 되었고,',
-  '양과와 소용녀는 강호 어딘가에서 신조와 함께 노닐며,',
-  '소봉의 호쾌한 웃음소리는 전설로 남았습니다.',
+  '곽정과 황용, 양과와 소용녀, 장무기와 조민,',
+  '그리고 소봉·단예·허죽 삼형제의 의(義)까지 —',
+  '강호의 별들은 이제 하나의 전설이 되었습니다.',
   '',
-  '다음 확장 예정: 의천도룡기 편 · 천룡팔부 본편 · 영웅집결 무한 모드…',
+  '타이틀의 「영웅집결 무한 모드」에서 끝없는 파도에 도전해 보세요!',
   '',
   '플레이해 주셔서 감사합니다.',
 ];
@@ -1062,8 +1554,12 @@ function titleArtSVG(){
    ============================================================ */
 
 const G = { chapterIdx:0, roster:{}, party:[], snapshot:null, extraSkills:{}, deploy:null };
-let B = null; // 현재 전투 상태
+let B = null;       // 현재 전투 상태
+let ENDLESS = null; // 영웅집결 무한 모드 상태 {wave, ch}
 let uidSeq = 0;
+
+/* 현재 챕터(스토리) 또는 현재 웨이브(무한 모드) 정의 반환 */
+function curCh(){ return ENDLESS ? ENDLESS.ch : CHAPTERS[G.chapterIdx]; }
 
 const app = () => document.getElementById('app');
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -1095,7 +1591,7 @@ function mkEnemyUnit(def){
   return {uid:'u'+(uidSeq++), cid:def.cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
     skills:c.skills, healer:false, leader:false, team:'E',
     x:def.x, y:def.y, stats:st, maxhp:st.hp, hp:st.hp, maxki:st.ki, ki:st.ki,
-    lvl:CHAPTERS[G.chapterIdx].no*3, exp:0, acted:false, alive:true,
+    lvl:curCh().no*3, exp:0, acted:false, alive:true,
     boss:!!def.boss, wait:def.wait||0, poison:0};
 }
 
@@ -1131,17 +1627,22 @@ function moveRange(u){
 function stoppable(u,x,y){ const o=unitAt(x,y); return !o || o===u; }
 
 /* ── 전투 계산 ── */
+function adjAllies(u){
+  if(!B) return 0;
+  return Math.min(3, B.units.filter(o=>o.alive&&o!==u&&o.team===u.team&&dist(o,u)===1).length);
+}
 function calcStrike(a,d,skillId){
   const sk=skillId?SKILLS[skillId]:null;
   const tri=triangle(a.type,d.type);
   const atk=a.type==='내'?a.stats.int:a.stats.str;
   const mit=a.type==='내'?d.stats.res:d.stats.def;
   const dT=TILE[tileChar(d.x,d.y)];
-  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 - mit - dT.def);
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) - d.stats.spd*2 - dT.avoid));
+  const supA=adjAllies(a), supD=adjAllies(d); /* 협공: 인접 아군 보정 */
+  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA - mit - dT.def);
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 - supD*3 - d.stats.spd*2 - dT.avoid));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl);
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
-  return {dmg,hit,crit,dbl,tri};
+  return {dmg,hit,crit,dbl,tri,supA,supD};
 }
 function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 
@@ -1288,7 +1789,7 @@ async function healAction(a,t,skillId){
 /* ── 승패 판정 ── */
 function checkEnd(){
   if(B.over) return true;
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   const leaderDown=B.units.some(u=>u.leader&&!u.alive);
   if(leaderDown||players().length===0){
     B.over=true; B.busy=true;
@@ -1447,7 +1948,7 @@ function openForecast(a,d,skillId){
     <div class="modal">
       <h3>전투 예측 ${sk?`— ${sk.name}`:''}</h3>
       <div class="fc-grid">
-        <div class="hd">${a.name}</div><div class="lbl">상성 ${triTxt}</div><div class="hd">${d.name}</div>
+        <div class="hd">${a.name}${my.supA?` <span style="font-size:11px;color:#8fce6a">협공+${my.supA}</span>`:''}</div><div class="lbl">상성 ${triTxt}</div><div class="hd">${d.name}${my.supD?` <span style="font-size:11px;color:#8fce6a">협공+${my.supD}</span>`:''}</div>
         <div class="val">${a.hp} / ${a.maxhp}</div><div class="lbl">HP</div><div class="val">${d.hp} / ${d.maxhp}</div>
         <div class="val">${my.dmg}${my.dbl?' ×2':''}</div><div class="lbl">위력</div><div class="val">${counter?`${counter.dmg}${counter.dbl?' ×2':''}`:'반격 불가'}</div>
         <div class="val">${my.hit}%</div><div class="lbl">명중</div><div class="val">${counter?counter.hit+'%':'—'}</div>
@@ -1477,7 +1978,7 @@ function confirmAttack(){
 async function startPlayerPhase(first){
   if(B.over) return;
   if(!first) B.turn++;
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   /* 방어전: 규정 턴을 버티면 승리 */
   if(ch.win.type==='survive' && B.turn>ch.win.turns){
     B.over=true; B.busy=true;
@@ -1514,7 +2015,7 @@ async function enemyPhase(){
   renderBattle();
   await banner('적군 페이즈',true);
   /* 증원군 등장 */
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   if(ch.reinforce){
     for(let i=0;i<ch.reinforce.length;i++){
       const r=ch.reinforce[i];
@@ -1582,7 +2083,7 @@ async function enemyPhase(){
 
 /* ── 전투 시작 ── */
 function startBattle(){
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   const map=ch.map.map(r=>{
     let s=r;
     while(s.length<14) s+='.';
@@ -1642,7 +2143,7 @@ window.addEventListener('resize',()=>{ if(B) fitMap(); });
 
 /* ── 전투 화면 골격 ── */
 function renderScreenBattle(){
-  const mw=14*TS, mh=CHAPTERS[G.chapterIdx].map.length*TS;
+  const mw=14*TS, mh=curCh().map.length*TS;
   app().innerHTML=`
   <div id="battle">
     <div id="mapcol">
@@ -1724,7 +2225,7 @@ function statRow(lbl,val){ return `<div>${lbl} <b>${val}</b></div>`; }
 function renderSide(){
   const side=document.getElementById('side');
   if(!side) return;
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   const u=B.sel||B.inspect||(B.tileSel?unitAt(B.tileSel.x,B.tileSel.y):null);
   let card='<div style="color:var(--dim);padding:14px 4px;text-align:center;">유닛을 선택하세요</div>';
   if(u){
@@ -1836,6 +2337,7 @@ function showDlgLine(){
 
 /* ── 챕터 진행 ── */
 function startChapter(idx, skipPre){
+  ENDLESS=null;
   G.chapterIdx=idx;
   const ch=CHAPTERS[idx];
   for(const cid of ch.joins) initRosterChar(cid);
@@ -1847,7 +2349,7 @@ function startChapter(idx, skipPre){
 
 /* ── 출전 준비 화면 ── */
 function showDeploy(){
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   const cap=Math.min(ch.spawns.length,12);
   if(!G.deploy) G.deploy=[];
   G.deploy=G.deploy.filter(cid=>G.party.includes(cid));
@@ -1857,7 +2359,7 @@ function showDeploy(){
   renderDeploy(cap);
 }
 function renderDeploy(cap){
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   app().innerHTML=`<div id="deploy">
     <h2>${ch.title} — 출전 준비</h2>
     <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명) · ★곽정은 반드시 출전 · 승리 조건: ${ch.win.text}</div>
@@ -1888,8 +2390,21 @@ function applyRoster(){
   }
 }
 function showVictory(){
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   applyRoster();
+  /* 무한 모드: 웨이브 클리어 */
+  if(ENDLESS){
+    const w=ENDLESS.wave;
+    setBestWave(w);
+    app().innerHTML=`<div class="result-screen">
+      <h2 style="color:#ffd94a">제${w}파 격퇴!</h2>
+      <p>영웅들은 호흡을 가다듬는다. 다음 파도는 더욱 거세진다…<br>
+      역대 최고 기록: <b style="color:var(--gold2)">${bestWave()}파</b></p>
+      <button class="btn" onclick="nextWave(${w+1})">제${w+1}파, 온다!</button>
+      <button class="btn danger" onclick="toTitle()">여기서 멈춘다 (기록 저장됨)</button>
+    </div>`;
+    return;
+  }
   /* 무공 습득 */
   let learnMsg='';
   if(ch.learn){
@@ -1910,13 +2425,25 @@ function showVictory(){
   </div>`;
 }
 function afterVictory(next){
-  const ch=CHAPTERS[G.chapterIdx];
+  const ch=curCh();
   showDialogue(ch.post, ()=>{
     if(next>=CHAPTERS.length) showEnding();
     else startChapter(next);
   });
 }
 function showDefeat(){
+  if(ENDLESS){
+    const w=ENDLESS.wave;
+    setBestWave(w-1);
+    app().innerHTML=`<div class="result-screen">
+      <h2 style="color:#e07a5a">敗 北</h2>
+      <p>영웅들은 제${w}파의 파도에 삼켜졌다…<br>
+      이번 도달: <b>${w-1}파 격퇴</b> · 역대 최고 기록: <b style="color:var(--gold2)">${bestWave()}파</b></p>
+      <button class="btn" onclick="startEndless()">처음부터 재도전</button>
+      <button class="btn danger" onclick="toTitle()">타이틀로</button>
+    </div>`;
+    return;
+  }
   app().innerHTML=`<div class="result-screen">
     <h2 style="color:#e07a5a">敗 北</h2>
     <p>곽정이 쓰러졌다… 강호의 이야기는 여기서 끝나지 않는다.</p>
@@ -1983,8 +2510,67 @@ function jumpChapter(i){
   startChapter(i);
 }
 
+/* ── 영웅집결 무한 모드 ── */
+const ENDLESS_KEY='kimyong_srpg_endless_best';
+function bestWave(){ try{ return parseInt(localStorage.getItem(ENDLESS_KEY)||'0')||0; }catch(e){ return 0; } }
+function setBestWave(w){ try{ if(w>bestWave()) localStorage.setItem(ENDLESS_KEY,String(w)); }catch(e){} }
+function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function rosterLevelUp(r){
+  const names=['hp','str','int','def','res','spd','skl'];
+  const c=CHARS[r.cid];
+  const g=(c.grow&&c.grow.length)?c.grow:[60,40,40,40,40,40,40];
+  r.lvl++;
+  names.forEach((n,i)=>{ if(Math.random()*100<g[i]) r.stats[n]++; });
+  r.stats.ki++;
+}
+/* 아레나로 쓸 챕터 인덱스 (초원·도화도·고묘·만안사·소림) */
+const ARENAS=[0,4,7,11,17];
+function makeEndlessWave(wave){
+  const base=CHAPTERS[ARENAS[(wave-1)%ARENAS.length]];
+  const minions=['dj','msa','gs','sab','sap','mgb','mgs','ydg','gdb','gds','ssj','myg'];
+  const elites=['jhp','hth','yjo','plh','stc','yjs','gwd','hnp'];
+  const bossPool=['mcp','ygang','ogg','oyb','imsu','grb','hbo','njg','sgon','myb','gmj','jcc','yyh'];
+  const count=Math.min(11, 5+Math.floor(wave*0.8));
+  const boost=Math.round((1+wave*0.05)*100)/100;
+  /* 적 배치 후보: 우측 절반의 통행 가능 타일, 아군 스폰에서 3칸 이상 */
+  let cells=[];
+  for(let y=0;y<base.map.length;y++)for(let x=7;x<14;x++){
+    if(TILE[base.map[y][x]].cost<99) cells.push([x,y]);
+  }
+  cells=cells.filter(c=>base.spawns.every(s=>Math.abs(s[0]-c[0])+Math.abs(s[1]-c[1])>=3));
+  shuffleArr(cells);
+  const enemies=[];
+  for(let i=0;i<count&&cells.length;i++){
+    const pool=(wave>=3&&Math.random()<0.35)?elites:minions;
+    const cid=pool[Math.floor(Math.random()*pool.length)];
+    const [x,y]=cells.pop();
+    enemies.push({cid,x,y,boost});
+  }
+  if(wave%3===0&&cells.length){ /* 3파마다 보스 출현 */
+    const cid=bossPool[Math.floor(Math.random()*bossPool.length)];
+    const [x,y]=cells.pop();
+    enemies.push({cid,x,y,boss:true,boost:Math.round((boost+0.15)*100)/100});
+  }
+  return { no:4+wave, title:`영웅집결 — 제${wave}파`, joins:[], map:base.map, spawns:base.spawns,
+    enemies, win:{type:'rout', text:`제${wave}파 전멸`}, lose:'곽정이 쓰러지면 패배', pre:[], post:[] };
+}
+function startEndless(){
+  /* 전 영웅 집결: 스토리 진행과 무관하게 모든 아군을 Lv.10으로 소집 */
+  ENDLESS=null;
+  G.chapterIdx=0; G.roster={}; G.party=[]; G.deploy=null;
+  const allies=Object.keys(CHARS).filter(id=>!ENEMY_IDS.has(id));
+  for(const cid of allies) initRosterChar(cid);
+  for(const cid of G.party){ const r=G.roster[cid]; for(let i=1;i<10;i++) rosterLevelUp(r); }
+  G.extraSkills={gj:['jwauhobak'], jmk:['geongon']};
+  nextWave(1);
+}
+function nextWave(w){
+  ENDLESS={wave:w, ch:makeEndlessWave(w)};
+  showDeploy();
+}
+
 /* ── 타이틀 ── */
-function toTitle(){ B=null; showTitle(); }
+function toTitle(){ B=null; ENDLESS=null; showTitle(); }
 function confirmToTitle(){ if(confirm('전투를 포기하고 타이틀로 돌아갈까요? (진행 상황은 챕터 시작 시점으로 돌아갑니다)')) toTitle(); }
 function showTitle(){
   const hasSave=!!loadGame();
@@ -1996,11 +2582,12 @@ function showTitle(){
       <div><button class="btn" onclick="newGame()">새로운 협객행 (새 게임)</button></div>
       <div><button class="btn" onclick="continueGame()" ${hasSave?'':'disabled'}>이어하기</button></div>
       <div><button class="btn" onclick="showChapterSelect()" ${hasSave?'':'disabled'}>장 선택 (회상)</button></div>
+      <div><button class="btn" onclick="startEndless()">영웅집결 무한 모드${bestWave()?` <span style="font-size:12px;color:var(--dim)">최고 ${bestWave()}파</span>`:''}</button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
     </div>
     <div class="title-note">
       본 게임은 AI(Claude)가 제작한 김용(金庸) 원작 팬메이드 데모입니다.<br>
-      전 9장: 사조영웅전 → 도화도 → 화산논검 → 신조협려 · 크로스오버 게스트(천룡팔부) 참전<br>
+      전 19장: 사조영웅전 → 신조협려 → 의천도룡기 → 천룡팔부 + 영웅집결 무한 모드<br>
       PC · 모바일(터치) 지원 — 진행 상황은 챕터 클리어 시 자동 저장
     </div>
   </div>`;
@@ -2037,12 +2624,14 @@ function showHelp(){
       ◆ <b style="color:var(--text)">경공</b> 유닛은 험지(숲/산) 이동비용 -1<br>
       ◆ <b style="color:var(--text)">무공(스킬)</b>은 기(氣)를 소모하며, 기는 매턴 4씩 회복 — 무공을 여러 개 익힌 협객은 골라 쓸 수 있습니다<br>
       ◆ 속도가 4 이상 높으면 <b style="color:var(--text)">2회 공격</b> (무공 사용 시 제외) · <b style="color:var(--text)">좌우호박</b>은 무공 자체가 2연격<br>
-      ◆ <b style="color:#c07ae0">중독</b>되면 3턴간 매턴 피해 (빙백은침 등)<br>
+      ◆ <b style="color:#c07ae0">중독</b>되면 3턴간 매턴 피해 (빙백은침·현명신장 등)<br>
+      ◆ <b style="color:var(--text)">협공</b>: 인접(상하좌우)한 아군 1명당 명중 +4·피해 +1, 수비 측은 인접 아군 1명당 회피 +3 (최대 3명)<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
       ◆ 쓰러진 아군은 <b style="color:var(--text)">부상 이탈</b> — 다음 챕터에 복귀 (곽정이 쓰러지면 패배)<br>
       ◆ <b style="color:var(--text)">모바일</b>: 유닛·타일을 탭해서 조작, 상단 <b style="color:var(--text)">취소</b> 버튼 = 우클릭, <b style="color:var(--text)">배율</b> 버튼으로 맵 확대<br>
-      ◆ 진행 상황은 챕터 클리어 시 자동 저장 · 타이틀의 <b style="color:var(--text)">장 선택</b>에서 회상 재도전 가능</p>
+      ◆ 진행 상황은 챕터 클리어 시 자동 저장 · 타이틀의 <b style="color:var(--text)">장 선택</b>에서 회상 재도전 가능<br>
+      ◆ <b style="color:var(--gold2)">영웅집결 무한 모드</b>: 전 영웅 Lv.10으로 집결, 갈수록 강해지는 적의 파도에 도전 — 3파마다 보스 출현, 웨이브 간 성장 유지, 최고 기록 자동 저장</p>
       <div class="btnrow"><button class="btn" onclick="document.getElementById('help-modal').remove()">닫기</button></div>
     </div>
   </div>`;
