@@ -39,16 +39,20 @@ for (const id in CHARS) CHARS[id].skills.forEach(s => { if (!SKILLS[s]) errs.pus
 
 /* ── v2 캠페인 그래프 검증 ── */
 const HWASAN = J('stages_hwasan.json');
+const SAJO = J('stages_sajo.json');
 const ITEMS = J('items.json');
-{
-  const S = HWASAN.stages;
-  if (!S[HWASAN.start]) errs.push('hwasan: start 노드 없음');
-  for (const id of HWASAN.order) if (!S[id]) errs.push(`hwasan order: 미정의 노드 ${id}`);
+for (const CAMP of [HWASAN, SAJO]) {
+  const S = CAMP.stages;
+  const CID = CAMP.id;
+  if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);
+  for (const id of CAMP.order) if (!S[id]) errs.push(`${CID} order: 미정의 노드 ${id}`);
   for (const id in S) {
-    const n = S[id], tag = `hwasan/${id}`;
+    const n = S[id], tag = `${CID}/${id}`;
     const targets = [];
     if (typeof n.next === 'string') targets.push(n.next);
+    if (n.next && typeof n.next === 'object' && n.next.cond) { n.next.cond.forEach(c => targets.push(c.to)); targets.push(n.next.else); }
     if (n.options) n.options.forEach(o => targets.push(o.to));
+    (n.joins || []).forEach(j => { if (!CHARS[j]) errs.push(`${tag} joins unknown ${j}`); });
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
     if (n.kind === 'battle') {
       const H = n.map.length, W = n.map[0].length;
@@ -83,10 +87,12 @@ const ITEMS = J('items.json');
     }
     if (n.kind === 'camp' && n.shop) n.shop.forEach(it => { if (!ITEMS[it]) errs.push(`${tag} shop unknown item ${it}`); });
   }
-  HWASAN.party.forEach(c => { if (!CHARS[c]) errs.push(`hwasan party unknown ${c}`); });
+  CAMP.party.forEach(c => { if (!CHARS[c]) errs.push(`${CID} party unknown ${c}`); });
+}
+{
   for (const cid in CHARS) {
     const pr = CHARS[cid].promo;
-    if (pr && (!ITEMS[pr.item] || !SKILLS[pr.skill])) errs.push(`char ${cid}: promo 참조 오류`);
+    if (pr && (!ITEMS[pr.item] || (pr.skill && !SKILLS[pr.skill]))) errs.push(`char ${cid}: promo 참조 오류`);
   }
 }
 

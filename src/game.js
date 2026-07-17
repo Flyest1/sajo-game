@@ -2,6 +2,7 @@ import { TS, TILE, SKILLS, CHARS, CHAPTERS, ENDING, ENEMY_IDS, TYPE_NAME, triang
 import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG } from './gfx.js';
 import ITEMS from './data/items.json';
 import HWASAN from './data/stages_hwasan.json';
+import SAJO from './data/stages_sajo.json';
 
 /* ============================================================
    전투 엔진
@@ -1103,7 +1104,7 @@ function startEndless(){
   /* 전 영웅 집결: 스토리 진행과 무관하게 모든 아군을 Lv.10으로 소집 */
   ENDLESS=null; V2=null;
   G.chapterIdx=0; G.roster={}; G.party=[]; G.deploy=null;
-  const allies=Object.keys(CHARS).filter(id=>!ENEMY_IDS.has(id));
+  const allies=Object.keys(CHARS).filter(id=>!ENEMY_IDS.has(id)&&!CHARS[id].npc);
   for(const cid of allies) initRosterChar(cid);
   for(const cid of G.party){ const r=G.roster[cid]; for(let i=1;i<10;i++) rosterLevelUp(r); }
   G.extraSkills={gj:['jwauhobak'], jmk:['geongon']};
@@ -1200,7 +1201,7 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { hwasan: HWASAN };
+const CAMPAIGNS = { sajo: SAJO, hwasan: HWASAN };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
@@ -1238,7 +1239,11 @@ function startCampaignV2(campId, useSave){
 }
 function curNode(){ return V2?CAMPAIGNS[V2.camp].stages[V2.stageId]:null; }
 function v2Lines(lines){
-  return (lines||[]).filter(l=>!('if' in l)||l.if===null||l.if===undefined||!!V2.flags[l.if]);
+  return (lines||[]).filter(l=>{
+    if(l.ifNot&&V2.flags[l.ifNot]) return false;
+    if(('if' in l)&&l.if!==null&&l.if!==undefined&&!V2.flags[l.if]) return false;
+    return true;
+  });
 }
 function v2BattleDef(n){
   const battles=V2.cleared.filter(id=>{const st=CAMPAIGNS[V2.camp].stages[id];return st&&st.kind==='battle';}).length;
@@ -1251,6 +1256,13 @@ function v2Enter(){
   v2Save();
   const n=curNode();
   if(!n){ toTitle(); return; }
+  (n.joins||[]).forEach(cid=>initRosterCharV2(cid));
+  if(n.kind==='talk'){
+    const go=()=>v2Advance(n);
+    if(V2.attempted[V2.stageId]) go();
+    else { V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
+    return;
+  }
   if(n.kind==='battle'){
     const dep=()=>v2Deploy(n);
     if(V2.attempted[V2.stageId]) dep();
@@ -1277,8 +1289,14 @@ function v2AfterBattle(){
   else go();
 }
 function v2Advance(n){
-  const nx=n?n.next:null;
+  let nx=n?n.next:null;
+  if(nx&&typeof nx==='object'&&nx.cond){ /* 플래그 조건 분기 */
+    let to=nx.else;
+    for(const c of nx.cond){ if(V2.flags[c.if]){ to=c.to; break; } }
+    nx=to;
+  }
   if(!nx){ toTitle(); return; }
+  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
   V2.stageId=nx; v2Save(); v2Enter();
 }
 function showChoiceNode(n){
@@ -1458,7 +1476,7 @@ function showRouteMap(){
     const cur=V2.stageId===id;
     const icon=cleared?'✓':(cur?'▶':'·');
     const cls=cleared?'done':(cur?'cur':'lock');
-    const kindTxt={battle:'전투',camp:'거점',choice:'분기',end:'종막'}[n.kind]||'';
+    const kindTxt={battle:'전투',camp:'거점',choice:'분기',talk:'이야기',end:'종막'}[n.kind]||'';
     return `<div class="route-row ${cls}" ${cur?`onclick="v2Enter()"`:''}>
       <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}</span></div>`;
   }).join('');
@@ -1475,20 +1493,23 @@ function showRouteMap(){
 }
 
 /* ── 캠페인 선택 ── */
+function campCard(id, badge){
+  const C=CAMPAIGNS[id], sv=v2LoadSave(id);
+  return `<div class="camp-card">
+    <h3>${C.name} ${badge?`<span style="font-size:12px;color:var(--gold2)">${badge}</span>`:''}</h3>
+    <p>${C.desc}</p>
+    <div>
+      ${sv?`<button class="btn" onclick="startCampaignV2('${id}',true)">이어하기 (진행 ${sv.cleared.length}단계)</button>`:''}
+      <button class="btn ${sv?'small':''}" ${sv?'style="margin-left:8px"':''} onclick="startCampaignV2('${id}',false)">${sv?'처음부터':'시작하기'}</button>
+    </div></div>`;
+}
 function showCampaignSelect(){
-  const s=v2LoadSave('hwasan');
   app().innerHTML=`<div id="campsel">
     <h2>신규 캠페인 (베타)</h2>
-    <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 새 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
-    <div class="camp-card">
-      <h3>외전Ⅰ 화산논검 전기 <span style="font-size:12px;color:var(--gold2)">파일럿 3막</span></h3>
-      <p>${CAMPAIGNS.hwasan.desc}</p>
-      <div>
-        ${s?`<button class="btn" onclick="startCampaignV2('hwasan',true)">이어하기 (진행 ${s.cleared.length}단계)</button>`:''}
-        <button class="btn ${s?'small':''}" ${s?'style="margin-left:8px"':''} onclick="startCampaignV2('hwasan',false)">${s?'처음부터':'시작하기'}</button>
-      </div>
-    </div>
-    <div class="camp-card lock"><h3>사조삼부곡 (연속 캠페인)</h3><p>사조영웅전 → 신조협려 → 의천도룡기 리부트 — 제작 예정 (R2~R4)</p></div>
+    <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
+    ${campCard('sajo','NEW · R2')}
+    ${campCard('hwasan','파일럿')}
+    <div class="camp-card lock"><h3>제2권 신조협려 · 제3권 의천도룡기</h3><p>사조에서 이어지는 연속 캠페인 — 제작 예정 (R3~R4)</p></div>
     <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;

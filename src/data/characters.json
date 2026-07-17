@@ -37,6 +37,20 @@
    "robe": "#3d6b8f",
    "brow": "thick",
    "mouth": "firm"
+  },
+  "promo": {
+   "lvl": 7,
+   "item": "hangryongbi",
+   "cls": "북협의 재목",
+   "bonus": {
+    "hp": 4,
+    "str": 2,
+    "int": 1,
+    "def": 1,
+    "res": 1,
+    "skl": 1
+   },
+   "skill": "jwauhobak"
   }
  },
  "hy": {
@@ -77,6 +91,18 @@
    "female": true,
    "mouth": "smile",
    "extra": "hairpin"
+  },
+  "promo": {
+   "lvl": 7,
+   "item": "dohwabi",
+   "cls": "개방의 신산",
+   "bonus": {
+    "hp": 3,
+    "int": 2,
+    "spd": 1,
+    "skl": 2,
+    "res": 1
+   }
   }
  },
  "gja": {
@@ -2021,6 +2047,435 @@
    "brow": "fierce",
    "extra": "scar",
    "mouth": "frown"
+  }
+ },
+ "gsc": {
+  "name": "곽소천",
+  "cls": "우가촌의 협사",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   26,
+   8,
+   3,
+   6,
+   4,
+   7,
+   6,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e2b088",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#5a5248",
+   "beard": "stub",
+   "bc": "#2b2119",
+   "mouth": "firm"
+  }
+ },
+ "ycs": {
+  "name": "양철심",
+  "cls": "양가창의 전인",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   26,
+   8,
+   3,
+   6,
+   4,
+   7,
+   6,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#33281d",
+   "robe": "#6b4a3a",
+   "beard": "must",
+   "bc": "#33281d",
+   "mouth": "firm"
+  }
+ },
+ "dds": {
+  "name": "일등대사",
+  "cls": "남제(南帝)",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "ilyang"
+  ],
+  "npc": true,
+  "base": [
+   40,
+   10,
+   16,
+   10,
+   13,
+   10,
+   12,
+   5,
+   34
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#eec6a0",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#c9a227",
+   "beard": "long",
+   "bc": "#b8b2a6",
+   "mouth": "smile"
+  }
+ },
+ "mok": {
+  "name": "목염자",
+  "cls": "강호의 여협",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   26,
+   8,
+   6,
+   5,
+   6,
+   10,
+   9,
+   6,
+   18
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2d0b0",
+   "hair": "bun",
+   "hc": "#241a12",
+   "robe": "#7a5a50",
+   "female": true,
+   "mouth": "firm"
+  }
+ },
+ "yeonggo": {
+  "name": "영고",
+  "cls": "흑늪의 은자",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   28,
+   8,
+   8,
+   5,
+   7,
+   9,
+   9,
+   5,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e8c4a8",
+   "hair": "bun",
+   "hc": "#8f8578",
+   "robe": "#4a4a5c",
+   "female": true,
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "dtd": {
+  "name": "단천덕",
+  "cls": "탐관의 주구",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   30,
+   10,
+   4,
+   7,
+   4,
+   8,
+   7,
+   5,
+   14
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#5c5248",
+   "beard": "stub",
+   "bc": "#33281d",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "wanyan": {
+  "name": "완안홍렬",
+  "cls": "금국 조왕",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   36,
+   9,
+   10,
+   8,
+   9,
+   8,
+   9,
+   5,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2cfa8",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#c9a227",
+   "beard": "goatee",
+   "bc": "#2b2119",
+   "mouth": "smirk"
+  }
+ },
+ "gbyeong": {
+  "name": "관병",
+  "cls": "임안부 병졸",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   22,
+   8,
+   3,
+   5,
+   3,
+   7,
+   5,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#6b6157",
+   "mouth": "frown"
+  }
+ },
+ "gci": {
+  "name": "구천인",
+  "cls": "철장수상표",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "cheoljang"
+  ],
+  "base": [
+   46,
+   13,
+   6,
+   10,
+   7,
+   11,
+   10,
+   5,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8a878",
+   "hair": "scholar",
+   "hc": "#8f8578",
+   "robe": "#3a3a4a",
+   "beard": "goatee",
+   "bc": "#8f8578",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "cjb": {
+  "name": "철장방도",
+  "cls": "철장방 무사",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   25,
+   9,
+   3,
+   5,
+   3,
+   8,
+   6,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#3a3a4a",
+   "mouth": "frown"
+  }
+ },
+ "eobu": {
+  "name": "어부",
+  "cls": "일등문하 제일관",
+  "type": "경",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [],
+  "base": [
+   32,
+   9,
+   7,
+   6,
+   6,
+   9,
+   8,
+   5,
+   18
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#4f6d7a",
+   "beard": "stub",
+   "bc": "#3a2e22",
+   "mouth": "firm"
+  }
+ },
+ "chobu": {
+  "name": "초부",
+  "cls": "일등문하 제이관",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   34,
+   10,
+   5,
+   8,
+   5,
+   7,
+   7,
+   5,
+   16
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dfa87e",
+   "hair": "wild",
+   "hc": "#2e241a",
+   "robe": "#5e6e46",
+   "beard": "must",
+   "bc": "#2e241a",
+   "mouth": "firm"
+  }
+ },
+ "nongbu": {
+  "name": "농부",
+  "cls": "일등문하 제삼관",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   36,
+   11,
+   5,
+   9,
+   5,
+   7,
+   7,
+   5,
+   16
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dfa87e",
+   "hair": "topknot",
+   "hc": "#2e241a",
+   "robe": "#7d6250",
+   "beard": "full",
+   "bc": "#2e241a",
+   "mouth": "firm"
+  }
+ },
+ "seosaeng": {
+  "name": "서생",
+  "cls": "일등문하 제사관",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [],
+  "base": [
+   32,
+   6,
+   11,
+   6,
+   9,
+   8,
+   9,
+   5,
+   22
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#ecc39a",
+   "hair": "scholar",
+   "hc": "#3a2e22",
+   "robe": "#6b7f5a",
+   "beard": "goatee",
+   "bc": "#3a2e22",
+   "mouth": "smile"
   }
  }
 }
