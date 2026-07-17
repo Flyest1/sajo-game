@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>사조영웅전: 강호의 별 — 김용 무협 SRPG 데모</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;user-select:none;}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
 :root{
   --bg:#1b1712; --panel:#2a241b; --panel2:#332c21; --line:#4d4433;
   --gold:#d9b36c; --gold2:#f0d49a; --text:#e8ddc8; --dim:#a89878;
@@ -60,7 +60,12 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 
 /* ── 전투 ── */
 #battle{display:flex;gap:12px;align-items:flex-start;}
-#mapwrap{position:relative;flex:0 0 auto;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000;}
+#mapcol{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;}
+#topbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--dim);flex-wrap:wrap;}
+#topbar .btn.small{padding:7px 13px;}
+#mapscroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%;border-radius:6px;}
+#mapsizer{position:relative;}
+#mapwrap{position:absolute;left:0;top:0;transform-origin:0 0;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000;touch-action:manipulation;}
 #mapsvg{display:block;}
 #fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
 .dmgpop{
@@ -134,8 +139,57 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 .result-screen h2{font-size:42px;margin-bottom:16px;}
 .result-screen p{color:var(--dim);font-size:16px;margin-bottom:26px;line-height:1.8;}
 
+/* ── 출전 준비 화면 ── */
+#deploy{padding:6px 0;}
+#deploy h2{font-size:22px;margin-bottom:4px;}
+.dep-sub{color:var(--dim);font-size:13px;margin-bottom:12px;line-height:1.6;}
+.dep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-bottom:16px;}
+.dep-card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 4px;text-align:center;cursor:pointer;transition:all .15s;}
+.dep-card .pt{width:56px;height:56px;margin:0 auto 5px;border-radius:50%;overflow:hidden;border:2px solid var(--line);background:#4a4032;}
+.dep-card.on{border-color:var(--gold);box-shadow:0 0 8px rgba(217,179,108,.3);}
+.dep-card.on .pt{border-color:var(--gold);}
+.dep-card.off{opacity:.55;}
+.dep-card.off .pt{filter:grayscale(.85) brightness(.7);}
+.dep-name{font-size:13.5px;color:var(--gold2);font-weight:700;}
+.dep-info{font-size:11.5px;color:var(--dim);}
+
 svg text{font-family:'Malgun Gothic',sans-serif;}
 ::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+/* ── 모바일 반응형 (iPhone 등 세로 화면) ── */
+@media (max-width:760px){
+  body{align-items:flex-start;padding:8px 0 44px;
+       padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
+       padding-top:calc(8px + env(safe-area-inset-top));}
+  #app{max-width:100vw;padding:0 6px;}
+  #battle{flex-direction:column;gap:10px;}
+  #side{min-width:0;width:100%;}
+  #side .panel{font-size:13px;}
+  .btn{padding:11px 20px;font-size:15px;}
+  .btn.small{padding:8px 13px;font-size:13px;}
+  #amenu .btn{padding:10px 14px;font-size:15px;width:170px;}
+  .title-main{font-size:29px;}
+  .title-sub{font-size:13px;}
+  .title-menu .btn{width:min(320px,86vw);margin:5px;}
+  .title-note{font-size:11px;padding:0 8px;}
+  #dlg-screen{height:74vh;min-height:430px;}
+  .dlg-pt{width:150px;height:150px;bottom:138px;}
+  .dlg-pt.L{left:8px;} .dlg-pt.R{right:8px;}
+  #dlg-box{left:8px;right:8px;bottom:8px;padding:11px 13px;min-height:110px;}
+  #dlg-name{font-size:15px;}
+  #dlg-text{font-size:15px;line-height:1.65;}
+  .dlg-title-card h2{font-size:25px;padding:0 12px;text-align:center;}
+  .modal{max-width:94vw;padding:15px 14px;max-height:82vh;}
+  .modal h3{font-size:18px;}
+  .fc-grid{font-size:13px;gap:3px 8px;}
+  .fc-grid .val{font-size:15px;}
+  .helptable{font-size:11.5px;}
+  .result-screen{padding:36px 0;}
+  .result-screen h2{font-size:32px;}
+  .dep-grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;}
+  .dep-card .pt{width:48px;height:48px;}
+  #banner{font-size:26px;letter-spacing:.18em;}
+}
 </style>
 </head>
 <body>
@@ -189,6 +243,14 @@ const SKILLS = {
   doksu:      {name:'독수신조',     cost:9,  mult:1.7, hit:10, desc:'양자옹의 조법. 위력 170%'},
   daesu:      {name:'대수인',       cost:10, mult:1.7, hit:5,  desc:'영지상인의 밀종 장법. 위력 170%'},
   yeongsa:    {name:'영사권법',     cost:10, mult:1.8, hit:10, desc:'구양극의 사권. 위력 180%'},
+  /* ── 5~9장 확장 무공 ── */
+  gongmyeong: {name:'공명권',       cost:9,  mult:1.6, hit:25, desc:'허를 치는 노완동의 권법. 위력 160%, 명중 대폭 상승'},
+  jwauhobak:  {name:'좌우호박',     cost:13, mult:1.35,hit:5,  dbl:true, desc:'양손이 따로 싸우는 기예. 위력 135% × 2연격'},
+  oknyeo:     {name:'옥녀소심검',   cost:10, mult:1.8, hit:15, desc:'고묘파 검법의 정수. 위력 180%'},
+  tanji:      {name:'탄지신통',     cost:11, mult:1.8, hit:20, desc:'동사 황약사의 절기. 위력 180%, 명중 상승'},
+  bingbaek:   {name:'빙백은침',     cost:9,  mult:1.4, hit:15, poison:true, desc:'맹독 은침. 위력 140% + 중독(3턴 지속 피해)'},
+  yongsang:   {name:'용상반야공',   cost:13, mult:2.0, hit:5,  desc:'금륜법왕의 밀종 신공. 위력 200%'},
+  chwihon:    {name:'최혼장',       cost:9,  mult:1.6, hit:10, desc:'곽도의 음험한 장법. 위력 160%'},
 };
 
 /* ── 캐릭터 정의 ──
@@ -231,6 +293,16 @@ const CHARS = {
   yg:{name:'양과', cls:'신조대협', type:'내', range:[1,2], skills:['amyeon'], guest:true,
       base:[34,11,13,8,9,12,12,6,30], grow:[65,45,60,40,45,60,60],
       pt:{skin:'#f2cfa8',hair:'long',hc:'#2b2119',robe:'#6d7b8a',mouth:'firm'}},
+  /* ── 5~9장 확장 아군 ── */
+  zbt:{name:'주백통', cls:'노완동', type:'내', range:[1], skills:['gongmyeong','jwauhobak'],
+      base:[34,10,13,8,10,11,10,6,32], grow:[70,45,60,40,50,50,50],
+      pt:{skin:'#eec6a0',hair:'wild',hc:'#c8c2b4',robe:'#b8b4a4',beard:'full',bc:'#c8c2b4',mouth:'grin'}},
+  yaksa:{name:'황약사', cls:'동사(東邪)', type:'내', range:[1,2], skills:['tanji'], guest:true,
+      base:[34,10,15,9,12,12,13,6,32], grow:[60,40,65,40,55,55,60],
+      pt:{skin:'#e8c0a0',hair:'topknot',hc:'#2b2119',robe:'#3a6b5a',beard:'goatee',bc:'#2b2119',mouth:'firm'}},
+  syn:{name:'소용녀', cls:'고묘파 전인', type:'경', range:[1], skills:['oknyeo'],
+      base:[30,8,12,6,10,14,13,6,28], grow:[60,35,60,30,55,65,65],
+      pt:{skin:'#f9e2c8',hair:'maiden',hc:'#1e1a16',robe:'#e8e4da',female:true,mouth:'firm'}},
   /* 적군 */
   dj:{name:'도적', cls:'초원의 낭인', type:'외', range:[1], skills:[],
       base:[18,6,2,3,1,5,4,5,10], grow:[],
@@ -274,7 +346,33 @@ const CHARS = {
   oyb:{name:'구양봉', cls:'서독(西毒)', type:'내', range:[1,2], skills:['habma'],
       base:[54,10,17,12,13,12,12,5,34], grow:[],
       pt:{skin:'#d8ac83',hair:'longwild',hc:'#8f8578',robe:'#2f4f4f',beard:'goatee',bc:'#8f8578',brow:'fierce',mouth:'frown'}},
+  /* ── 5~9장 확장 적군 ── */
+  imsu:{name:'이막수', cls:'적련선자', type:'경', range:[1,2], skills:['bingbaek'],
+      base:[46,12,13,9,10,13,12,6,30], grow:[],
+      pt:{skin:'#f2d0b0',hair:'bun',hc:'#241a12',robe:'#8a7a5a',female:true,brow:'fierce',mouth:'frown'}},
+  hnp:{name:'홍능파', cls:'이막수의 제자', type:'경', range:[1], skills:[],
+      base:[26,8,6,5,6,10,8,5,16], grow:[],
+      pt:{skin:'#edc8a5',hair:'bun',hc:'#2a1f16',robe:'#7a6a8a',female:true,mouth:'frown'}},
+  sap:{name:'사파 낭인', cls:'강호의 뜨내기', type:'외', range:[1], skills:[],
+      base:[24,8,3,5,3,7,5,5,10], grow:[],
+      pt:{skin:'#d9a678',hair:'band',hc:'#3a2e22',robe:'#5c5248',beard:'stub',bc:'#3a2e22',brow:'fierce',mouth:'frown'}},
+  grb:{name:'금륜법왕', cls:'몽골 제일국사', type:'내', range:[1,2], skills:['yongsang'],
+      base:[58,12,17,13,13,12,12,5,36], grow:[],
+      pt:{skin:'#d8a878',hair:'bald',hc:'#333',robe:'#a04a2a',brow:'fierce',mouth:'frown'}},
+  gwd:{name:'곽도', cls:'금륜법왕의 제자', type:'내', range:[1], skills:['chwihon'],
+      base:[32,9,11,7,8,10,9,5,22], grow:[],
+      pt:{skin:'#dcae86',hair:'band',hc:'#2e2620',robe:'#6a5a3a',mouth:'smirk'}},
+  mgb:{name:'몽골 병사', cls:'몽골 정예병', type:'외', range:[1], skills:[],
+      base:[27,9,4,7,4,7,5,5,10], grow:[],
+      pt:{skin:'#dcae86',hair:'helm',hc:'#4a443c',robe:'#5c5248',mouth:'frown'}},
+  mgs:{name:'몽골 궁수', cls:'초원의 명사수', type:'경', range:[2], skills:[],
+      base:[22,7,3,4,3,8,7,5,10], grow:[],
+      pt:{skin:'#dcae86',hair:'band',hc:'#3a2e22',robe:'#55604f',mouth:'frown'}},
 };
+
+/* ── 적측 인물 목록 (대화 화면 이름색 판정용) ── */
+const ENEMY_IDS = new Set(['mcp','jhp','dj','msa','gs','hth','yjs','yjo','plh','stc','ygang','sab','ogg','oyb',
+  'imsu','hnp','sap','grb','gwd','mgb','mgs']);
 
 /* ── 대화 헬퍼: [화자id|null, 좌우, 대사] ── */
 function D(s, side, t){ return {s:s, side:side, t:t}; }
@@ -463,15 +561,231 @@ const CHAPTERS = [
     D('gj','L','응! 나아가자, 용아. 협의 길이 닿는 곳까지—!'),
   ],
 },
+{
+  no:5, title:'제5장  도화도의 시험',
+  joins:[],
+  map:[
+    "wwwwwwwwwwwwww",
+    "wff........fww",
+    "w.f..ff..f...w",
+    "w..f....f...hw",
+    "w.ff..f...ff.w",
+    "w....f...f...w",
+    "wf..f..ff...fw",
+    "w..f......f..w",
+    "wwf...ff...fww",
+    "wwwwwwwwwwwwww",
+  ],
+  spawns:[[2,4],[1,5],[2,5],[1,4],[3,4],[2,3],[1,6],[3,5],[2,6],[1,7],[3,3],[2,7]],
+  enemies:[
+    {cid:'sab', x:8,  y:3}, {cid:'sab', x:9, y:5}, {cid:'sab', x:8, y:6}, {cid:'sab', x:10, y:4}, {cid:'sab', x:9, y:7},
+    {cid:'ogg', x:11, y:3, boss:true},
+  ],
+  win:{type:'boss', boss:'ogg', text:'구양극 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('망망대해 동쪽, 복사꽃이 만발한 신비의 섬 — 도화도(桃花島).'),
+    D('hy','L','아버지! 딸이 돌아왔어요! …그리고, 소개해 드릴 사람이 있어요.'),
+    D('yaksa','R','흥. 데려온 것이 이런 미련퉁이란 말이냐. 동사 황약사의 사위가 되려면, 시험을 통과해야 할 것이다.'),
+    D('ogg','R','하하, 장인어른 후보님. 백타산의 구양극도 청혼하러 왔습니다. 저 몽골 촌뜨기와 비교가 되겠습니까?'),
+    D('gj','L','곽정, 정식으로 청을 드립니다. 황 낭자와… 혼인하고 싶습니다!'),
+    D('hy','L','(얼굴을 붉히며) 오라버니도 참… 이럴 때만 빠르다니까.'),
+    D('yaksa','R','좋다. 두 구혼자가 무예로 겨뤄라. 복사숲 진법 안에서, 실력으로 증명해 보여라!'),
+    D('ogg','R','영사권법의 맛을 보여주지. 백타산의 사군(蛇軍)이여, 나서라!'),
+  ],
+  post:[
+    D('ogg','R','크윽… 이런 촌놈 따위에게…! 숙부님께 이 치욕, 반드시 갚아드리라 하겠다! (구양극은 배를 타고 물러갔다)'),
+    D('yaksa','R','…우직하나 근골이 비범하고, 일격에 혼신을 싣는구나. 흥. 아주 조금은 인정해 주마.'),
+    D('hy','L','아버지의 "조금"은 "많이"라는 뜻이에요. 후훗.'),
+    D('gj','L','…? 그런데 용아, 저쪽 동굴에서 이상한 소리가 들리네. 흐느끼는 것 같기도 하고, 웃는 것 같기도 하고…'),
+    N('동굴 속에는 십오 년째 갇혀 지내는 기인 — 노완동 주백통이 있었다.'),
+  ],
+},
+{
+  no:6, title:'제6장  노완동과 구음진경',
+  joins:['zbt'],
+  map:[
+    "wwwww....wwwww",
+    "www........www",
+    "w....ff......w",
+    "..f.......f...",
+    "......ff......",
+    "..ff.......f..",
+    ".....f....ff..",
+    "w.....hh.....w",
+    "www...hh...www",
+    "wwwww....wwwww",
+  ],
+  spawns:[[4,7],[5,7],[3,7],[8,7],[9,7],[4,8],[5,8],[8,8],[9,8],[6,7],[7,7],[3,8]],
+  enemies:[
+    {cid:'sab', x:5, y:1}, {cid:'sab', x:8, y:1}, {cid:'sab', x:4, y:2}, {cid:'sab', x:9, y:2},
+    {cid:'ogg', x:7, y:2},
+    {cid:'oyb', x:6, y:0, boss:true, wait:2},
+  ],
+  reinforce:[
+    {turn:3, msg:'백타산 증원대가 상륙했다!', units:[{cid:'sab',x:5,y:0},{cid:'sab',x:8,y:0}]},
+  ],
+  win:{type:'boss', boss:'oyb', text:'구양봉 격퇴'},
+  lose:'곽정이 쓰러지면 패배',
+  learn:[{cid:'gj', skill:'jwauhobak'}],
+  pre:[
+    D('zbt','L','심심해 죽겠던 참에 잘 왔다! 이봐 젊은이, 나랑 의형제 맺자! 너 권법 좀 치더구나?'),
+    D('gj','L','주… 주 형님? 아니, 어르신? 아무튼… 좋습니다, 형님!'),
+    D('zbt','L','으하하! 그럼 의제(義弟)에게 공명권이나 가르쳐 줄까. 그리고 이 구음진경(九陰眞經)이란 책 말인데—'),
+    D('hy','R','그 책 때문에 강호가 피로 물들었어요. 함부로 꺼내지 마세요, 노완동 할아버지.'),
+    N('그때 — 섬의 해안에 백타산의 배가 들이닥쳤다!'),
+    D('oyb','R','구음진경은 서독 구양봉이 가져가겠다. 조카의 혼사도 겸사겸사 매듭짓지.'),
+    D('zbt','L','어이쿠, 늙은 독사가 왔구나! 의제, 실전 수련이다! 좌우호박(左右互搏)을 보여주마!'),
+  ],
+  post:[
+    D('oyb','R','늙은 미치광이와 애송이 놈들이…! 좋다, 화산논검에서 진짜 승부를 내주마!'),
+    D('zbt','L','의제! 봤느냐, 왼손과 오른손이 따로 노는 좌우호박! 자, 약속대로 네게도 전수해 주마!'),
+    N('곽정은 좌우호박을 터득했다! (곽정에게 새 무공이 추가되었습니다)'),
+    D('hy','L','화산논검이 코앞이에요. 천하제일의 자리를 두고… 아버지도, 홍 사부님도 오시겠죠.'),
+    N('일행은 화산(華山)으로 향한다. 제이차 화산논검의 막이 오른다—'),
+  ],
+},
+{
+  no:7, title:'제7장  제이차 화산논검',
+  joins:['yaksa'],
+  map:[
+    "mmmm......mmmm",
+    "mm...mm....mmm",
+    "m...m...m....m",
+    "...m......m...",
+    ".m....mm....m.",
+    "...m......m...",
+    "m....m...m...m",
+    "mm..........mm",
+    "mmm...mm...mmm",
+    "mmmmm....mmmmm",
+  ],
+  spawns:[[5,9],[6,9],[7,9],[8,9],[3,8],[4,8],[5,8],[8,8],[9,8],[10,8],[4,7],[9,7]],
+  enemies:[
+    {cid:'sab', x:5, y:2}, {cid:'sab', x:9, y:2}, {cid:'sab', x:7, y:3},
+    {cid:'oyb', x:8, y:1, boss:true, boost:1.2},
+  ],
+  win:{type:'boss', boss:'oyb', text:'광인 구양봉 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('오악의 으뜸, 화산(華山). 천하제일 고수를 가리는 논검의 날이 밝았다.'),
+    D('yaksa','L','동사 황약사, 약속대로 왔다. …정 녀석. 내 딸을 울리면 이 섬주가 용서치 않을 것이야.'),
+    D('hcg','L','헐헐, 다들 모였구먼. 그런데 서독 저놈… 눈빛이 영 이상하구먼?'),
+    D('oyb','R','크크크… 나는 누구냐… 구양봉은 어디 있느냐! 천하제일은 나다! 전부 쓰러뜨려 주마!!'),
+    D('hy','L','가짜 구음진경을 역행 연공해서 주화입마에… 경맥이 뒤집혀 오히려 더 강해졌어요! 모두 조심하세요!'),
+    D('sb','L','광인이 된 절정고수라… 좋다. 전력으로 상대해 주지. 항룡이십팔장의 진수를 보여주마.'),
+    D('gj','L','갑니다! 이 한 판에 강호의 안녕이 걸렸습니다!'),
+  ],
+  post:[
+    D('oyb','R','나는… 나는 대체 누구란 말이냐…!! (구양봉은 통곡하며 안개 속으로 사라졌다)'),
+    D('yaksa','L','…광인이 되어서도 저 무위라니. 어쨌든 오늘의 논검, 최후까지 서 있던 것은 정 녀석이로군.'),
+    D('hcg','L','헐헐! 이 늙은 거지가 인정하마. 곽정, 네가 이번 화산논검의 주인공이다!'),
+    D('gj','L','아닙니다. 함께 싸워 준 모두의 승리입니다!'),
+    N('세월은 흘러, 강호에는 새로운 바람이 분다. — 신조협려(神鵰俠侶)의 시대.'),
+  ],
+},
+{
+  no:8, title:'제8장  고묘의 그림자',
+  joins:['syn'],
+  map:[
+    "##############",
+    "#.....##.....#",
+    "#.##......##.#",
+    "#....#..#....#",
+    "#.#........#.#",
+    "#.#..hh....#.#",
+    "#....#..#....#",
+    "#.##......##.#",
+    "#.....##.....#",
+    "##############",
+  ],
+  spawns:[[2,8],[3,8],[4,8],[5,8],[9,8],[10,8],[11,8],[5,7],[6,7],[8,7],[4,7],[9,7]],
+  enemies:[
+    {cid:'sap', x:3, y:3}, {cid:'sap', x:10, y:3}, {cid:'sap', x:6, y:4},
+    {cid:'hnp', x:7, y:2},
+    {cid:'imsu', x:9, y:1, boss:true, wait:2},
+  ],
+  reinforce:[
+    {turn:2, msg:'사파의 낭인들이 고묘로 몰려든다!', units:[{cid:'sap',x:2,y:1},{cid:'sap',x:11,y:1}]},
+  ],
+  win:{type:'boss', boss:'imsu', text:'이막수 격파'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('종남산 뒤편, 활사인묘(活死人墓). 세상을 등진 고묘파의 거처에 살기가 스며들었다.'),
+    D('yg','L','용아, 손님이 온 모양이오. 그것도 아주 무례한 손님이.'),
+    D('syn','L','…적련선자 이막수. 사저(師姐)가 고묘의 문을 부수고 들어올 줄이야.'),
+    D('imsu','R','묻겠다, 사매. 옥녀심경을 내놓아라. 그러면 목숨만은 붙여 주지.'),
+    D('imsu','R','문세간 정시하물(問世間 情是何物)… 사랑이 대체 무엇이길래, 이토록 사람을 미치게 하는가.'),
+    D('yg','L','당신의 한(恨)은 알겠소. 허나 고묘에는 손대게 두지 않아. — 모두, 갑시다!'),
+    D('gj','L','양 형제! 시공을 넘은 인연, 다시 한 번 힘을 합칩시다!'),
+    D('syn','L','…고마워요, 여러분. 옥녀검이 함께하겠어요. 아, 사저의 빙백은침은 맹독이니 부디 조심하세요.'),
+  ],
+  post:[
+    D('imsu','R','빙백은침이 통하지 않다니… 정(情)도 얻지 못하고, 경전도 얻지 못하고… 하하, 하하하… (이막수는 불진을 떨치며 사라졌다)'),
+    D('syn','L','과(過)… 그리고 여러분. 고묘를 지켜 주셔서 감사해요.'),
+    D('yg','L','용아, 이제 은거는 끝일지도 모르오. 몽골 대군이 남하한다는 소식이오.'),
+    D('gj','L','…양양(襄陽)이 위험하다. 백성들이 위험합니다. 갑시다, 모두!'),
+    N('협지대자, 위국위민(俠之大者 爲國爲民) — 일행은 양양성으로 달려간다.'),
+  ],
+},
+{
+  no:9, title:'제9장  양양 대회전',
+  joins:[],
+  map:[
+    "..............",
+    ".....ff.......",
+    "..f.......f...",
+    "..............",
+    "......rr......",
+    "......rr......",
+    "#####.rr.#####",
+    "....r.rr.r....",
+    "..hh..rr..hh..",
+    "....hhrrhh....",
+  ],
+  spawns:[[6,7],[7,7],[5,7],[8,7],[6,8],[7,8],[4,7],[9,7],[5,8],[8,8],[6,9],[7,9]],
+  enemies:[
+    {cid:'mgb', x:4, y:1}, {cid:'mgb', x:9, y:1}, {cid:'mgb', x:3, y:2}, {cid:'mgb', x:9, y:2},
+    {cid:'mgs', x:5, y:2}, {cid:'mgs', x:8, y:2},
+    {cid:'gwd', x:7, y:1},
+    {cid:'grb', x:6, y:0, boss:true, wait:3},
+  ],
+  reinforce:[
+    {turn:3, msg:'몽골군 제2진이 몰려온다!', units:[{cid:'mgb',x:1,y:0},{cid:'mgb',x:12,y:0},{cid:'mgs',x:5,y:0}]},
+    {turn:5, msg:'몽골군 제3진이 몰려온다!', units:[{cid:'mgb',x:2,y:0},{cid:'mgb',x:11,y:0},{cid:'mgs',x:8,y:0}]},
+  ],
+  win:{type:'survive', turns:8, boss:'grb', text:'8턴 방어 (금륜법왕 격파 시 즉시 승리)'},
+  lose:'곽정이 쓰러지면 패배',
+  pre:[
+    N('양양성(襄陽城). 몽골 대군이 성 아래 새까맣게 진을 쳤다.'),
+    D('gj','L','성이 있으면 사람이 살고, 성이 무너지면 나라가 무너진다. 이 곽정, 목숨으로 성을 지키겠다!'),
+    D('grb','R','몽골 제일국사, 금륜법왕이다. 남조의 협객들이여, 항복하라. 용상반야공 앞에 자비는 없다.'),
+    D('gwd','R','사부님, 제가 저들의 수급을 가져오겠습니다.'),
+    D('sb','L','…나는 거란인이오. 허나 무고한 백성을 짓밟는 전쟁은, 언제나 나의 적이었소.'),
+    D('yg','L','십육 년의 기다림도 지켜냈는데, 성 하나쯤 못 지키겠소? 후후.'),
+    D('hy','L','성문이 뚫리면 끝이에요! 여덟 턴만 버티면 원군이 도착해요. 모두, 위치로!'),
+  ],
+  post:[
+    D('grb','R','이럴 수가… 남조에 이런 고수들이 있었다니…! 전군, 퇴각하라!'),
+    N('몽골군의 첫 남침이 꺾였다. 양양성 위로 협(俠)의 깃발이 나부낀다.'),
+    D('gj','L','모두… 정말 고맙습니다. 협의 길에 끝은 없습니다. 백성이 있는 한, 우리는 싸울 것입니다.'),
+    D('hy','L','오라버니 곁에는 언제나 제가 있어요. 영원히.'),
+    D('sb','L','좋은 싸움이었다. 인연이 다하면 나는 내 시대로 돌아가야겠지… 잘 있게, 친구들.'),
+    D('yg','L','강호의 별들이 오늘 가장 밝게 빛났군. — 후일, 또 다른 이야기에서 만납시다.'),
+  ],
+},
 ];
 
 /* 엔딩 문구 */
 const ENDING = [
-  '— 데모판 여기까지 —',
-  '곽정과 황용의 이야기는 이제 막 시작되었습니다.',
+  '— 大團圓 · 전 9장 완결 —',
+  '사조영웅전: 강호의 별, 아홉 장의 여정을 모두 마치셨습니다!',
   '',
-  '다음 확장 예정: 도화도 · 우가촌 · 철장봉 · 화산논검,',
-  '그리고 신조협려 / 의천도룡기 / 천룡팔부 챕터…',
+  '곽정과 황용은 양양을 지키는 대협이 되었고,',
+  '양과와 소용녀는 강호 어딘가에서 신조와 함께 노닐며,',
+  '소봉의 호쾌한 웃음소리는 전설로 남았습니다.',
+  '',
+  '다음 확장 예정: 의천도룡기 편 · 천룡팔부 본편 · 영웅집결 무한 모드…',
   '',
   '플레이해 주셔서 감사합니다.',
 ];
@@ -702,6 +1016,7 @@ function unitSVG(u){
   const sc=(r-2)*2/100, ox=px-(r-2), oy=py-2-(r-2);
   s+=`<g clip-path="url(#clip-${u.uid})"><g transform="translate(${ox},${oy}) scale(${sc})"><rect width="100" height="100" fill="#4a4032"/><use href="#pt-${u.cid}"/></g></g>`;
   if(u.boss) s+=`<path d="M${px-7},${py-r-7} L${px-4},${py-r-2} L${px},${py-r-8} L${px+4},${py-r-2} L${px+7},${py-r-7} L${px+6},${py-r-1} L${px-6},${py-r-1} Z" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;
+  if(u.poison) s+=`<circle cx="${px-r+3}" cy="${py-r+5}" r="6.5" fill="#8a4ab0" stroke="#141008" stroke-width="1"/><text x="${px-r+3}" y="${py-r+8}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">독</text>`;
   s+=`<rect x="${px-hpw/2}" y="${py+r-8}" width="${hpw}" height="5" rx="2.5" fill="#141008" stroke="#000" stroke-width=".6"/>`;
   s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="3.4" rx="1.7" fill="${hpr>0.4?'#7ec860':'#e07a4a'}"/>`;
   const tb={'외':'#a05038','경':'#3e8a62','내':'#4a6aa0'}[u.type];
@@ -746,7 +1061,7 @@ function titleArtSVG(){
    전투 엔진
    ============================================================ */
 
-const G = { chapterIdx:0, roster:{}, party:[], snapshot:null };
+const G = { chapterIdx:0, roster:{}, party:[], snapshot:null, extraSkills:{}, deploy:null };
 let B = null; // 현재 전투 상태
 let uidSeq = 0;
 
@@ -768,18 +1083,20 @@ function initRosterChar(cid){
 /* ── 전투 유닛 생성 ── */
 function mkPlayerUnit(cid, x, y){
   const r=G.roster[cid], c=CHARS[cid];
+  const extra=(G.extraSkills&&G.extraSkills[cid]||[]).filter(s=>!c.skills.includes(s));
   return {uid:'u'+(uidSeq++), cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
-    skills:c.skills, healer:!!c.healer, leader:!!c.leader, team:'P',
+    skills:[...c.skills, ...extra], healer:!!c.healer, leader:!!c.leader, team:'P',
     x, y, stats:deepClone(r.stats), maxhp:r.stats.hp, hp:r.stats.hp,
-    maxki:r.stats.ki, ki:r.stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false};
+    maxki:r.stats.ki, ki:r.stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false, poison:0};
 }
 function mkEnemyUnit(def){
   const c=CHARS[def.cid], st=statObj(c.base);
+  if(def.boost) for(const k in st) st[k]=Math.round(st[k]*def.boost);
   return {uid:'u'+(uidSeq++), cid:def.cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
     skills:c.skills, healer:false, leader:false, team:'E',
     x:def.x, y:def.y, stats:st, maxhp:st.hp, hp:st.hp, maxki:st.ki, ki:st.ki,
     lvl:CHAPTERS[G.chapterIdx].no*3, exp:0, acted:false, alive:true,
-    boss:!!def.boss, wait:def.wait||0};
+    boss:!!def.boss, wait:def.wait||0, poison:0};
 }
 
 /* ── 그리드 헬퍼 ── */
@@ -877,11 +1194,20 @@ function rollLevel(u){
   return ups;
 }
 
+/* ── 상태이상: 중독 ── */
+function poisonTick(team){
+  for(const u of B.units.filter(u=>u.alive&&u.team===team&&u.poison>0)){
+    u.hp=Math.max(1,u.hp-2); u.poison--;
+    fx(u.x,u.y,'-2','miss');
+    log(`${u.name} — 중독 피해 2${u.poison?` (남은 ${u.poison}턴)`:' (해독됨)'}`);
+  }
+}
+
 /* ── 타격 1회 ── */
-async function strike(a,d,skillId){
+async function strike(a,d,skillId,followup){
   const c=calcStrike(a,d,skillId);
   const sk=skillId?SKILLS[skillId]:null;
-  if(sk){ a.ki-=sk.cost; fx(a.x,a.y,sk.name,'label'); await sleep(420); }
+  if(sk&&!followup){ a.ki-=sk.cost; fx(a.x,a.y,sk.name,'label'); await sleep(420); }
   const roll=Math.random()*100;
   document.getElementById('mapwrap').classList.add('shake');
   setTimeout(()=>{const m=document.getElementById('mapwrap'); if(m) m.classList.remove('shake');},380);
@@ -894,6 +1220,10 @@ async function strike(a,d,skillId){
     if(isCrit) log(`${a.name}의 <b>필살!</b> ${d.name}에게 ${dmg} 피해`);
     else log(`${a.name} → ${d.name} ${dmg} 피해`);
     grantExp(a, 8 + (sk?2:0));
+    if(sk&&sk.poison&&d.hp>0&&!d.poison){
+      d.poison=3; fx(d.x,d.y,'중독!','label');
+      log(`${d.name}이(가) <b>중독</b>되었다! (3턴간 지속 피해)`,true);
+    }
     if(d.hp<=0){
       d.alive=false;
       fx(d.x,d.y,'격파!','label');
@@ -916,8 +1246,13 @@ async function strike(a,d,skillId){
 async function combat(a,d,skillId){
   B.busy=true;
   const pre=calcStrike(a,d,skillId);
+  const skA=skillId?SKILLS[skillId]:null;
   await strike(a,d,skillId);
   if(checkEnd()) return;
+  if(skA&&skA.dbl&&a.alive&&d.alive){ /* 좌우호박: 무공 2연격 */
+    await strike(a,d,skillId,true);
+    if(checkEnd()) return;
+  }
   if(d.alive && canCounter(d,a)){
     await strike(d,a,null);
     if(checkEnd()) return;
@@ -934,9 +1269,9 @@ async function combat(a,d,skillId){
 }
 
 /* ── 치료 ── */
-async function healAction(a,t){
+async function healAction(a,t,skillId){
   B.busy=true;
-  const sk=SKILLS[a.skills[0]];
+  const sk=SKILLS[skillId||a.skills[0]];
   a.ki-=sk.cost;
   const amt=a.stats.int+sk.healPow;
   t.hp=Math.min(t.maxhp,t.hp+amt);
@@ -961,8 +1296,9 @@ function checkEnd(){
     return true;
   }
   let win=false;
-  if(ch.win.type==='rout') win = foes().length===0;
-  else win = !B.units.some(u=>u.team==='E'&&u.cid===ch.win.boss&&u.alive);
+  const pendingReinf=(ch.reinforce||[]).some((r,i)=>!(B.reinfDone||[]).includes(i));
+  if(ch.win.boss && !B.units.some(u=>u.team==='E'&&u.cid===ch.win.boss&&u.alive)) win=true;
+  if(!win && foes().length===0 && !pendingReinf) win=true;
   if(win){
     B.over=true; B.busy=true;
     setTimeout(()=>showVictory(),800);
@@ -1038,15 +1374,15 @@ function onTile(x,y){
     } else clearSel();
   }
   else if(B.mode==='target-attack'||B.mode==='target-skill'){
-    const skill=B.mode==='target-skill'?B.sel.skills[0]:null;
+    const skill=B.mode==='target-skill'?B.sel.skills[B.skillIdx]:null;
     if(u&&u.team==='E'&&B.targets.includes(u)) openForecast(B.sel,u,skill);
     else backToMenu();
   }
   else if(B.mode==='target-heal'){
     if(u&&u.team==='P'&&B.targets.includes(u)){
-      const a=B.sel;
+      const a=B.sel, sid=a.skills[B.skillIdx];
       hideMenu(); B.mode='idle';
-      healAction(a,u).then(()=>{ finishUnit(a); });
+      healAction(a,u,sid).then(()=>{ finishUnit(a); });
     } else backToMenu();
   }
   else if(B.mode==='menu'){ backToMenu(); }
@@ -1063,34 +1399,40 @@ function finishUnit(u){
 function openMenu(){
   const u=B.sel; hideMenu();
   const enemiesNear=foes().filter(e=>u.range.includes(dist(u,e)));
-  const sk=u.skills.length?SKILLS[u.skills[0]]:null;
   let html='';
   if(enemiesNear.length) html+=`<button class="btn" onclick="menuAct('attack')">공격</button>`;
-  if(sk&&!sk.heal&&u.ki>=sk.cost&&enemiesNear.length) html+=`<button class="btn" onclick="menuAct('skill')">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
-  if(sk&&sk.heal&&u.ki>=sk.cost){
-    const hurt=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp);
-    if(hurt.length) html+=`<button class="btn" onclick="menuAct('heal')">치료 <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
-  }
+  u.skills.forEach((sid,i)=>{
+    const sk=SKILLS[sid];
+    if(u.ki<sk.cost) return;
+    if(sk.heal){
+      const hurt=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp);
+      if(hurt.length) html+=`<button class="btn" onclick="menuAct('heal',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
+    }else if(enemiesNear.length){
+      html+=`<button class="btn" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
+    }
+  });
   html+=`<button class="btn" onclick="menuAct('wait')">대기</button>`;
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
   m.id='amenu'; m.innerHTML=html;
-  const wrap=document.getElementById('mapwrap');
-  let mx=(u.x+1)*TS+6, my=u.y*TS-10;
-  if(mx>B.w*TS-165) mx=u.x*TS-160;
-  my=Math.max(4,Math.min(my,B.h*TS-160));
+  const sizer=document.getElementById('mapsizer')||document.getElementById('mapwrap');
+  const sc=mapScale();
+  const menuW=165, menuH=60+u.skills.length*38+80;
+  let mx=((u.x+1)*TS+6)*sc, my=(u.y*TS-10)*sc;
+  if(mx>B.w*TS*sc-menuW) mx=Math.max(2,u.x*TS*sc-menuW);
+  my=Math.max(4,Math.min(my,Math.max(4,B.h*TS*sc-menuH)));
   m.style.left=mx+'px'; m.style.top=my+'px';
-  wrap.appendChild(m);
+  sizer.appendChild(m);
 }
 function hideMenu(){ const m=document.getElementById('amenu'); if(m) m.remove(); }
-function menuAct(act){
+function menuAct(act,idx){
   const u=B.sel;
   if(act==='cancel'){ clearSel(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
   hideMenu();
-  if(act==='attack'){ B.mode='target-attack'; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
-  if(act==='skill'){ B.mode='target-skill'; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
-  if(act==='heal'){ B.mode='target-heal'; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
+  if(act==='attack'){ B.mode='target-attack'; B.skillIdx=null; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
+  if(act==='skill'){ B.mode='target-skill'; B.skillIdx=idx; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
+  if(act==='heal'){ B.mode='target-heal'; B.skillIdx=idx; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
   renderBattle();
 }
 
@@ -1135,6 +1477,15 @@ function confirmAttack(){
 async function startPlayerPhase(first){
   if(B.over) return;
   if(!first) B.turn++;
+  const ch=CHAPTERS[G.chapterIdx];
+  /* 방어전: 규정 턴을 버티면 승리 */
+  if(ch.win.type==='survive' && B.turn>ch.win.turns){
+    B.over=true; B.busy=true;
+    renderBattle();
+    await banner('방어 성공!');
+    setTimeout(()=>showVictory(),500);
+    return;
+  }
   B.phase='P';
   for(const u of B.units.filter(u=>u.alive)) u.acted=false;
   for(const p of players()){
@@ -1146,6 +1497,7 @@ async function startPlayerPhase(first){
       fx(p.x,p.y,'+'+amt,'heal');
     }
   }
+  poisonTick('P');
   renderBattle();
   await banner(`아군 페이즈 — ${B.turn}턴`);
   B.busy=false;
@@ -1161,6 +1513,23 @@ async function enemyPhase(){
   B.phase='E'; B.busy=true;
   renderBattle();
   await banner('적군 페이즈',true);
+  /* 증원군 등장 */
+  const ch=CHAPTERS[G.chapterIdx];
+  if(ch.reinforce){
+    for(let i=0;i<ch.reinforce.length;i++){
+      const r=ch.reinforce[i];
+      if(B.reinfDone.includes(i)||B.turn<r.turn) continue;
+      B.reinfDone.push(i);
+      let n=0;
+      for(const d of r.units){ if(inb(d.x,d.y)&&!unitAt(d.x,d.y)){ B.units.push(mkEnemyUnit(d)); n++; } }
+      if(n){
+        renderBattle(true);
+        log(`<b>${r.msg||'적 증원 출현!'}</b> (${n}명)`,true);
+        await banner(r.msg||'적 증원 출현!',true);
+      }
+    }
+  }
+  poisonTick('E');
   for(const e of foes()) e.ki=Math.min(e.maxki,e.ki+4);
   const list=B.units.filter(u=>u.team==='E');
   for(const u of list){
@@ -1179,19 +1548,19 @@ async function enemyPhase(){
       for(const p of players()){
         const dd=Math.abs(p.x-x)+Math.abs(p.y-y);
         if(!u.range.includes(dd)) continue;
-        const useSkill=u.skills.length&&!SKILLS[u.skills[0]].heal&&u.ki>=SKILLS[u.skills[0]].cost;
-        const pv=calcStrike(u,p,useSkill?u.skills[0]:null);
+        const sid=u.skills.find(s=>!SKILLS[s].heal&&u.ki>=SKILLS[s].cost)||null;
+        const pv=calcStrike(u,p,sid);
         let score=pv.dmg*(pv.hit/100)+(pv.dmg>=p.hp?60:0)+TILE[tileChar(x,y)].avoid*0.2+(p.leader?6:0);
         if(p.range.includes(dd)){
           const c=calcStrike(p,u,null);
           score-=c.dmg*(c.hit/100)*0.5;
         }
-        if(!best||score>best.score) best={x,y,p,score,useSkill};
+        if(!best||score>best.score) best={x,y,p,score,sid};
       }
     }
     if(best){
       if(best.x!==u.x||best.y!==u.y){ u.x=best.x; u.y=best.y; renderBattle(true); await sleep(300); }
-      await combat(u,best.p,best.useSkill?u.skills[0]:null);
+      await combat(u,best.p,best.sid);
       if(B.over) return;
     }else{
       let tgt=null;
@@ -1223,13 +1592,13 @@ function startBattle(){
     map, w:14, h:map.length,
     units:[], turn:1, phase:'P', mode:'idle',
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
-    busy:true, over:false, log:[], pending:null,
+    busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
   };
-  G.party.forEach((cid,i)=>{
-    if(i<ch.spawns.length){
-      const [x,y]=ch.spawns[i];
-      B.units.push(mkPlayerUnit(cid,x,y));
-    }
+  const cap=Math.min(ch.spawns.length,12);
+  const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
+  lineup.forEach((cid,i)=>{
+    const [x,y]=ch.spawns[i];
+    B.units.push(mkPlayerUnit(cid,x,y));
   });
   for(const def of ch.enemies) B.units.push(mkEnemyUnit(def));
   renderScreenBattle();
@@ -1240,14 +1609,57 @@ function startBattle(){
    렌더링 · 화면 흐름
    ============================================================ */
 
+/* ── 맵 스케일링 (모바일 자동 맞춤) ── */
+let MAPZOOM=0;      // 0=자동 맞춤, 1.5/2 = 확대 배율
+let CURSCALE=1;     // 현재 적용 스케일
+function mapScale(){ return CURSCALE; }
+function fitMap(){
+  if(!B) return;
+  const wrap=document.getElementById('mapwrap'), sizer=document.getElementById('mapsizer');
+  if(!wrap||!sizer) return;
+  const mw=B.w*TS, mh=B.h*TS;
+  const appEl=document.getElementById('app');
+  const avail=Math.max(260,(appEl?appEl.clientWidth:window.innerWidth)-4);
+  const fit=Math.min(1, avail/mw);
+  let sc = MAPZOOM===0 ? fit : Math.min(2, fit*MAPZOOM);
+  CURSCALE=sc;
+  wrap.style.transform=`scale(${sc})`;
+  sizer.style.width=(mw*sc)+'px';
+  sizer.style.height=(mh*sc)+'px';
+}
+function cycleZoom(){
+  MAPZOOM = MAPZOOM===0 ? 1.5 : (MAPZOOM===1.5 ? 2 : 0);
+  const z=document.getElementById('tb-zoom');
+  if(z) z.textContent = MAPZOOM===0 ? '자동' : ('×'+MAPZOOM);
+  fitMap();
+}
+function uiCancel(){
+  if(!B||B.busy) return;
+  if(B.mode!=='idle') clearSel();
+  else if(B.inspect){ B.inspect=null; B.mr=null; renderBattle(); }
+}
+window.addEventListener('resize',()=>{ if(B) fitMap(); });
+
 /* ── 전투 화면 골격 ── */
 function renderScreenBattle(){
+  const mw=14*TS, mh=CHAPTERS[G.chapterIdx].map.length*TS;
   app().innerHTML=`
   <div id="battle">
-    <div id="mapwrap" style="width:${14*TS}px;height:${CHAPTERS[G.chapterIdx].map.length*TS}px">
-      <svg id="mapsvg" width="${14*TS}" height="${CHAPTERS[G.chapterIdx].map.length*TS}"></svg>
-      <div id="fx"></div>
-      <div id="banner"></div>
+    <div id="mapcol">
+      <div id="topbar">
+        <span id="tb-info"></span>
+        <span style="flex:1"></span>
+        <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
+        <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
+        <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
+      </div>
+      <div id="mapscroll"><div id="mapsizer">
+        <div id="mapwrap" style="width:${mw}px;height:${mh}px">
+          <svg id="mapsvg" width="${mw}" height="${mh}"></svg>
+          <div id="fx"></div>
+          <div id="banner"></div>
+        </div>
+      </div></div>
     </div>
     <div id="side"></div>
   </div>`;
@@ -1256,14 +1668,14 @@ function renderScreenBattle(){
     if(e.target.closest('#amenu')) return;
     const svg=document.getElementById('mapsvg');
     const r=svg.getBoundingClientRect();
-    const x=Math.floor((e.clientX-r.left)/TS), y=Math.floor((e.clientY-r.top)/TS);
+    const x=Math.floor((e.clientX-r.left)/r.width*B.w), y=Math.floor((e.clientY-r.top)/r.height*B.h);
     if(inb(x,y)) onTile(x,y);
   });
   wrap.addEventListener('contextmenu',e=>{
     e.preventDefault();
-    if(!B.busy&&B.mode!=='idle'){ if(B.mode==='menu'||B.mode.startsWith('target')) clearSel(); else clearSel(); }
-    else if(B.inspect){ B.inspect=null; B.mr=null; renderBattle(); }
+    uiCancel();
   });
+  fitMap();
   renderBattle();
 }
 
@@ -1316,14 +1728,13 @@ function renderSide(){
   const u=B.sel||B.inspect||(B.tileSel?unitAt(B.tileSel.x,B.tileSel.y):null);
   let card='<div style="color:var(--dim);padding:14px 4px;text-align:center;">유닛을 선택하세요</div>';
   if(u){
-    const sk=u.skills.length?SKILLS[u.skills[0]]:null;
     const hpPct=Math.round(u.hp/u.maxhp*100), kiPct=Math.round(u.ki/u.maxki*100);
     card=`
     <div class="uc-head">
       <div class="uc-pt ${u.team==='E'?'enemy':''}">${ptSVG(u.cid)}</div>
       <div style="flex:1">
         <div class="uc-name">${u.name}${u.boss?' ★':''}<span class="typebadge type-${u.type}">${TYPE_NAME[u.type]}</span></div>
-        <div class="uc-sub">${u.cls} · Lv.${u.lvl}${u.team==='P'?` · EXP ${u.exp}`:''}</div>
+        <div class="uc-sub">${u.cls} · Lv.${u.lvl}${u.team==='P'?` · EXP ${u.exp}`:''}${u.poison?` · <span style="color:#c07ae0">☠ 중독 ${u.poison}턴</span>`:''}</div>
         <div class="bar hp ${hpPct<=35?'low':''}"><i style="width:${hpPct}%"></i></div>
         <div class="uc-sub" style="display:flex;justify-content:space-between"><span>HP ${u.hp}/${u.maxhp}</span><span>기 ${u.ki}/${u.maxki}</span></div>
         <div class="bar ki"><i style="width:${kiPct}%"></i></div>
@@ -1334,19 +1745,21 @@ function renderSide(){
       ${statRow('방어',u.stats.def)}${statRow('정신',u.stats.res)}${statRow('속도',u.stats.spd)}
       ${statRow('이동',u.stats.mov)}${statRow('사거리',u.range.join('·'))}<div></div>
     </div>
-    ${sk?`<div class="uc-skill">◆ ${sk.name} — ${sk.desc} (기 ${sk.cost})</div>`:''}`;
+    ${u.skills.map(sid=>{const sk=SKILLS[sid];return `<div class="uc-skill">◆ ${sk.name} — ${sk.desc} (기 ${sk.cost})</div>`;}).join('')}`;
   }
   let terr='';
   if(B.tileSel){
     const T=TILE[tileChar(B.tileSel.x,B.tileSel.y)];
     terr=`지형: <b>${T.name}</b> — 회피 +${T.avoid} · 방어 +${T.def}${T.heal?' · 매턴 HP 회복':''}`;
   }
+  const surviveTxt = ch.win.type==='survive' ? `<div class="row"><span>남은 방어</span><b>${Math.max(0,ch.win.turns-B.turn+1)}턴</b></div>` : '';
   side.innerHTML=`
   <div class="panel" id="chinfo">
     <div class="ch-t">${ch.title}</div>
     <div class="row"><span>턴</span><b>${B.turn}</b></div>
     <div class="row"><span>페이즈</span><b>${B.phase==='P'?'아군':'적군'}</b></div>
     <div class="row"><span>승리</span><b>${ch.win.text}</b></div>
+    ${surviveTxt}
     <div class="row"><span>패배</span><b>${ch.lose}</b></div>
     <div class="row"><span>병력</span><b>아군 ${players().length} · 적 ${foes().length}</b></div>
   </div>
@@ -1358,6 +1771,11 @@ function renderSide(){
     <button class="btn small danger" onclick="confirmToTitle()">타이틀로</button>
   </div>
   <div class="panel"><div id="log">${B.log.map(l=>`<div class="${l.imp?'imp':''}">${l.msg}</div>`).join('')}</div></div>`;
+  /* 상단 바 갱신 */
+  const tbi=document.getElementById('tb-info');
+  if(tbi) tbi.innerHTML=`${B.turn}턴 · ${B.phase==='P'?'아군':'<span style="color:#e09080">적군</span>'} 페이즈 · 적 ${foes().length}`;
+  const te=document.getElementById('tb-end'); if(te) te.disabled=(B.phase!=='P'||B.busy);
+  const tc=document.getElementById('tb-cancel'); if(tc) tc.disabled=(B.mode==='idle'&&!B.inspect);
 }
 
 /* ── 대화 화면 ── */
@@ -1407,7 +1825,7 @@ function showDlgLine(){
     textEl.innerHTML=`<i style="color:#cfc2a8">${L.t}</i>`;
   }else{
     const c=CHARS[L.s];
-    const isEnemy=['mcp','jhp','dj','msa','gs','hth','yjs','yjo','plh','stc','ygang','sab','ogg','oyb'].includes(L.s);
+    const isEnemy=ENEMY_IDS.has(L.s);
     nameEl.textContent=c.name+' 「'+c.cls+'」'; nameEl.className=isEnemy?'enemy':'';
     textEl.textContent=L.t;
     if(L.side==='L'){ DLG.lastL=L.s; } else { DLG.lastR=L.s; }
@@ -1421,9 +1839,47 @@ function startChapter(idx, skipPre){
   G.chapterIdx=idx;
   const ch=CHAPTERS[idx];
   for(const cid of ch.joins) initRosterChar(cid);
-  G.snapshot=deepClone({roster:G.roster, party:G.party});
-  if(skipPre) startBattle();
-  else showDialogue(ch.pre, startBattle, ch.title);
+  G.snapshot=deepClone({roster:G.roster, party:G.party, extra:G.extraSkills});
+  const go=()=>{ if(idx===0) startBattle(); else showDeploy(); };
+  if(skipPre) go();
+  else showDialogue(ch.pre, go, ch.title);
+}
+
+/* ── 출전 준비 화면 ── */
+function showDeploy(){
+  const ch=CHAPTERS[G.chapterIdx];
+  const cap=Math.min(ch.spawns.length,12);
+  if(!G.deploy) G.deploy=[];
+  G.deploy=G.deploy.filter(cid=>G.party.includes(cid));
+  for(const cid of G.party){ if(G.deploy.length<cap&&!G.deploy.includes(cid)) G.deploy.push(cid); }
+  const leader=G.party.find(cid=>CHARS[cid].leader);
+  if(leader&&!G.deploy.includes(leader)){ G.deploy.unshift(leader); G.deploy=G.deploy.slice(0,cap); }
+  renderDeploy(cap);
+}
+function renderDeploy(cap){
+  const ch=CHAPTERS[G.chapterIdx];
+  app().innerHTML=`<div id="deploy">
+    <h2>${ch.title} — 출전 준비</h2>
+    <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명) · ★곽정은 반드시 출전 · 승리 조건: ${ch.win.text}</div>
+    <div class="dep-grid">${G.party.map(cid=>{
+      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader;
+      return `<div class="dep-card ${on?'on':'off'} ${lock?'lock':''}" onclick="toggleDeploy('${cid}',${cap})">
+        <div class="pt">${ptSVG(cid)}</div>
+        <div class="dep-name">${c.name}${lock?' ★':''}</div>
+        <div class="dep-info">Lv.${r.lvl} · ${TYPE_NAME[c.type]}</div>
+      </div>`;}).join('')}</div>
+    <div style="text-align:center">
+      <button class="btn" onclick="startBattle()">출 전 !</button>
+      <button class="btn small" style="margin-left:8px" onclick="showHelp()">도움말</button>
+    </div>
+  </div>`;
+}
+function toggleDeploy(cid,cap){
+  if(CHARS[cid].leader) return;
+  const i=G.deploy.indexOf(cid);
+  if(i>=0) G.deploy.splice(i,1);
+  else{ if(G.deploy.length>=cap) return; G.deploy.push(cid); }
+  renderDeploy(cap);
 }
 function applyRoster(){
   for(const u of B.units.filter(u=>u.team==='P')){
@@ -1434,11 +1890,22 @@ function applyRoster(){
 function showVictory(){
   const ch=CHAPTERS[G.chapterIdx];
   applyRoster();
+  /* 무공 습득 */
+  let learnMsg='';
+  if(ch.learn){
+    for(const l of ch.learn){
+      G.extraSkills[l.cid]=G.extraSkills[l.cid]||[];
+      if(!G.extraSkills[l.cid].includes(l.skill)&&!CHARS[l.cid].skills.includes(l.skill)){
+        G.extraSkills[l.cid].push(l.skill);
+        learnMsg+=`<br><b style="color:var(--gold2)">${CHARS[l.cid].name}</b>이(가) 신규 무공 <b style="color:var(--gold2)">${SKILLS[l.skill].name}</b>을(를) 익혔다!`;
+      }
+    }
+  }
   const next=G.chapterIdx+1;
   saveGame(next);
   app().innerHTML=`<div class="result-screen">
     <h2 style="color:#ffd94a">勝 利</h2>
-    <p>${ch.title} — 클리어!<br>부상당한 동료들도 무사히 회복했습니다.</p>
+    <p>${ch.title} — 클리어!${learnMsg}<br>부상당한 동료들도 무사히 회복했습니다.</p>
     <button class="btn" onclick="afterVictory(${next})">계속</button>
   </div>`;
 }
@@ -1459,7 +1926,7 @@ function showDefeat(){
 }
 function retryChapter(){
   const s=deepClone(G.snapshot);
-  G.roster=s.roster; G.party=s.party;
+  G.roster=s.roster; G.party=s.party; G.extraSkills=s.extra||{};
   startChapter(G.chapterIdx, true);
 }
 function showEnding(){
@@ -1474,7 +1941,9 @@ function showEnding(){
 const SAVE_KEY='kimyong_srpg_save_v1';
 function saveGame(nextCh){
   try{
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ch:nextCh, roster:G.roster, party:G.party}));
+    const prev=loadGame();
+    const ch=Math.max(nextCh, prev?(prev.ch||0):0); /* 회상 재도전 시 진행도 후퇴 방지 */
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ch, roster:G.roster, party:G.party, extra:G.extraSkills, deploy:G.deploy}));
   }catch(e){}
 }
 function loadGame(){
@@ -1483,12 +1952,35 @@ function loadGame(){
     return s?JSON.parse(s):null;
   }catch(e){ return null; }
 }
+function loadState(s){
+  G.roster=s.roster; G.party=s.party;
+  G.extraSkills=s.extra||{}; G.deploy=s.deploy||null;
+}
 function continueGame(){
   const s=loadGame();
   if(!s) return;
-  if(s.ch>=CHAPTERS.length){ toTitle(); return; }
-  G.roster=s.roster; G.party=s.party;
+  loadState(s);
+  if(s.ch>=CHAPTERS.length){ showChapterSelect(); return; }
   startChapter(s.ch);
+}
+
+/* ── 장 선택 (회상 모드) ── */
+function showChapterSelect(){
+  const s=loadGame(); if(!s) return;
+  const maxCh=Math.min(s.ch, CHAPTERS.length-1);
+  const html=`<div class="modal-back" id="cs-modal" onclick="if(event.target===this)this.remove()">
+    <div class="modal"><h3>장 선택 (회상)</h3>
+    <p style="font-size:13px;color:var(--dim);margin-bottom:8px">도달한 장까지, 현재 육성 상태 그대로 다시 도전할 수 있습니다.</p>
+    ${CHAPTERS.map((c,i)=>`<div style="margin:4px 0"><button class="btn small" style="width:100%;text-align:left" ${i<=maxCh?'':'disabled'} onclick="jumpChapter(${i})">${c.title}${i<=maxCh?'':' 🔒'}</button></div>`).join('')}
+    <div class="btnrow"><button class="btn" onclick="document.getElementById('cs-modal').remove()">닫기</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function jumpChapter(i){
+  const m=document.getElementById('cs-modal'); if(m) m.remove();
+  const s=loadGame(); if(!s) return;
+  loadState(s);
+  startChapter(i);
 }
 
 /* ── 타이틀 ── */
@@ -1503,16 +1995,18 @@ function showTitle(){
     <div class="title-menu">
       <div><button class="btn" onclick="newGame()">새로운 협객행 (새 게임)</button></div>
       <div><button class="btn" onclick="continueGame()" ${hasSave?'':'disabled'}>이어하기</button></div>
+      <div><button class="btn" onclick="showChapterSelect()" ${hasSave?'':'disabled'}>장 선택 (회상)</button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
     </div>
     <div class="title-note">
       본 게임은 AI(Claude)가 제작한 김용(金庸) 원작 팬메이드 데모입니다.<br>
-      데모 범위: 사조영웅전 4개 챕터 + 크로스오버 게스트(천룡팔부·신조협려) 참전
+      전 9장: 사조영웅전 → 도화도 → 화산논검 → 신조협려 · 크로스오버 게스트(천룡팔부) 참전<br>
+      PC · 모바일(터치) 지원 — 진행 상황은 챕터 클리어 시 자동 저장
     </div>
   </div>`;
 }
 function newGame(){
-  G.chapterIdx=0; G.roster={}; G.party=[];
+  G.chapterIdx=0; G.roster={}; G.party=[]; G.extraSkills={}; G.deploy=null;
   startChapter(0);
 }
 
@@ -1541,10 +2035,14 @@ function showHelp(){
       </table>
       <p style="font-size:13.5px;line-height:1.8;color:var(--dim)">
       ◆ <b style="color:var(--text)">경공</b> 유닛은 험지(숲/산) 이동비용 -1<br>
-      ◆ <b style="color:var(--text)">무공(스킬)</b>은 기(氣)를 소모하며, 기는 매턴 4씩 회복<br>
-      ◆ 속도가 4 이상 높으면 <b style="color:var(--text)">2회 공격</b> (무공 사용 시 제외)<br>
+      ◆ <b style="color:var(--text)">무공(스킬)</b>은 기(氣)를 소모하며, 기는 매턴 4씩 회복 — 무공을 여러 개 익힌 협객은 골라 쓸 수 있습니다<br>
+      ◆ 속도가 4 이상 높으면 <b style="color:var(--text)">2회 공격</b> (무공 사용 시 제외) · <b style="color:var(--text)">좌우호박</b>은 무공 자체가 2연격<br>
+      ◆ <b style="color:#c07ae0">중독</b>되면 3턴간 매턴 피해 (빙백은침 등)<br>
+      ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
+      ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
       ◆ 쓰러진 아군은 <b style="color:var(--text)">부상 이탈</b> — 다음 챕터에 복귀 (곽정이 쓰러지면 패배)<br>
-      ◆ 진행 상황은 챕터 클리어 시 자동 저장</p>
+      ◆ <b style="color:var(--text)">모바일</b>: 유닛·타일을 탭해서 조작, 상단 <b style="color:var(--text)">취소</b> 버튼 = 우클릭, <b style="color:var(--text)">배율</b> 버튼으로 맵 확대<br>
+      ◆ 진행 상황은 챕터 클리어 시 자동 저장 · 타이틀의 <b style="color:var(--text)">장 선택</b>에서 회상 재도전 가능</p>
       <div class="btnrow"><button class="btn" onclick="document.getElementById('help-modal').remove()">닫기</button></div>
     </div>
   </div>`;
