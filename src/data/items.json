@@ -117,5 +117,20 @@
   "kind": "key",
   "price": 2000,
   "desc": "검총에 남겨진 검도의 깨달음. 양과 승급 재료"
+ },
+ "geongonbi": {
+  "name": "건곤비급",
+  "kind": "key",
+  "price": 2000,
+  "desc": "건곤대나이 심법의 요결. 장무기 승급 재료"
+ },
+ "uicheongeom": {
+  "name": "의천검",
+  "kind": "weapon",
+  "price": 3600,
+  "atk": 5,
+  "hit": 8,
+  "crit": 8,
+  "desc": "천하를 호령하는 보검. 공격 +5 · 명중 +8 · 필살 +8"
  }
 }

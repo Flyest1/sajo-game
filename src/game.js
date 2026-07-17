@@ -4,6 +4,7 @@ import ITEMS from './data/items.json';
 import HWASAN from './data/stages_hwasan.json';
 import SAJO from './data/stages_sajo.json';
 import SINJO from './data/stages_sinjo.json';
+import UICHEON from './data/stages_uicheon.json';
 
 /* ============================================================
    전투 엔진
@@ -1205,7 +1206,7 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, hwasan: HWASAN };
+const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, hwasan: HWASAN };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
@@ -1319,9 +1320,12 @@ function v2AfterBattle(){
 }
 function v2Advance(n){
   let nx=n?n.next:null;
-  if(nx&&typeof nx==='object'&&nx.cond){ /* 플래그 조건 분기 */
+  if(nx&&typeof nx==='object'&&nx.cond){ /* 플래그 조건/비교 분기 */
     let to=nx.else;
-    for(const c of nx.cond){ if(V2.flags[c.if]){ to=c.to; break; } }
+    for(const c of nx.cond){
+      if(c.gte){ if((V2.flags[c.gte[0]]||0)>=(V2.flags[c.gte[1]]||0)){ to=c.to; break; } }
+      else if(c.if&&V2.flags[c.if]){ to=c.to; break; }
+    }
     nx=to;
   }
   if(!nx){ toTitle(); return; }
@@ -1340,6 +1344,7 @@ function showChoiceNode(n){
 function pickChoice(i){
   const n=curNode(), o=n.options[i];
   if(o.set) Object.assign(V2.flags,o.set);
+  if(o.add) for(const k in o.add) V2.flags[k]=(V2.flags[k]||0)+o.add[k];
   if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
   V2.stageId=o.to; v2Save(); v2Enter();
 }
@@ -1537,9 +1542,9 @@ function showCampaignSelect(){
     <h2>신규 캠페인 (베타)</h2>
     <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
     ${campCard('sajo','제1권')}
-    ${campCard('sinjo','제2권 · NEW')}
+    ${campCard('sinjo','제2권')}
+    ${campCard('uicheon','제3권 · NEW')}
     ${campCard('hwasan','외전 파일럿')}
-    <div class="camp-card lock"><h3>제3권 의천도룡기</h3><p>신조에서 이어지는 연속 캠페인 — 제작 예정 (R4)</p></div>
     <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;

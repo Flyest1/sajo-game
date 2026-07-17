@@ -41,8 +41,9 @@ for (const id in CHARS) CHARS[id].skills.forEach(s => { if (!SKILLS[s]) errs.pus
 const HWASAN = J('stages_hwasan.json');
 const SAJO = J('stages_sajo.json');
 const SINJO = J('stages_sinjo.json');
+const UICHEON = J('stages_uicheon.json');
 const ITEMS = J('items.json');
-for (const CAMP of [HWASAN, SAJO, SINJO]) {
+for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON]) {
   const S = CAMP.stages;
   const CID = CAMP.id;
   if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);
@@ -52,6 +53,7 @@ for (const CAMP of [HWASAN, SAJO, SINJO]) {
     const targets = [];
     if (typeof n.next === 'string') targets.push(n.next);
     if (n.next && typeof n.next === 'object' && n.next.cond) { n.next.cond.forEach(c => targets.push(c.to)); targets.push(n.next.else); }
+    (n.rewardItems || []).forEach(ri => { if (!ITEMS[ri]) errs.push(`${tag} rewardItem unknown ${ri}`); });
     if (n.options) n.options.forEach(o => targets.push(o.to));
     (n.joins || []).forEach(j => { if (!CHARS[j]) errs.push(`${tag} joins unknown ${j}`); });
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });

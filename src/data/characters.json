@@ -676,6 +676,20 @@
    "hc": "#241c14",
    "robe": "#7d4a3a",
    "mouth": "firm"
+  },
+  "promo": {
+   "lvl": 8,
+   "item": "geongonbi",
+   "cls": "명교 교주",
+   "bonus": {
+    "hp": 5,
+    "str": 1,
+    "int": 3,
+    "def": 1,
+    "res": 2,
+    "skl": 1
+   },
+   "skill": "geongon"
   }
  },
  "jomin": {
@@ -2615,6 +2629,269 @@
    "robe": "#6b6257",
    "brow": "fierce",
    "mouth": "firm"
+  }
+ },
+ "jjy": {
+  "name": "주지약",
+  "cls": "아미의 신성",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "emei"
+  ],
+  "base": [
+   27,
+   7,
+   10,
+   5,
+   8,
+   12,
+   11,
+   6,
+   24
+  ],
+  "grow": [
+   55,
+   35,
+   55,
+   30,
+   50,
+   60,
+   60
+  ],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "bun",
+   "hc": "#241a12",
+   "robe": "#d8d3c0",
+   "female": true,
+   "mouth": "firm"
+  }
+ },
+ "sason": {
+  "name": "사손",
+  "cls": "금모사왕",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "sajahu"
+  ],
+  "base": [
+   40,
+   13,
+   8,
+   10,
+   8,
+   10,
+   10,
+   5,
+   28
+  ],
+  "grow": [
+   60,
+   50,
+   35,
+   45,
+   40,
+   40,
+   45
+  ],
+  "pt": {
+   "skin": "#d8a878",
+   "hair": "longwild",
+   "hc": "#c9a227",
+   "robe": "#6b5a4a",
+   "beard": "full",
+   "bc": "#c9a227",
+   "brow": "fierce",
+   "extra": "blindfold",
+   "mouth": "firm"
+  }
+ },
+ "geumhwa": {
+  "name": "금화파파",
+  "cls": "자삼용왕",
+  "type": "경",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "bido"
+  ],
+  "base": [
+   40,
+   10,
+   12,
+   8,
+   10,
+   12,
+   11,
+   5,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e8c4a8",
+   "hair": "bun",
+   "hc": "#8f8578",
+   "robe": "#7a5a7a",
+   "female": true,
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "psa": {
+  "name": "페르시아 사자",
+  "cls": "서역 명교 무사",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   7,
+   9,
+   5,
+   7,
+   9,
+   7,
+   5,
+   14
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#cf9e70",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#8b3a3a",
+   "beard": "stub",
+   "bc": "#2e2620",
+   "mouth": "frown"
+  }
+ },
+ "mgyo": {
+  "name": "명교 교도",
+  "cls": "광명정 수비대",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   9,
+   4,
+   6,
+   4,
+   8,
+   6,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#33281d",
+   "robe": "#8a3a2e",
+   "mouth": "frown"
+  }
+ },
+ "myeoljeol": {
+  "name": "멸절사태",
+  "cls": "아미 장문",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "wolnyeo"
+  ],
+  "base": [
+   44,
+   12,
+   9,
+   9,
+   9,
+   12,
+   11,
+   5,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e8c4a0",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#d8d3c0",
+   "female": true,
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "jchsan": {
+  "name": "장취산",
+  "cls": "무당오협",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   30,
+   9,
+   7,
+   7,
+   6,
+   9,
+   9,
+   5,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#eab88f",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#4f6d7a",
+   "mouth": "firm"
+  }
+ },
+ "unss": {
+  "name": "은소소",
+  "cls": "천응교의 딸",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "npc": true,
+  "base": [
+   26,
+   7,
+   8,
+   5,
+   7,
+   10,
+   9,
+   6,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "maiden",
+   "hc": "#241a12",
+   "robe": "#5c4a6a",
+   "female": true,
+   "mouth": "smile"
   }
  }
 }
