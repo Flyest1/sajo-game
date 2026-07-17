@@ -36,6 +36,58 @@ CHAPTERS.forEach((ch, ci) => {
 });
 for (const id in CHARS) CHARS[id].skills.forEach(s => { if (!SKILLS[s]) errs.push(`char ${id}: unknown skill ${s}`); });
 
+
+/* ── v2 캠페인 그래프 검증 ── */
+const HWASAN = J('stages_hwasan.json');
+const ITEMS = J('items.json');
+{
+  const S = HWASAN.stages;
+  if (!S[HWASAN.start]) errs.push('hwasan: start 노드 없음');
+  for (const id of HWASAN.order) if (!S[id]) errs.push(`hwasan order: 미정의 노드 ${id}`);
+  for (const id in S) {
+    const n = S[id], tag = `hwasan/${id}`;
+    const targets = [];
+    if (typeof n.next === 'string') targets.push(n.next);
+    if (n.options) n.options.forEach(o => targets.push(o.to));
+    targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
+    if (n.kind === 'battle') {
+      if (n.map.length !== 10) errs.push(`${tag}: map rows=${n.map.length}`);
+      n.map.forEach((row, y) => {
+        if (row.length !== 14) errs.push(`${tag} row${y}: len=${row.length}`);
+        for (const c of row) if (!TILE[c]) errs.push(`${tag} row${y}: unknown tile '${c}'`);
+      });
+      const blocked = (x, y) => { const t = n.map[y] && n.map[y][x]; return !t || TILE[t].cost >= 99; };
+      const occ = new Set();
+      n.spawns.forEach(([x, y], i) => {
+        if (blocked(x, y)) errs.push(`${tag} spawn${i} (${x},${y}) blocked`);
+        const k = x + ',' + y; if (occ.has(k)) errs.push(`${tag} dup spawn ${k}`); occ.add(k);
+      });
+      n.enemies.forEach(e => {
+        if (!CHARS[e.cid]) errs.push(`${tag}: unknown cid ${e.cid}`);
+        if (blocked(e.x, e.y)) errs.push(`${tag} enemy ${e.cid} (${e.x},${e.y}) blocked`);
+        const k = e.x + ',' + e.y; if (occ.has(k)) errs.push(`${tag} enemy overlaps ${k}`); occ.add(k);
+      });
+      (n.reinforce || []).forEach(r => r.units.forEach(u => {
+        if (!CHARS[u.cid]) errs.push(`${tag} reinf unknown ${u.cid}`);
+        if (blocked(u.x, u.y)) errs.push(`${tag} reinf blocked (${u.x},${u.y})`);
+      }));
+      (n.treasures || []).forEach(t => {
+        if (blocked(t.x, t.y)) errs.push(`${tag} treasure blocked (${t.x},${t.y})`);
+        if (t.item && !ITEMS[t.item]) errs.push(`${tag} treasure unknown item ${t.item}`);
+      });
+      if (n.win.boss && !n.enemies.some(e => e.cid === n.win.boss)) errs.push(`${tag} boss ${n.win.boss} not on map`);
+      if (n.deploy && n.deploy.forced) n.deploy.forced.forEach(c => { if (!CHARS[c]) errs.push(`${tag} forced unknown ${c}`); });
+      [...(n.pre || []), ...(n.post || [])].forEach((d, i) => { if (d.s && !CHARS[d.s]) errs.push(`${tag} dlg${i}: unknown speaker ${d.s}`); });
+    }
+    if (n.kind === 'camp' && n.shop) n.shop.forEach(it => { if (!ITEMS[it]) errs.push(`${tag} shop unknown item ${it}`); });
+  }
+  HWASAN.party.forEach(c => { if (!CHARS[c]) errs.push(`hwasan party unknown ${c}`); });
+  for (const cid in CHARS) {
+    const pr = CHARS[cid].promo;
+    if (pr && (!ITEMS[pr.item] || !SKILLS[pr.skill])) errs.push(`char ${cid}: promo 참조 오류`);
+  }
+}
+
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 검사`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
 console.log('DATA VALIDATION OK');

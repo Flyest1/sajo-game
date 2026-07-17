@@ -183,3 +183,33 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
   .dep-card .pt{width:48px;height:48px;}
   #banner{font-size:26px;letter-spacing:.18em;}
 }
+
+/* ── v2: 거점·루트맵·캠페인 선택 ── */
+#camp,#routemap,#campsel{padding:8px 0;}
+#camp h2,#routemap h2,#campsel h2{font-size:22px;margin-bottom:8px;}
+.camp-head{display:flex;gap:18px;color:var(--dim);font-size:13.5px;margin-bottom:10px;flex-wrap:wrap;}
+.camp-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.camp-tabs .btn.on{background:linear-gradient(180deg,#5d4f37,#40372a);box-shadow:0 0 8px rgba(217,179,108,.3);}
+.camptable{width:100%;border-collapse:collapse;font-size:13.5px;}
+.camptable td,.camptable th{border:1px solid var(--line);padding:6px 8px;text-align:center;vertical-align:middle;}
+.camptable th{background:var(--panel2);color:var(--gold2);}
+.camptable select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:5px 6px;font-family:inherit;max-width:140px;font-size:13px;}
+.camp-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.camp-cols h3{font-size:15px;margin-bottom:6px;color:var(--gold2);}
+.camp-card{background:var(--panel);border:1px solid var(--gold);border-radius:8px;padding:14px 16px;margin:10px 0;}
+.camp-card.lock{opacity:.55;border-color:var(--line);}
+.camp-card h3{font-size:17px;margin-bottom:4px;}
+.camp-card p{color:var(--dim);font-size:13px;margin-bottom:10px;line-height:1.6;}
+.route-list{display:flex;flex-direction:column;gap:6px;max-width:660px;}
+.route-row{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:14px;}
+.route-row.cur{border-color:var(--gold);box-shadow:0 0 8px rgba(217,179,108,.25);cursor:pointer;}
+.route-row.done{opacity:.75;}
+.route-row.lock{opacity:.45;}
+.route-row .ri{width:18px;color:var(--gold2);text-align:center;}
+.route-row .rt{flex:1;}
+.route-row .rk{color:var(--dim);font-size:12px;}
+@media(max-width:760px){
+  .camp-cols{grid-template-columns:1fr;}
+  .camptable{font-size:12.5px;}
+  .camptable select{max-width:110px;}
+}

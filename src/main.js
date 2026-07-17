@@ -2,9 +2,10 @@
    엔트리 포인트 — 스타일/모듈 로드, 전역 노출, 부팅
    ============================================================ */
 import './style.css';
-import { boot, GLOBALS } from './game.js';
+import { boot, GLOBALS, DEBUG } from './game.js';
 
 /* 인라인 onclick 핸들러(동적 생성 HTML)에서 쓰는 함수들을 전역에 노출 */
 Object.assign(window, GLOBALS);
+window.__dbg = DEBUG;
 
 boot();

@@ -1823,5 +1823,204 @@
    "brow": "fierce",
    "mouth": "firm"
   }
+ },
+ "wjy": {
+  "name": "왕중양",
+  "cls": "전진의 도사",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "seoncheon"
+  ],
+  "leader": true,
+  "promo": {
+   "lvl": 5,
+   "item": "hyeonmun",
+   "cls": "중신통(中神通)",
+   "bonus": {
+    "hp": 4,
+    "str": 1,
+    "int": 2,
+    "def": 1,
+    "res": 1,
+    "spd": 1,
+    "skl": 1
+   },
+   "skill": "ilyang"
+  },
+  "base": [
+   34,
+   10,
+   14,
+   9,
+   11,
+   11,
+   12,
+   5,
+   32
+  ],
+  "grow": [
+   70,
+   45,
+   60,
+   45,
+   55,
+   50,
+   55
+  ],
+  "pt": {
+   "skin": "#eec6a0",
+   "hair": "daoist",
+   "hc": "#2b2119",
+   "robe": "#c9c4b4",
+   "beard": "goatee",
+   "bc": "#2b2119",
+   "mouth": "firm"
+  }
+ },
+ "ijy": {
+  "name": "임조영",
+  "cls": "강호의 여협",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "okgung"
+  ],
+  "base": [
+   30,
+   9,
+   13,
+   6,
+   10,
+   13,
+   13,
+   6,
+   28
+  ],
+  "grow": [
+   60,
+   40,
+   60,
+   30,
+   55,
+   65,
+   65
+  ],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "maiden",
+   "hc": "#241a12",
+   "robe": "#e0d8e8",
+   "female": true,
+   "mouth": "firm"
+  }
+ },
+ "djh": {
+  "name": "단지흥",
+  "cls": "대리국 황야",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "ilyang"
+  ],
+  "base": [
+   33,
+   10,
+   14,
+   9,
+   11,
+   10,
+   11,
+   5,
+   30
+  ],
+  "grow": [
+   65,
+   40,
+   60,
+   45,
+   55,
+   45,
+   55
+  ],
+  "pt": {
+   "skin": "#f0c9a2",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#c9a227",
+   "beard": "must",
+   "bc": "#2b2119",
+   "mouth": "firm"
+  }
+ },
+ "gwi": {
+  "name": "금위군",
+  "cls": "황실 위병",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   9,
+   4,
+   7,
+   4,
+   7,
+   5,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#8a6d3b",
+   "mouth": "frown"
+  }
+ },
+ "hgd": {
+  "name": "흑풍채 두목",
+  "cls": "흑도의 수령",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "gaesan"
+  ],
+  "base": [
+   38,
+   12,
+   5,
+   9,
+   6,
+   10,
+   9,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "wild",
+   "hc": "#2e2620",
+   "robe": "#4a4038",
+   "beard": "full",
+   "bc": "#2e2620",
+   "brow": "fierce",
+   "extra": "scar",
+   "mouth": "frown"
+  }
  }
 }

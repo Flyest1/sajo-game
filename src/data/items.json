@@ -1,0 +1,14 @@
+{
+ "mokgeom":   {"name":"목검",     "kind":"weapon", "price":150,  "atk":1, "hit":0,  "crit":0, "desc":"수련용 목검. 공격 +1"},
+ "cheolgeom": {"name":"철검",     "kind":"weapon", "price":350,  "atk":2, "hit":5,  "crit":0, "desc":"단단한 철검. 공격 +2 · 명중 +5"},
+ "gangcheol": {"name":"강철검",   "kind":"weapon", "price":700,  "atk":3, "hit":5,  "crit":3, "desc":"백련강철 검. 공격 +3 · 명중 +5 · 필살 +3"},
+ "bogeom":    {"name":"보검",     "kind":"weapon", "price":1400, "atk":4, "hit":10, "crit":5, "desc":"명장의 보검. 공격 +4 · 명중 +10 · 필살 +5"},
+ "hosinbu":   {"name":"호신부",   "kind":"acc",    "price":400,  "def":2, "desc":"몸을 지키는 부적. 방어 +2"},
+ "okpae":     {"name":"옥패",     "kind":"acc",    "price":400,  "res":2, "desc":"정신을 맑게 하는 옥. 정신 +2"},
+ "gyeonggong":{"name":"경공혜",   "kind":"acc",    "price":900,  "mov":1, "desc":"가벼운 신발. 이동 +1"},
+ "ungdam":    {"name":"웅담환",   "kind":"acc",    "price":550,  "hp":5,  "desc":"기력을 보하는 환약. 최대 HP +5"},
+ "geumchang": {"name":"금창약",   "kind":"use",    "price":120,  "heal":15, "desc":"상처에 바르는 약. HP 15 회복"},
+ "daehwandan":{"name":"대환단",   "kind":"use",    "price":450,  "heal":99, "desc":"소림의 영약. HP 완전 회복"},
+ "haedok":    {"name":"해독환",   "kind":"use",    "price":100,  "cure":true, "heal":5, "desc":"중독을 치료하고 HP 5 회복"},
+ "hyeonmun":  {"name":"현문비급", "kind":"key",    "price":1600, "desc":"도가 상승 무학의 비급. 승급 재료"}
+}

@@ -1,5 +1,7 @@
 import { TS, TILE, SKILLS, CHARS, CHAPTERS, ENDING, ENEMY_IDS, TYPE_NAME, triangle } from './data.js';
 import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG } from './gfx.js';
+import ITEMS from './data/items.json';
+import HWASAN from './data/stages_hwasan.json';
 
 /* ============================================================
    전투 엔진
@@ -11,7 +13,7 @@ let ENDLESS = null; // 영웅집결 무한 모드 상태 {wave, ch}
 let uidSeq = 0;
 
 /* 현재 챕터(스토리) 또는 현재 웨이브(무한 모드) 정의 반환 */
-function curCh(){ return ENDLESS ? ENDLESS.ch : CHAPTERS[G.chapterIdx]; }
+function curCh(){ return ENDLESS ? ENDLESS.ch : (V2 && V2.curBattle ? V2.curBattle : CHAPTERS[G.chapterIdx]); }
 
 const app = () => document.getElementById('app');
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -32,10 +34,22 @@ function initRosterChar(cid){
 function mkPlayerUnit(cid, x, y){
   const r=G.roster[cid], c=CHARS[cid];
   const extra=(G.extraSkills&&G.extraSkills[cid]||[]).filter(s=>!c.skills.includes(s));
-  return {uid:'u'+(uidSeq++), cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
+  const stats=deepClone(r.stats);
+  let eqAtk=0, eqHit=0, eqCrit=0;
+  if(V2&&V2.equips&&V2.equips[cid]){
+    for(const slot of ['w','a']){
+      const it=V2.equips[cid][slot]?ITEMS[V2.equips[cid][slot]]:null;
+      if(!it) continue;
+      eqAtk+=it.atk||0; eqHit+=it.hit||0; eqCrit+=it.crit||0;
+      stats.def+=it.def||0; stats.res+=it.res||0; stats.mov+=it.mov||0; stats.hp+=it.hp||0;
+    }
+  }
+  const cls=(V2&&V2.promoted&&V2.promoted[cid])||c.cls;
+  return {uid:'u'+(uidSeq++), cid, name:c.name, cls, type:c.type, range:c.range,
     skills:[...c.skills, ...extra], healer:!!c.healer, leader:!!c.leader, team:'P',
-    x, y, stats:deepClone(r.stats), maxhp:r.stats.hp, hp:r.stats.hp,
-    maxki:r.stats.ki, ki:r.stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false, poison:0};
+    x, y, stats, maxhp:stats.hp, hp:stats.hp,
+    maxki:stats.ki, ki:stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false, poison:0,
+    eqAtk, eqHit, eqCrit};
 }
 function mkEnemyUnit(def){
   const c=CHARS[def.cid], st=statObj(c.base);
@@ -90,9 +104,9 @@ function calcStrike(a,d,skillId){
   const mit=a.type==='내'?d.stats.res:d.stats.def;
   const dT=TILE[tileChar(d.x,d.y)];
   const supA=adjAllies(a), supD=adjAllies(d); /* 협공: 인접 아군 보정 */
-  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA - mit - dT.def);
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 - supD*3 - d.stats.spd*2 - dT.avoid));
-  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl);
+  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA + (a.eqAtk||0) - mit - dT.def);
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 - supD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
+  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
   return {dmg,hit,crit,dbl,tri,supA,supD};
 }
@@ -343,6 +357,7 @@ function onTile(x,y){
 function backToMenu(){ B.mode='menu'; B.targets=null; renderBattle(); openMenu(); }
 
 function finishUnit(u){
+  v2Pickup(u);
   u.acted=true; B.sel=null; B.orig=null; B.mode='idle'; B.mr=null; B.targets=null;
   hideMenu(); renderBattle();
   if(!B.over && players().every(p=>p.acted)) setTimeout(endPlayerPhase,400);
@@ -364,6 +379,9 @@ function openMenu(){
       html+=`<button class="btn" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
     }
   });
+  if(V2&&v2Usables().length){
+    html+=`<button class="btn" onclick="menuAct('tool')">도구 <span style="color:#d9b36c;font-size:12px">${v2Usables().length}</span></button>`;
+  }
   html+=`<button class="btn" onclick="menuAct('wait')">대기</button>`;
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
@@ -383,6 +401,7 @@ function menuAct(act,idx){
   if(act==='cancel'){ clearSel(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
   hideMenu();
+  if(act==='tool'){ openToolMenu(u); return; }
   if(act==='attack'){ B.mode='target-attack'; B.skillIdx=null; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
   if(act==='skill'){ B.mode='target-skill'; B.skillIdx=idx; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
   if(act==='heal'){ B.mode='target-heal'; B.skillIdx=idx; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
@@ -551,12 +570,15 @@ function startBattle(){
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
     busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
   };
-  const cap=Math.min(ch.spawns.length,12);
+  const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
   lineup.forEach((cid,i)=>{
     const [x,y]=ch.spawns[i];
     B.units.push(mkPlayerUnit(cid,x,y));
   });
+  B.treasures=deepClone(ch.treasures||[]);
+  B.loot={gold:0,items:[]};
+  if(V2&&V2.curBattle){ V2.deploy=G.deploy.slice(); v2Save(); }
   for(const def of ch.enemies) B.units.push(mkEnemyUnit(def));
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${ch.win.text}`,true);
@@ -644,6 +666,16 @@ function renderBattle(light){
   if(!svg) return;
   let s='';
   for(let y=0;y<B.h;y++) for(let x=0;x<B.w;x++) s+=tileSVG(tileChar(x,y),x,y);
+
+  /* 보물 궤짝 */
+  for(const t of (B.treasures||[])){
+    if(t.taken) continue;
+    const px=t.x*TS, py=t.y*TS;
+    s+=`<g><ellipse cx="${px+TS/2}" cy="${py+TS-12}" rx="14" ry="4" fill="rgba(0,0,0,.25)"/>
+      <rect x="${px+12}" y="${py+18}" width="${TS-24}" height="${TS-28}" rx="3" fill="#8a5a28" stroke="#3a2a12" stroke-width="1.5"/>
+      <rect x="${px+12}" y="${py+25}" width="${TS-24}" height="4" fill="#d9b36c"/>
+      <circle cx="${px+TS/2}" cy="${py+27}" r="3.2" fill="#f0d49a" stroke="#3a2a12"/></g>`;
+  }
 
   /* 하이라이트 */
   const hl=[];
@@ -794,7 +826,7 @@ function showDlgLine(){
 
 /* ── 챕터 진행 ── */
 function startChapter(idx, skipPre){
-  ENDLESS=null;
+  ENDLESS=null; V2=null;
   G.chapterIdx=idx;
   const ch=CHAPTERS[idx];
   for(const cid of ch.joins) initRosterChar(cid);
@@ -807,12 +839,19 @@ function startChapter(idx, skipPre){
 /* ── 출전 준비 화면 ── */
 function showDeploy(){
   const ch=curCh();
-  const cap=Math.min(ch.spawns.length,12);
+  const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   if(!G.deploy) G.deploy=[];
   G.deploy=G.deploy.filter(cid=>G.party.includes(cid));
   for(const cid of G.party){ if(G.deploy.length<cap&&!G.deploy.includes(cid)) G.deploy.push(cid); }
+  const forced=[...((ch.deploy&&ch.deploy.forced)||[])];
   const leader=G.party.find(cid=>CHARS[cid].leader);
-  if(leader&&!G.deploy.includes(leader)){ G.deploy.unshift(leader); G.deploy=G.deploy.slice(0,cap); }
+  if(leader&&!forced.includes(leader)) forced.unshift(leader);
+  for(const cid of forced.reverse()){
+    if(!G.party.includes(cid)) continue;
+    const i=G.deploy.indexOf(cid); if(i>=0) G.deploy.splice(i,1);
+    G.deploy.unshift(cid);
+  }
+  G.deploy=G.deploy.slice(0,cap);
   renderDeploy(cap);
 }
 function renderDeploy(cap){
@@ -821,7 +860,7 @@ function renderDeploy(cap){
     <h2>${ch.title} — 출전 준비</h2>
     <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명) · ★곽정은 반드시 출전 · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${G.party.map(cid=>{
-      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader;
+      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
       return `<div class="dep-card ${on?'on':'off'} ${lock?'lock':''}" onclick="toggleDeploy('${cid}',${cap})">
         <div class="pt">${ptSVG(cid)}</div>
         <div class="dep-name">${c.name}${lock?' ★':''}</div>
@@ -829,12 +868,15 @@ function renderDeploy(cap){
       </div>`;}).join('')}</div>
     <div style="text-align:center">
       <button class="btn" onclick="startBattle()">출 전 !</button>
+      ${V2?`<button class="btn small" style="margin-left:8px" onclick="campFromDeploy()">거점 (장비·승급·상점)</button>`:''}
       <button class="btn small" style="margin-left:8px" onclick="showHelp()">도움말</button>
     </div>
   </div>`;
 }
 function toggleDeploy(cid,cap){
   if(CHARS[cid].leader) return;
+  const chD=curCh();
+  if(chD.deploy&&chD.deploy.forced&&chD.deploy.forced.includes(cid)) return;
   const i=G.deploy.indexOf(cid);
   if(i>=0) G.deploy.splice(i,1);
   else{ if(G.deploy.length>=cap) return; G.deploy.push(cid); }
@@ -849,6 +891,27 @@ function applyRoster(){
 function showVictory(){
   const ch=curCh();
   applyRoster();
+  /* v2 캠페인: 스테이지 클리어 */
+  if(V2&&V2.curBattle){
+    const n=curNode();
+    const loot=(B&&B.loot)||{gold:0,items:[]};
+    V2.gold += (n.goldReward||0) + (loot.gold||0);
+    for(const id of (loot.items||[])) V2.inv[id]=(V2.inv[id]||0)+1;
+    if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+    V2.curBattle=null;
+    v2Save();
+    const lootTxt=[
+      n.goldReward?`보수 ${n.goldReward}냥`:'',
+      loot.gold?`보물 ${loot.gold}냥`:'',
+      ...(loot.items||[]).map(id=>ITEMS[id].name)
+    ].filter(Boolean).join(' · ');
+    app().innerHTML=`<div class="result-screen">
+      <h2 style="color:#ffd94a">勝 利</h2>
+      <p>${n.title} — 클리어!${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${V2.gold}냥</p>
+      <button class="btn" onclick="v2AfterBattle()">계속</button>
+    </div>`;
+    return;
+  }
   /* 무한 모드: 웨이브 클리어 */
   if(ENDLESS){
     const w=ENDLESS.wave;
@@ -889,6 +952,17 @@ function afterVictory(next){
   });
 }
 function showDefeat(){
+  if(V2&&V2.curBattle){
+    V2.curBattle=null;
+    app().innerHTML=`<div class="result-screen">
+      <h2 style="color:#e07a5a">敗 北</h2>
+      <p>${curNode().title} — 패배… 부대를 정비해 다시 도전하자.<br>(도구 소모는 유지되고, 경험치·전리품은 무효가 됩니다)</p>
+      <button class="btn" onclick="v2Enter()">재도전</button>
+      <button class="btn small" onclick="showRouteMap()">루트 맵</button>
+      <button class="btn danger" onclick="toTitle()">타이틀로</button>
+    </div>`;
+    return;
+  }
   if(ENDLESS){
     const w=ENDLESS.wave;
     setBestWave(w-1);
@@ -1013,7 +1087,7 @@ function makeEndlessWave(wave){
 }
 function startEndless(){
   /* 전 영웅 집결: 스토리 진행과 무관하게 모든 아군을 Lv.10으로 소집 */
-  ENDLESS=null;
+  ENDLESS=null; V2=null;
   G.chapterIdx=0; G.roster={}; G.party=[]; G.deploy=null;
   const allies=Object.keys(CHARS).filter(id=>!ENEMY_IDS.has(id));
   for(const cid of allies) initRosterChar(cid);
@@ -1027,7 +1101,7 @@ function nextWave(w){
 }
 
 /* ── 타이틀 ── */
-function toTitle(){ B=null; ENDLESS=null; showTitle(); }
+function toTitle(){ B=null; ENDLESS=null; V2=null; showTitle(); }
 function confirmToTitle(){ if(confirm('전투를 포기하고 타이틀로 돌아갈까요? (진행 상황은 챕터 시작 시점으로 돌아갑니다)')) toTitle(); }
 function showTitle(){
   const hasSave=!!loadGame();
@@ -1039,6 +1113,7 @@ function showTitle(){
       <div><button class="btn" onclick="newGame()">새로운 협객행 (새 게임)</button></div>
       <div><button class="btn" onclick="continueGame()" ${hasSave?'':'disabled'}>이어하기</button></div>
       <div><button class="btn" onclick="showChapterSelect()" ${hasSave?'':'disabled'}>장 선택 (회상)</button></div>
+      <div><button class="btn" onclick="showCampaignSelect()">신규 캠페인 <span style="font-size:12px;color:var(--gold2)">분기·아이템 (베타)</span></button></div>
       <div><button class="btn" onclick="startEndless()">영웅집결 무한 모드${bestWave()?` <span style="font-size:12px;color:var(--dim)">최고 ${bestWave()}파</span>`:''}</button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
     </div>
@@ -1107,13 +1182,326 @@ document.addEventListener('keydown',e=>{
 });
 /* 부팅은 main.js 의 boot() 에서 수행 */
 
+
+/* ============================================================
+   v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
+   ============================================================ */
+const CAMPAIGNS = { hwasan: HWASAN };
+let V2 = null; // 진행 중 캠페인 상태
+let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
+let CAMP_TAB = 'unit';
+const DEFAULT_SHOP = ['mokgeom','cheolgeom','hosinbu','okpae','geumchang','haedok'];
+
+const v2Key = id => 'kimyong_v2_' + id;
+function v2New(campId){
+  const C = CAMPAIGNS[campId];
+  return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
+           cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null };
+}
+function v2Save(){
+  if(!V2) return;
+  try{ const {curBattle, ...st}=V2; localStorage.setItem(v2Key(V2.camp), JSON.stringify(st)); }catch(e){}
+}
+function v2LoadSave(campId){
+  try{ const s=localStorage.getItem(v2Key(campId)); return s?JSON.parse(s):null; }catch(e){ return null; }
+}
+function v2Bind(){
+  G.roster=V2.roster; G.party=V2.party; G.extraSkills=V2.extraSkills; G.deploy=V2.deploy;
+}
+function initRosterCharV2(cid){
+  if(V2.roster[cid]) return;
+  V2.roster[cid]={cid, lvl:1, exp:0, stats:statObj(CHARS[cid].base)};
+  V2.party.push(cid);
+}
+function startCampaignV2(campId, useSave){
+  ENDLESS=null; B=null;
+  const C=CAMPAIGNS[campId];
+  V2=(useSave&&v2LoadSave(campId))||v2New(campId);
+  V2.attempted=V2.attempted||{};
+  if(!V2.party.length){ for(const cid of C.party) initRosterCharV2(cid); }
+  v2Bind();
+  showRouteMap();
+}
+function curNode(){ return V2?CAMPAIGNS[V2.camp].stages[V2.stageId]:null; }
+function v2Lines(lines){
+  return (lines||[]).filter(l=>!('if' in l)||l.if===null||l.if===undefined||!!V2.flags[l.if]);
+}
+function v2BattleDef(n){
+  const battles=V2.cleared.filter(id=>{const st=CAMPAIGNS[V2.camp].stages[id];return st&&st.kind==='battle';}).length;
+  return { no:battles+1, joins:[], title:n.title, map:n.map, spawns:n.spawns, enemies:n.enemies,
+    reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', pre:[], post:[],
+    treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null };
+}
+function v2Enter(){
+  if(!V2) return;
+  v2Save();
+  const n=curNode();
+  if(!n){ toTitle(); return; }
+  if(n.kind==='battle'){
+    const dep=()=>v2Deploy(n);
+    if(V2.attempted[V2.stageId]) dep();
+    else { V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), dep, n.title); }
+  }else if(n.kind==='camp'){
+    const go=()=>showCamp(n,'route');
+    if(n.pre&&!V2.cleared.includes(V2.stageId)&&!V2.attempted[V2.stageId]){ V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
+    else go();
+  }else if(n.kind==='choice'){
+    showChoiceNode(n);
+  }else if(n.kind==='end'){
+    showV2End(n);
+  }
+}
+function v2Deploy(n){
+  V2.curBattle=v2BattleDef(n);
+  G.deploy=V2.deploy;
+  showDeploy();
+}
+function v2AfterBattle(){
+  const n=curNode();
+  const go=()=>v2Advance(n);
+  if(n.post&&n.post.length) showDialogue(v2Lines(n.post), go);
+  else go();
+}
+function v2Advance(n){
+  const nx=n?n.next:null;
+  if(!nx){ toTitle(); return; }
+  V2.stageId=nx; v2Save(); v2Enter();
+}
+function showChoiceNode(n){
+  app().innerHTML=`<div class="result-screen" style="padding:44px 0">
+    <h2 style="font-size:26px">${n.title}</h2>
+    <p>${n.prompt}</p>
+    ${n.options.map((o,i)=>`<div style="margin:12px 0">
+      <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${i})">${o.label}</button>
+      <div style="color:var(--dim);font-size:12.5px;margin-top:4px">${o.desc||''}</div></div>`).join('')}
+  </div>`;
+}
+function pickChoice(i){
+  const n=curNode(), o=n.options[i];
+  if(o.set) Object.assign(V2.flags,o.set);
+  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+  V2.stageId=o.to; v2Save(); v2Enter();
+}
+function showV2End(n){
+  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+  v2Save();
+  app().innerHTML=`<div class="result-screen">
+    <h2>終 幕</h2>
+    <p>${(n.text||[]).join('<br>')}</p>
+    <button class="btn" onclick="showRouteMap()">루트 맵</button>
+    <button class="btn danger" onclick="toTitle()">타이틀로</button>
+  </div>`;
+}
+
+/* ── 보물 획득 ── */
+function v2Pickup(u){
+  if(!B||!B.treasures||!u||u.team!=='P') return;
+  const t=B.treasures.find(t=>!t.taken&&t.x===u.x&&t.y===u.y);
+  if(!t) return;
+  t.taken=true;
+  if(t.gold){ B.loot.gold+=t.gold; fx(u.x,u.y,`+${t.gold}냥`,'label'); log(`<b>보물!</b> ${t.gold}냥 획득 (승리 시 확정)`,true); }
+  if(t.item){ B.loot.items.push(t.item); fx(u.x,u.y,ITEMS[t.item].name,'label'); log(`<b>보물!</b> ${ITEMS[t.item].name} 획득 (승리 시 확정)`,true); }
+  renderBattle(true);
+}
+
+/* ── 도구 (전투 중 소모품) ── */
+function v2Usables(){
+  if(!V2) return [];
+  return Object.keys(V2.inv).filter(id=>V2.inv[id]>0&&ITEMS[id]&&ITEMS[id].kind==='use');
+}
+function openToolMenu(u){
+  const list=v2Usables();
+  const html=`<div class="modal-back" id="tool-modal">
+    <div class="modal"><h3>도구 사용 — ${u.name}</h3>
+    ${list.map(id=>{const it=ITEMS[id];return `<div style="margin:6px 0"><button class="btn small" style="width:100%;text-align:left" onclick="v2UseTool('${id}')">${it.name} ×${V2.inv[id]} <span style="color:var(--dim);font-size:12px">— ${it.desc}</span></button></div>`;}).join('')}
+    <div class="btnrow"><button class="btn" onclick="closeToolMenu()">취소</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function closeToolMenu(){ const m=document.getElementById('tool-modal'); if(m) m.remove(); backToMenu(); }
+function v2UseTool(id){
+  const m=document.getElementById('tool-modal'); if(m) m.remove();
+  const u=B.sel, it=ITEMS[id];
+  if(!u||!it||(V2.inv[id]||0)<=0){ backToMenu(); return; }
+  V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+  if(it.cure&&u.poison){ u.poison=0; log(`${u.name} — 해독되었다`); }
+  if(it.heal){ const amt=Math.min(u.maxhp-u.hp, it.heal); u.hp+=amt; fx(u.x,u.y,'+'+amt,'heal'); log(`${u.name} — ${it.name} 사용 (HP ${amt} 회복)`); }
+  v2Save();
+  renderBattle(true);
+  finishUnit(u);
+}
+
+/* ── 거점 (편성·상점·행낭·승급) ── */
+function showCamp(node, back){
+  CAMP_CTX={node:node||null, back:back||'route'};
+  CAMP_TAB='unit';
+  renderCamp();
+}
+function campTab(t){ CAMP_TAB=t; renderCamp(); }
+function campFromDeploy(){ showCamp(null,'deploy'); }
+function campFromRoute(){ showCamp(null,'route'); }
+function campBack(){ if(CAMP_CTX&&CAMP_CTX.back==='deploy'){ v2Deploy(curNode()); } else showRouteMap(); }
+function campShopList(){ return (CAMP_CTX&&CAMP_CTX.node&&CAMP_CTX.node.shop)||DEFAULT_SHOP; }
+function ownedCount(id){ return V2.inv[id]||0; }
+function renderCamp(){
+  const n=CAMP_CTX.node;
+  let body='';
+  if(CAMP_TAB==='unit') body=campUnitHTML();
+  else if(CAMP_TAB==='shop') body=campShopHTML();
+  else body=campBagHTML();
+  app().innerHTML=`<div id="camp">
+    <h2>${n?n.title:'거점 — 부대 정비'}</h2>
+    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span></div>
+    <div class="camp-tabs">
+      <button class="btn small ${CAMP_TAB==='unit'?'on':''}" onclick="campTab('unit')">편성·승급</button>
+      <button class="btn small ${CAMP_TAB==='shop'?'on':''}" onclick="campTab('shop')">상점</button>
+      <button class="btn small ${CAMP_TAB==='bag'?'on':''}" onclick="campTab('bag')">행낭</button>
+    </div>
+    <div id="camp-body">${body}</div>
+    <div style="text-align:center;margin-top:14px">
+      ${n?`<button class="btn" onclick="v2Depart()">출 발</button>`:`<button class="btn" onclick="campBack()">돌아가기</button>`}
+      <button class="btn small danger" style="margin-left:8px" onclick="toTitle()">타이틀로</button>
+    </div>
+  </div>`;
+}
+function v2Depart(){
+  const n=CAMP_CTX.node;
+  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+  v2Advance(n);
+}
+function campUnitHTML(){
+  return `<table class="camptable"><tr><th>협객</th><th>Lv</th><th>병기</th><th>보구</th><th>승급</th></tr>`+
+  V2.party.map(cid=>{
+    const r=V2.roster[cid], c=CHARS[cid];
+    const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+    const opts=k=>{
+      const kind=k==='w'?'weapon':'acc';
+      let o=`<option value="">—</option>`;
+      for(const id in ITEMS){
+        if(ITEMS[id].kind!==kind) continue;
+        if(eq[k]===id) o+=`<option value="${id}" selected>${ITEMS[id].name} (장착)</option>`;
+        else if(ownedCount(id)>0) o+=`<option value="${id}">${ITEMS[id].name} ×${ownedCount(id)}</option>`;
+      }
+      return o;
+    };
+    const promo=c.promo;
+    let pcell='—';
+    if(V2.promoted[cid]) pcell=`<span style="color:var(--gold2)">${V2.promoted[cid]}</span>`;
+    else if(promo){
+      const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;
+      pcell=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button>
+        <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}</div>`;
+    }
+    return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${V2.promoted[cid]||c.cls}</div></td>
+      <td>${r.lvl}</td>
+      <td><select onchange="v2Equip('${cid}','w',this.value)">${opts('w')}</select></td>
+      <td><select onchange="v2Equip('${cid}','a',this.value)">${opts('a')}</select></td>
+      <td>${pcell}</td></tr>`;
+  }).join('')+`</table>`;
+}
+function v2Equip(cid, slot, id){
+  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  if(eq[slot]){ V2.inv[eq[slot]]=(V2.inv[eq[slot]]||0)+1; eq[slot]=null; }
+  if(id){
+    if((V2.inv[id]||0)<=0){ v2Save(); renderCamp(); return; }
+    V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+    eq[slot]=id;
+  }
+  v2Save(); renderCamp();
+}
+function v2Promote(cid){
+  const c=CHARS[cid], promo=c.promo, r=V2.roster[cid];
+  if(!promo||V2.promoted[cid]||r.lvl<promo.lvl||(V2.inv[promo.item]||0)<=0) return;
+  V2.inv[promo.item]--; if(V2.inv[promo.item]<=0) delete V2.inv[promo.item];
+  for(const k in (promo.bonus||{})) r.stats[k]=(r.stats[k]||0)+promo.bonus[k];
+  V2.promoted[cid]=promo.cls;
+  if(promo.skill){
+    V2.extraSkills[cid]=V2.extraSkills[cid]||[];
+    if(!V2.extraSkills[cid].includes(promo.skill)) V2.extraSkills[cid].push(promo.skill);
+  }
+  v2Save(); renderCamp();
+}
+function campShopHTML(){
+  const list=campShopList();
+  const buy=list.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left"><b>${it.name}</b><div style="font-size:11px;color:var(--dim)">${it.desc}</div></td><td>${it.price}냥</td><td><button class="btn small" ${V2.gold>=it.price?'':'disabled'} onclick="v2Buy('${id}')">구입</button></td></tr>`;}).join('');
+  const inv=Object.keys(V2.inv);
+  const sell=inv.length?inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left">${it.name} ×${V2.inv[id]}</td><td>${Math.floor(it.price/2)}냥</td><td><button class="btn small" onclick="v2Sell('${id}')">매각</button></td></tr>`;}).join(''):`<tr><td colspan="3" style="color:var(--dim)">매각할 물건이 없습니다</td></tr>`;
+  return `<div class="camp-cols"><div><h3>구입</h3><table class="camptable">${buy}</table></div>
+  <div><h3>매각 <span style="font-size:11px;color:var(--dim)">(정가의 절반)</span></h3><table class="camptable">${sell}</table></div></div>`;
+}
+function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gold-=it.price; V2.inv[id]=(V2.inv[id]||0)+1; v2Save(); renderCamp(); }
+function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); v2Save(); renderCamp(); }
+function campBagHTML(){
+  const inv=Object.keys(V2.inv);
+  if(!inv.length) return `<p style="color:var(--dim);padding:8px 0">행낭이 비었습니다.</p>`;
+  return `<table class="camptable">`+inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left"><b>${it.name}</b> ×${V2.inv[id]}</td><td style="text-align:left;color:var(--dim);font-size:12px">${it.desc}</td></tr>`;}).join('')+`</table>`;
+}
+
+/* ── 루트 맵 ── */
+function showRouteMap(){
+  const C=CAMPAIGNS[V2.camp];
+  const rows=C.order.map(id=>{
+    const n=C.stages[id];
+    const cleared=V2.cleared.includes(id);
+    const cur=V2.stageId===id;
+    const icon=cleared?'✓':(cur?'▶':'·');
+    const cls=cleared?'done':(cur?'cur':'lock');
+    const kindTxt={battle:'전투',camp:'거점',choice:'분기',end:'종막'}[n.kind]||'';
+    return `<div class="route-row ${cls}" ${cur?`onclick="v2Enter()"`:''}>
+      <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}</span></div>`;
+  }).join('');
+  app().innerHTML=`<div id="routemap">
+    <h2>${C.name}</h2>
+    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span><span>행적 ${Object.keys(V2.flags).length}건</span></div>
+    <div class="route-list">${rows}</div>
+    <div style="text-align:center;margin-top:14px">
+      <button class="btn" onclick="v2Enter()">진행 ▶</button>
+      <button class="btn small" style="margin-left:8px" onclick="campFromRoute()">거점 (장비·승급)</button>
+      <button class="btn small danger" style="margin-left:8px" onclick="toTitle()">타이틀로</button>
+    </div>
+  </div>`;
+}
+
+/* ── 캠페인 선택 ── */
+function showCampaignSelect(){
+  const s=v2LoadSave('hwasan');
+  app().innerHTML=`<div id="campsel">
+    <h2>신규 캠페인 (베타)</h2>
+    <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 새 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
+    <div class="camp-card">
+      <h3>외전Ⅰ 화산논검 전기 <span style="font-size:12px;color:var(--gold2)">파일럿 3막</span></h3>
+      <p>${CAMPAIGNS.hwasan.desc}</p>
+      <div>
+        ${s?`<button class="btn" onclick="startCampaignV2('hwasan',true)">이어하기 (진행 ${s.cleared.length}단계)</button>`:''}
+        <button class="btn ${s?'small':''}" ${s?'style="margin-left:8px"':''} onclick="startCampaignV2('hwasan',false)">${s?'처음부터':'시작하기'}</button>
+      </div>
+    </div>
+    <div class="camp-card lock"><h3>사조삼부곡 (연속 캠페인)</h3><p>사조영웅전 → 신조협려 → 의천도룡기 리부트 — 제작 예정 (R2~R4)</p></div>
+    <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
+    <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
+  </div>`;
+}
+
 /* ── 부팅 및 전역(인라인 onclick) 노출 ── */
 export function boot(){
   buildPortraitDefs();
   showTitle();
 }
+/* 자동 테스트용 디버그 훅 (게임 로직에는 미사용) */
+export const DEBUG = {
+  get B(){ return B; },
+  get V2(){ return V2; },
+  get ENDLESS(){ return ENDLESS; },
+  get G(){ return G; },
+  winCheck(){ return checkEnd(); },
+  CHAPTERS, CHARS, SKILLS, ITEMS,
+};
+
 export const GLOBALS = {
   menuAct, confirmAttack, cancelForecast, endPlayerPhase, showHelp, confirmToTitle,
   uiCancel, cycleZoom, toggleDeploy, startBattle, newGame, continueGame,
   showChapterSelect, jumpChapter, startEndless, nextWave, toTitle, retryChapter, afterVictory,
+  showCampaignSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
+  v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
+  campTab, campBack, campFromDeploy, campFromRoute,
 };
