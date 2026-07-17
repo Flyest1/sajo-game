@@ -6,6 +6,8 @@ import SAJO from './data/stages_sajo.json';
 import SINJO from './data/stages_sinjo.json';
 import UICHEON from './data/stages_uicheon.json';
 import CHUNRYONG from './data/stages_chunryong.json';
+import HOOILDAM from './data/stages_hooildam.json';
+import JINFINAL from './data/stages_jinfinal.json';
 
 /* ============================================================
    전투 엔진
@@ -1215,7 +1217,7 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNRYONG, hwasan: HWASAN };
+const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNRYONG, hwasan: HWASAN, hooildam: HOOILDAM, jinfinal: JINFINAL };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
@@ -1269,6 +1271,11 @@ function startCampaignV2(campId, useSave){
     }
   }
   if(!V2.party.length){ for(const cid of C.party) initRosterCharV2(cid); }
+  if(!loaded){
+    if(C.startLvl){ for(const cid of V2.party){ const r=V2.roster[cid]; while(r.lvl<C.startLvl) rosterLevelUp(r); } }
+    if(C.startInv) for(const k in C.startInv) V2.inv[k]=(V2.inv[k]||0)+C.startInv[k];
+    if(C.startSkills) for(const k in C.startSkills) V2.extraSkills[k]=[...(C.startSkills[k]||[])];
+  }
   v2Bind();
   showRouteMap();
 }
@@ -1538,6 +1545,18 @@ function showRouteMap(){
 }
 
 /* ── 캠페인 선택 ── */
+function campCleared(id){
+  const sv=v2LoadSave(id);
+  return !!(sv&&sv.cleared&&sv.cleared.some(x=>String(x).startsWith('end')));
+}
+function lockedCard(id, badge){
+  const C=CAMPAIGNS[id];
+  const req=C.requireAll||[];
+  const done=req.filter(campCleared).length;
+  return `<div class="camp-card lock"><h3>${C.name} ${badge?`<span style="font-size:12px;color:var(--gold2)">${badge}</span>`:''}</h3>
+    <p>${C.desc}</p>
+    <p style="color:var(--gold2);font-size:12.5px">해금 조건: 본편·외전 5개 캠페인 완주 (${done}/${req.length})</p></div>`;
+}
 function campCard(id, badge){
   const C=CAMPAIGNS[id], sv=v2LoadSave(id);
   return `<div class="camp-card">
@@ -1555,8 +1574,10 @@ function showCampaignSelect(){
     ${campCard('sajo','제1권')}
     ${campCard('sinjo','제2권')}
     ${campCard('uicheon','제3권')}
-    ${campCard('chunryong','천룡팔부 · NEW')}
-    ${campCard('hwasan','외전 파일럿')}
+    ${campCard('chunryong','천룡팔부')}
+    ${campCard('hwasan','외전Ⅰ · 6막 완성판')}
+    ${campCard('hooildam','외전Ⅱ · NEW')}
+    ${(CAMPAIGNS.jinfinal.requireAll||[]).every(campCleared)?campCard('jinfinal','진최종전 · 해금!'):lockedCard('jinfinal','진최종전')}
     <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;

@@ -3333,5 +3333,104 @@
    "robe": "#7a7466",
    "mouth": "frown"
   }
+ },
+ "scs": {
+  "name": "송청서",
+  "cls": "무당의 그림자",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "wolnyeo"
+  ],
+  "base": [
+   40,
+   11,
+   9,
+   8,
+   8,
+   12,
+   11,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#eab88f",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#4f6d7a",
+   "brow": "fierce",
+   "mouth": "smirk"
+  }
+ },
+ "drb": {
+  "name": "도룡방주",
+  "cls": "신흥 흑도의 수령",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "gaesan"
+  ],
+  "base": [
+   44,
+   13,
+   6,
+   10,
+   7,
+   10,
+   9,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "wild",
+   "hc": "#2e2620",
+   "robe": "#3a3a4a",
+   "beard": "full",
+   "bc": "#2e2620",
+   "brow": "fierce",
+   "extra": "scar",
+   "mouth": "frown"
+  }
+ },
+ "wonjang": {
+  "name": "북원 밀사",
+  "cls": "패망 왕조의 그림자",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "eumpung"
+  ],
+  "base": [
+   42,
+   9,
+   13,
+   8,
+   10,
+   10,
+   10,
+   5,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#4a3b5c",
+   "beard": "goatee",
+   "bc": "#2e2620",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
  }
 }
