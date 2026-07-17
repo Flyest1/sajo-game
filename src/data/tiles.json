@@ -1,0 +1,52 @@
+{
+ ".": {
+  "name": "평지",
+  "cost": 1,
+  "avoid": 0,
+  "def": 0,
+  "color": "#8fb573"
+ },
+ "r": {
+  "name": "길",
+  "cost": 1,
+  "avoid": 0,
+  "def": 0,
+  "color": "#c9b284"
+ },
+ "f": {
+  "name": "숲",
+  "cost": 2,
+  "avoid": 20,
+  "def": 1,
+  "color": "#5e8f4e"
+ },
+ "m": {
+  "name": "산",
+  "cost": 3,
+  "avoid": 30,
+  "def": 2,
+  "color": "#8d8574"
+ },
+ "w": {
+  "name": "물",
+  "cost": 99,
+  "avoid": 0,
+  "def": 0,
+  "color": "#5d8fb5"
+ },
+ "h": {
+  "name": "가옥",
+  "cost": 1,
+  "avoid": 10,
+  "def": 2,
+  "color": "#a98b6b",
+  "heal": 0.15
+ },
+ "#": {
+  "name": "담장",
+  "cost": 99,
+  "avoid": 0,
+  "def": 0,
+  "color": "#5a5148"
+ }
+}

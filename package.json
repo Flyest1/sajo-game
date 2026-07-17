@@ -1,0 +1,16 @@
+{
+  "name": "sajo-game",
+  "private": true,
+  "version": "1.0.0",
+  "description": "사조영웅전: 강호의 별 — 김용 무협 팬메이드 SRPG (AI 제작 데모)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "validate": "node tools/validate_data.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

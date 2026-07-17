@@ -1,0 +1,1827 @@
+{
+ "gj": {
+  "name": "곽정",
+  "cls": "항룡의 후계",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "hangryong18"
+  ],
+  "leader": true,
+  "base": [
+   30,
+   9,
+   4,
+   7,
+   6,
+   6,
+   6,
+   5,
+   26
+  ],
+  "grow": [
+   80,
+   60,
+   25,
+   50,
+   45,
+   45,
+   45
+  ],
+  "pt": {
+   "skin": "#f0c9a2",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#3d6b8f",
+   "brow": "thick",
+   "mouth": "firm"
+  }
+ },
+ "hy": {
+  "name": "황용",
+  "cls": "도화도의 재녀",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "tagubong"
+  ],
+  "base": [
+   24,
+   6,
+   8,
+   4,
+   7,
+   10,
+   10,
+   6,
+   24
+  ],
+  "grow": [
+   60,
+   35,
+   55,
+   30,
+   50,
+   60,
+   60
+  ],
+  "pt": {
+   "skin": "#f7d9b8",
+   "hair": "maiden",
+   "hc": "#241a12",
+   "robe": "#c46a7d",
+   "female": true,
+   "mouth": "smile",
+   "extra": "hairpin"
+  }
+ },
+ "gja": {
+  "name": "가진악",
+  "cls": "비천복",
+  "type": "경",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "bokma"
+  ],
+  "base": [
+   26,
+   7,
+   5,
+   5,
+   5,
+   7,
+   8,
+   5,
+   22
+  ],
+  "grow": [
+   65,
+   50,
+   30,
+   40,
+   35,
+   40,
+   55
+  ],
+  "pt": {
+   "skin": "#d8ac83",
+   "hair": "bald",
+   "hc": "#555",
+   "robe": "#4a463e",
+   "beard": "goatee",
+   "bc": "#6b6257",
+   "extra": "blindfold"
+  }
+ },
+ "jc": {
+  "name": "주총",
+  "cls": "묘수서생",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "myosu"
+  ],
+  "base": [
+   23,
+   6,
+   7,
+   4,
+   6,
+   9,
+   10,
+   6,
+   22
+  ],
+  "grow": [
+   60,
+   40,
+   45,
+   30,
+   40,
+   55,
+   60
+  ],
+  "pt": {
+   "skin": "#ecc39a",
+   "hair": "scholar",
+   "hc": "#3a2e22",
+   "robe": "#6b7f5a",
+   "beard": "goatee",
+   "bc": "#3a2e22",
+   "mouth": "smile"
+  }
+ },
+ "hbg": {
+  "name": "한보구",
+  "cls": "마왕신",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "geumryong"
+  ],
+  "base": [
+   25,
+   7,
+   3,
+   5,
+   3,
+   8,
+   7,
+   7,
+   20
+  ],
+  "grow": [
+   65,
+   50,
+   20,
+   35,
+   25,
+   55,
+   45
+  ],
+  "pt": {
+   "skin": "#e2b088",
+   "hair": "wild",
+   "hc": "#4a3524",
+   "robe": "#8a6d3b",
+   "beard": "must",
+   "bc": "#4a3524"
+  }
+ },
+ "nhi": {
+  "name": "남희인",
+  "cls": "남산초자",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "gaesan"
+  ],
+  "base": [
+   28,
+   8,
+   3,
+   8,
+   4,
+   5,
+   6,
+   4,
+   20
+  ],
+  "grow": [
+   75,
+   55,
+   20,
+   55,
+   30,
+   30,
+   40
+  ],
+  "pt": {
+   "skin": "#dfa87e",
+   "hair": "topknot",
+   "hc": "#2e241a",
+   "robe": "#7d6250",
+   "beard": "full",
+   "bc": "#2e241a"
+  }
+ },
+ "jgb": {
+  "name": "전금발",
+  "cls": "요시선생",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "cheolchu"
+  ],
+  "base": [
+   26,
+   7,
+   4,
+   6,
+   4,
+   6,
+   7,
+   5,
+   20
+  ],
+  "grow": [
+   65,
+   50,
+   25,
+   45,
+   30,
+   40,
+   50
+  ],
+  "pt": {
+   "skin": "#eab88f",
+   "hair": "band",
+   "hc": "#33281d",
+   "robe": "#4f6d7a",
+   "beard": "must",
+   "bc": "#33281d"
+  }
+ },
+ "hsy": {
+  "name": "한소영",
+  "cls": "월녀검",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "wolnyeo"
+  ],
+  "base": [
+   22,
+   5,
+   6,
+   4,
+   6,
+   9,
+   8,
+   6,
+   22
+  ],
+  "grow": [
+   55,
+   40,
+   40,
+   30,
+   45,
+   60,
+   55
+  ],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "bun",
+   "hc": "#2a1f16",
+   "robe": "#7fa7b8",
+   "female": true,
+   "mouth": "smile"
+  }
+ },
+ "mo": {
+  "name": "마옥",
+  "cls": "전진교 단양자",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "jeonjin"
+  ],
+  "healer": true,
+  "base": [
+   24,
+   3,
+   9,
+   4,
+   9,
+   5,
+   6,
+   5,
+   28
+  ],
+  "grow": [
+   60,
+   15,
+   60,
+   30,
+   60,
+   30,
+   40
+  ],
+  "pt": {
+   "skin": "#eec6a0",
+   "hair": "daoist",
+   "hc": "#7a7466",
+   "robe": "#d8d3c0",
+   "beard": "long",
+   "bc": "#8f897c",
+   "mouth": "smile"
+  }
+ },
+ "hcg": {
+  "name": "홍칠공",
+  "cls": "구지신개",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "hangryong18"
+  ],
+  "base": [
+   36,
+   13,
+   8,
+   9,
+   8,
+   10,
+   11,
+   6,
+   30
+  ],
+  "grow": [
+   70,
+   55,
+   35,
+   45,
+   40,
+   50,
+   55
+  ],
+  "pt": {
+   "skin": "#e0ac80",
+   "hair": "wild",
+   "hc": "#8f8578",
+   "robe": "#b0483a",
+   "beard": "full",
+   "bc": "#8f8578",
+   "mouth": "grin"
+  }
+ },
+ "sb": {
+  "name": "소봉",
+  "cls": "거란의 호걸",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "hangryong28"
+  ],
+  "guest": true,
+  "base": [
+   38,
+   14,
+   9,
+   10,
+   8,
+   11,
+   11,
+   6,
+   30
+  ],
+  "grow": [
+   70,
+   55,
+   35,
+   45,
+   40,
+   50,
+   50
+  ],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "wild",
+   "hc": "#241c14",
+   "robe": "#5a4632",
+   "beard": "stub",
+   "bc": "#241c14",
+   "brow": "fierce"
+  }
+ },
+ "yg": {
+  "name": "양과",
+  "cls": "신조대협",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "amyeon"
+  ],
+  "guest": true,
+  "base": [
+   34,
+   11,
+   13,
+   8,
+   9,
+   12,
+   12,
+   6,
+   30
+  ],
+  "grow": [
+   65,
+   45,
+   60,
+   40,
+   45,
+   60,
+   60
+  ],
+  "pt": {
+   "skin": "#f2cfa8",
+   "hair": "long",
+   "hc": "#2b2119",
+   "robe": "#6d7b8a",
+   "mouth": "firm"
+  }
+ },
+ "zbt": {
+  "name": "주백통",
+  "cls": "노완동",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [
+   "gongmyeong",
+   "jwauhobak"
+  ],
+  "base": [
+   34,
+   10,
+   13,
+   8,
+   10,
+   11,
+   10,
+   6,
+   32
+  ],
+  "grow": [
+   70,
+   45,
+   60,
+   40,
+   50,
+   50,
+   50
+  ],
+  "pt": {
+   "skin": "#eec6a0",
+   "hair": "wild",
+   "hc": "#c8c2b4",
+   "robe": "#b8b4a4",
+   "beard": "full",
+   "bc": "#c8c2b4",
+   "mouth": "grin"
+  }
+ },
+ "yaksa": {
+  "name": "황약사",
+  "cls": "동사(東邪)",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "tanji"
+  ],
+  "guest": true,
+  "base": [
+   34,
+   10,
+   15,
+   9,
+   12,
+   12,
+   13,
+   6,
+   32
+  ],
+  "grow": [
+   60,
+   40,
+   65,
+   40,
+   55,
+   55,
+   60
+  ],
+  "pt": {
+   "skin": "#e8c0a0",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#3a6b5a",
+   "beard": "goatee",
+   "bc": "#2b2119",
+   "mouth": "firm"
+  }
+ },
+ "syn": {
+  "name": "소용녀",
+  "cls": "고묘파 전인",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "oknyeo"
+  ],
+  "base": [
+   30,
+   8,
+   12,
+   6,
+   10,
+   14,
+   13,
+   6,
+   28
+  ],
+  "grow": [
+   60,
+   35,
+   60,
+   30,
+   55,
+   65,
+   65
+  ],
+  "pt": {
+   "skin": "#f9e2c8",
+   "hair": "maiden",
+   "hc": "#1e1a16",
+   "robe": "#e8e4da",
+   "female": true,
+   "mouth": "firm"
+  }
+ },
+ "jmk": {
+  "name": "장무기",
+  "cls": "명교 교주",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [
+   "taegeuk"
+  ],
+  "base": [
+   36,
+   11,
+   15,
+   9,
+   11,
+   12,
+   12,
+   6,
+   32
+  ],
+  "grow": [
+   70,
+   45,
+   65,
+   45,
+   55,
+   55,
+   55
+  ],
+  "pt": {
+   "skin": "#f0cba4",
+   "hair": "long",
+   "hc": "#241c14",
+   "robe": "#7d4a3a",
+   "mouth": "firm"
+  }
+ },
+ "jomin": {
+  "name": "조민",
+  "cls": "여양왕부 군주",
+  "type": "경",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "bido"
+  ],
+  "base": [
+   26,
+   7,
+   10,
+   5,
+   8,
+   12,
+   12,
+   6,
+   24
+  ],
+  "grow": [
+   55,
+   30,
+   55,
+   30,
+   50,
+   60,
+   65
+  ],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "maiden",
+   "hc": "#241a12",
+   "robe": "#8a5a7a",
+   "female": true,
+   "extra": "hairpin",
+   "mouth": "smirk"
+  }
+ },
+ "jsam": {
+  "name": "장삼봉",
+  "cls": "무당 조사",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "taegeukgeom"
+  ],
+  "guest": true,
+  "base": [
+   38,
+   10,
+   16,
+   10,
+   13,
+   11,
+   13,
+   5,
+   34
+  ],
+  "grow": [
+   60,
+   35,
+   65,
+   45,
+   60,
+   45,
+   60
+  ],
+  "pt": {
+   "skin": "#eec6a0",
+   "hair": "daoist",
+   "hc": "#d8d2c6",
+   "robe": "#c9c4b4",
+   "beard": "long",
+   "bc": "#d8d2c6",
+   "mouth": "smile"
+  }
+ },
+ "dy": {
+  "name": "단예",
+  "cls": "대리국 왕자",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "yukmaek"
+  ],
+  "base": [
+   30,
+   6,
+   15,
+   6,
+   11,
+   13,
+   11,
+   6,
+   34
+  ],
+  "grow": [
+   60,
+   25,
+   70,
+   30,
+   60,
+   60,
+   55
+  ],
+  "pt": {
+   "skin": "#f4d2ac",
+   "hair": "scholar",
+   "hc": "#241c14",
+   "robe": "#5a7ab0",
+   "mouth": "smile"
+  }
+ },
+ "hj": {
+  "name": "허죽",
+  "cls": "영취궁주",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [
+   "cheonsan",
+   "bukmyeong"
+  ],
+  "base": [
+   34,
+   9,
+   14,
+   8,
+   11,
+   11,
+   10,
+   5,
+   34
+  ],
+  "grow": [
+   70,
+   40,
+   65,
+   45,
+   55,
+   50,
+   50
+  ],
+  "pt": {
+   "skin": "#ecc39a",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#8a8060",
+   "mouth": "smile"
+  }
+ },
+ "dj": {
+  "name": "도적",
+  "cls": "초원의 낭인",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   18,
+   6,
+   2,
+   3,
+   1,
+   5,
+   4,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#6b6157",
+   "beard": "stub",
+   "bc": "#3a2e22",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "jhp": {
+  "name": "진현풍",
+  "cls": "동시(銅屍)",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "guum"
+  ],
+  "base": [
+   27,
+   9,
+   4,
+   6,
+   4,
+   9,
+   8,
+   5,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#cfa887",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#3a3a4a",
+   "beard": "stub",
+   "bc": "#333",
+   "brow": "fierce",
+   "extra": "scar",
+   "mouth": "frown"
+  }
+ },
+ "mcp": {
+  "name": "매초풍",
+  "cls": "철시(鐵屍)",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "guum"
+  ],
+  "base": [
+   32,
+   11,
+   5,
+   6,
+   5,
+   11,
+   9,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e8c4a8",
+   "hair": "longwild",
+   "hc": "#1e1a16",
+   "robe": "#3a3a4a",
+   "female": true,
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "msa": {
+  "name": "조왕부 무사",
+  "cls": "금국 무사",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   23,
+   7,
+   3,
+   5,
+   3,
+   6,
+   5,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#5c5248",
+   "mouth": "frown"
+  }
+ },
+ "gs": {
+  "name": "궁수",
+  "cls": "금국 궁수",
+  "type": "경",
+  "range": [
+   2
+  ],
+  "skills": [],
+  "base": [
+   19,
+   6,
+   3,
+   3,
+   3,
+   7,
+   7,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#55604f",
+   "mouth": "frown"
+  }
+ },
+ "hth": {
+  "name": "후통해",
+  "cls": "삼두교",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "samdu"
+  ],
+  "base": [
+   31,
+   10,
+   4,
+   7,
+   4,
+   7,
+   6,
+   5,
+   20
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "tri",
+   "hc": "#2e2620",
+   "robe": "#4a4038",
+   "beard": "stub",
+   "bc": "#2e2620",
+   "brow": "fierce",
+   "extra": "scar",
+   "mouth": "frown"
+  }
+ },
+ "yjs": {
+  "name": "영지상인",
+  "cls": "장백산 밀승",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "daesu"
+  ],
+  "base": [
+   30,
+   6,
+   11,
+   6,
+   8,
+   6,
+   7,
+   5,
+   22
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#c89060",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#8b3a3a",
+   "mouth": "frown"
+  }
+ },
+ "yjo": {
+  "name": "양자옹",
+  "cls": "삼선노괴",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "doksu"
+  ],
+  "base": [
+   28,
+   10,
+   5,
+   6,
+   6,
+   10,
+   9,
+   6,
+   22
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e0b890",
+   "hair": "daoist",
+   "hc": "#b8b2a6",
+   "robe": "#556b2f",
+   "beard": "long",
+   "bc": "#b8b2a6",
+   "brow": "fierce"
+  }
+ },
+ "plh": {
+  "name": "팽련호",
+  "cls": "천수인도",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "eumpung"
+  ],
+  "base": [
+   29,
+   6,
+   10,
+   6,
+   8,
+   8,
+   8,
+   5,
+   22
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "scholar",
+   "hc": "#3a2e22",
+   "robe": "#6b4a3b",
+   "beard": "goatee",
+   "bc": "#3a2e22",
+   "mouth": "frown"
+  }
+ },
+ "stc": {
+  "name": "사통천",
+  "cls": "귀문용왕",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "tongcheon"
+  ],
+  "base": [
+   31,
+   7,
+   11,
+   6,
+   8,
+   8,
+   8,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "wild",
+   "hc": "#4a4038",
+   "robe": "#4a3b5c",
+   "beard": "full",
+   "bc": "#4a4038",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "ygang": {
+  "name": "양강",
+  "cls": "금국 소왕야",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [
+   "guum"
+  ],
+  "base": [
+   33,
+   8,
+   10,
+   7,
+   9,
+   8,
+   9,
+   4,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2cfa8",
+   "hair": "topknot",
+   "hc": "#2b2119",
+   "robe": "#c9a227",
+   "extra": "hairpin",
+   "mouth": "smirk"
+  }
+ },
+ "sab": {
+  "name": "백타산 사병",
+  "cls": "서역 사군",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   9,
+   4,
+   6,
+   5,
+   9,
+   7,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#cf9e70",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#7a7466",
+   "mouth": "frown"
+  }
+ },
+ "ogg": {
+  "name": "구양극",
+  "cls": "백타산 소주",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "yeongsa"
+  ],
+  "base": [
+   36,
+   8,
+   13,
+   8,
+   10,
+   11,
+   11,
+   6,
+   26
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2d4ae",
+   "hair": "scholar",
+   "hc": "#2b2119",
+   "robe": "#e0dccc",
+   "mouth": "smirk"
+  }
+ },
+ "oyb": {
+  "name": "구양봉",
+  "cls": "서독(西毒)",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "habma"
+  ],
+  "base": [
+   54,
+   10,
+   17,
+   12,
+   13,
+   12,
+   12,
+   5,
+   34
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8ac83",
+   "hair": "longwild",
+   "hc": "#8f8578",
+   "robe": "#2f4f4f",
+   "beard": "goatee",
+   "bc": "#8f8578",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "imsu": {
+  "name": "이막수",
+  "cls": "적련선자",
+  "type": "경",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "bingbaek"
+  ],
+  "base": [
+   46,
+   12,
+   13,
+   9,
+   10,
+   13,
+   12,
+   6,
+   30
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2d0b0",
+   "hair": "bun",
+   "hc": "#241a12",
+   "robe": "#8a7a5a",
+   "female": true,
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "hnp": {
+  "name": "홍능파",
+  "cls": "이막수의 제자",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   8,
+   6,
+   5,
+   6,
+   10,
+   8,
+   5,
+   16
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#edc8a5",
+   "hair": "bun",
+   "hc": "#2a1f16",
+   "robe": "#7a6a8a",
+   "female": true,
+   "mouth": "frown"
+  }
+ },
+ "sap": {
+  "name": "사파 낭인",
+  "cls": "강호의 뜨내기",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   24,
+   8,
+   3,
+   5,
+   3,
+   7,
+   5,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9a678",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#5c5248",
+   "beard": "stub",
+   "bc": "#3a2e22",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "grb": {
+  "name": "금륜법왕",
+  "cls": "몽골 제일국사",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "yongsang"
+  ],
+  "base": [
+   58,
+   12,
+   17,
+   13,
+   13,
+   12,
+   12,
+   5,
+   36
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8a878",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#a04a2a",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "gwd": {
+  "name": "곽도",
+  "cls": "금륜법왕의 제자",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [
+   "chwihon"
+  ],
+  "base": [
+   32,
+   9,
+   11,
+   7,
+   8,
+   10,
+   9,
+   5,
+   22
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#6a5a3a",
+   "mouth": "smirk"
+  }
+ },
+ "mgb": {
+  "name": "몽골 병사",
+  "cls": "몽골 정예병",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   27,
+   9,
+   4,
+   7,
+   4,
+   7,
+   5,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#5c5248",
+   "mouth": "frown"
+  }
+ },
+ "mgs": {
+  "name": "몽골 궁수",
+  "cls": "초원의 명사수",
+  "type": "경",
+  "range": [
+   2
+  ],
+  "skills": [],
+  "base": [
+   22,
+   7,
+   3,
+   4,
+   3,
+   8,
+   7,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#55604f",
+   "mouth": "frown"
+  }
+ },
+ "hbo": {
+  "name": "학필옹",
+  "cls": "현명이로(鶴)",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "hyeonmyeong"
+  ],
+  "base": [
+   40,
+   10,
+   13,
+   9,
+   10,
+   10,
+   10,
+   5,
+   28
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e0c0a0",
+   "hair": "scholar",
+   "hc": "#b8b2a6",
+   "robe": "#3a4a6a",
+   "beard": "goatee",
+   "bc": "#b8b2a6",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "njg": {
+  "name": "녹장객",
+  "cls": "현명이로(鹿)",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "hyeonmyeong"
+  ],
+  "base": [
+   44,
+   11,
+   14,
+   10,
+   11,
+   11,
+   10,
+   5,
+   30
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8b088",
+   "hair": "daoist",
+   "hc": "#8f8578",
+   "robe": "#4a5a3a",
+   "beard": "must",
+   "bc": "#8f8578",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "sgon": {
+  "name": "성곤",
+  "cls": "혼원벽력수",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "honwon"
+  ],
+  "base": [
+   48,
+   13,
+   9,
+   11,
+   9,
+   11,
+   11,
+   5,
+   30
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8a878",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#6b5a4a",
+   "beard": "stub",
+   "bc": "#4a4038",
+   "brow": "fierce",
+   "extra": "scar",
+   "mouth": "frown"
+  }
+ },
+ "ydg": {
+  "name": "육대파 검수",
+  "cls": "조종당한 무인",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   26,
+   8,
+   5,
+   5,
+   5,
+   9,
+   8,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e2b088",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#5a6a7a",
+   "mouth": "frown"
+  }
+ },
+ "myb": {
+  "name": "모용복",
+  "cls": "고소모용가 공자",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [
+   "dujeon"
+  ],
+  "base": [
+   44,
+   12,
+   12,
+   9,
+   10,
+   13,
+   12,
+   6,
+   30
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#f2d4ae",
+   "hair": "topknot",
+   "hc": "#241c14",
+   "robe": "#9aa0b8",
+   "extra": "hairpin",
+   "mouth": "smirk"
+  }
+ },
+ "gmj": {
+  "name": "구마지",
+  "cls": "토번 국사",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "hwayeom"
+  ],
+  "base": [
+   42,
+   9,
+   15,
+   9,
+   12,
+   11,
+   11,
+   5,
+   32
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d8a878",
+   "hair": "bald",
+   "hc": "#333",
+   "robe": "#a05a2a",
+   "brow": "fierce",
+   "mouth": "smile"
+  }
+ },
+ "jcc": {
+  "name": "정춘추",
+  "cls": "성수노괴",
+  "type": "내",
+  "range": [
+   1,
+   2
+  ],
+  "skills": [
+   "hwagong"
+  ],
+  "base": [
+   46,
+   9,
+   14,
+   9,
+   12,
+   10,
+   10,
+   5,
+   32
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e0c0a0",
+   "hair": "daoist",
+   "hc": "#c8c2b4",
+   "robe": "#4a6a4a",
+   "beard": "long",
+   "bc": "#c8c2b4",
+   "brow": "fierce",
+   "mouth": "frown"
+  }
+ },
+ "ssj": {
+  "name": "성수파 제자",
+  "cls": "독공의 무리",
+  "type": "내",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   24,
+   6,
+   8,
+   4,
+   6,
+   8,
+   7,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#d9b088",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#5a6a5a",
+   "mouth": "frown"
+  }
+ },
+ "myg": {
+  "name": "모용가 가신",
+  "cls": "참합장 무사",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   27,
+   9,
+   5,
+   5,
+   5,
+   10,
+   8,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e2b088",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#8a90a8",
+   "mouth": "frown"
+  }
+ },
+ "gdb": {
+  "name": "거란 무사",
+  "cls": "대요 정예병",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   28,
+   10,
+   4,
+   7,
+   4,
+   8,
+   6,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "helm",
+   "hc": "#4a443c",
+   "robe": "#6a4a3a",
+   "mouth": "frown"
+  }
+ },
+ "gds": {
+  "name": "거란 궁수",
+  "cls": "대요 사수",
+  "type": "경",
+  "range": [
+   2
+  ],
+  "skills": [],
+  "base": [
+   23,
+   7,
+   3,
+   4,
+   3,
+   9,
+   7,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#3a2e22",
+   "robe": "#7a5a40",
+   "mouth": "frown"
+  }
+ },
+ "yyh": {
+  "name": "야율홍기",
+  "cls": "대요 황제",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "yulim"
+  ],
+  "base": [
+   52,
+   13,
+   10,
+   12,
+   10,
+   11,
+   11,
+   5,
+   30
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e0b088",
+   "hair": "band",
+   "hc": "#2e2620",
+   "robe": "#b08a2a",
+   "beard": "must",
+   "bc": "#2e2620",
+   "brow": "fierce",
+   "mouth": "firm"
+  }
+ }
+}
