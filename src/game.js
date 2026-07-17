@@ -382,6 +382,9 @@ function openMenu(){
   if(V2&&v2Usables().length){
     html+=`<button class="btn" onclick="menuAct('tool')">도구 <span style="color:#d9b36c;font-size:12px">${v2Usables().length}</span></button>`;
   }
+  if(V2){
+    html+=`<button class="btn" onclick="menuAct('equip')">장비</button>`;
+  }
   html+=`<button class="btn" onclick="menuAct('wait')">대기</button>`;
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
@@ -402,6 +405,7 @@ function menuAct(act,idx){
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
   hideMenu();
   if(act==='tool'){ openToolMenu(u); return; }
+  if(act==='equip'){ openEquipModal(u); return; }
   if(act==='attack'){ B.mode='target-attack'; B.skillIdx=null; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
   if(act==='skill'){ B.mode='target-skill'; B.skillIdx=idx; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
   if(act==='heal'){ B.mode='target-heal'; B.skillIdx=idx; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
@@ -559,13 +563,14 @@ async function enemyPhase(){
 /* ── 전투 시작 ── */
 function startBattle(){
   const ch=curCh();
+  const W=ch.map[0].length;
   const map=ch.map.map(r=>{
     let s=r;
-    while(s.length<14) s+='.';
-    return s.slice(0,14);
+    while(s.length<W) s+='.';
+    return s.slice(0,W);
   });
   B={
-    map, w:14, h:map.length,
+    map, w:W, h:map.length,
     units:[], turn:1, phase:'P', mode:'idle',
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
     busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
@@ -601,7 +606,11 @@ function fitMap(){
   const appEl=document.getElementById('app');
   const avail=Math.max(260,(appEl?appEl.clientWidth:window.innerWidth)-4);
   const fit=Math.min(1, avail/mw);
-  let sc = MAPZOOM===0 ? fit : Math.min(2, fit*MAPZOOM);
+  let sc;
+  if(MAPZOOM===0){
+    sc=fit;
+    if(fit<0.6) sc=Math.min(1, 34/TS); /* 세로 화면: 타일이 너무 작아지면 가로 스크롤 방식으로 전환 */
+  }else sc=Math.min(2, fit*MAPZOOM);
   CURSCALE=sc;
   wrap.style.transform=`scale(${sc})`;
   sizer.style.width=(mw*sc)+'px';
@@ -622,13 +631,14 @@ window.addEventListener('resize',()=>{ if(B) fitMap(); });
 
 /* ── 전투 화면 골격 ── */
 function renderScreenBattle(){
-  const mw=14*TS, mh=curCh().map.length*TS;
+  const mw=curCh().map[0].length*TS, mh=curCh().map.length*TS;
   app().innerHTML=`
   <div id="battle">
     <div id="mapcol">
       <div id="topbar">
         <span id="tb-info"></span>
         <span style="flex:1"></span>
+        ${V2?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
         <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
         <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
         <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
@@ -858,7 +868,10 @@ function renderDeploy(cap){
   const ch=curCh();
   app().innerHTML=`<div id="deploy">
     <h2>${ch.title} — 출전 준비</h2>
-    <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명) · ★곽정은 반드시 출전 · 승리 조건: ${ch.win.text}</div>
+    <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명)${(()=>{
+      const forcedIds=[...new Set([G.party.find(c=>CHARS[c].leader),...((ch.deploy&&ch.deploy.forced)||[])])].filter(c=>c&&G.party.includes(c));
+      return forcedIds.length?` · ★필수 출전: ${forcedIds.map(c=>CHARS[c].name).join('·')}`:'';
+    })()} · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${G.party.map(cid=>{
       const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
       return `<div class="dep-card ${on?'on':'off'} ${lock?'lock':''}" onclick="toggleDeploy('${cid}',${cap})">
@@ -1065,7 +1078,8 @@ function makeEndlessWave(wave){
   const boost=Math.round((1+wave*0.05)*100)/100;
   /* 적 배치 후보: 우측 절반의 통행 가능 타일, 아군 스폰에서 3칸 이상 */
   let cells=[];
-  for(let y=0;y<base.map.length;y++)for(let x=7;x<14;x++){
+  const W=base.map[0].length;
+  for(let y=0;y<base.map.length;y++)for(let x=Math.floor(W/2);x<W;x++){
     if(TILE[base.map[y][x]].cost<99) cells.push([x,y]);
   }
   cells=cells.filter(c=>base.spawns.every(s=>Math.abs(s[0]-c[0])+Math.abs(s[1]-c[1])>=3));
@@ -1432,9 +1446,7 @@ function campShopHTML(){
 function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gold-=it.price; V2.inv[id]=(V2.inv[id]||0)+1; v2Save(); renderCamp(); }
 function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); v2Save(); renderCamp(); }
 function campBagHTML(){
-  const inv=Object.keys(V2.inv);
-  if(!inv.length) return `<p style="color:var(--dim);padding:8px 0">행낭이 비었습니다.</p>`;
-  return `<table class="camptable">`+inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left"><b>${it.name}</b> ×${V2.inv[id]}</td><td style="text-align:left;color:var(--dim);font-size:12px">${it.desc}</td></tr>`;}).join('')+`</table>`;
+  return `<table class="camptable">${invRowsHTML()}</table>`;
 }
 
 /* ── 루트 맵 ── */
@@ -1482,6 +1494,86 @@ function showCampaignSelect(){
   </div>`;
 }
 
+
+/* ── 행낭(인벤토리) 모달 ── */
+function invRowsHTML(){
+  const eqBy={};
+  for(const cid in (V2.equips||{})){
+    const e=V2.equips[cid];
+    for(const k of ['w','a']) if(e[k]) (eqBy[e[k]]=eqBy[e[k]]||[]).push(CHARS[cid].name);
+  }
+  const ids=[...new Set([...Object.keys(V2.inv),...Object.keys(eqBy)])];
+  if(!ids.length) return `<tr><td colspan="2" style="color:var(--dim)">행낭이 비었습니다</td></tr>`;
+  const kindName={weapon:'병기',acc:'보구',use:'영약',key:'비급'};
+  return ids.map(id=>{
+    const it=ITEMS[id];
+    return `<tr><td style="text-align:left;white-space:nowrap"><b>${it.name}</b>${V2.inv[id]?` ×${V2.inv[id]}`:''}<div style="font-size:11px;color:var(--dim)">${kindName[it.kind]||''}</div></td>
+      <td style="text-align:left;font-size:12.5px;color:var(--dim)">${it.desc}${eqBy[id]?`<br><span style="color:var(--gold2)">장착 중: ${eqBy[id].join(' · ')}</span>`:''}</td></tr>`;
+  }).join('');
+}
+function openInvModal(){
+  if(!V2) return;
+  const html=`<div class="modal-back" id="inv-modal" onclick="if(event.target===this)this.remove()">
+    <div class="modal"><h3>행낭 · 소지금 <span style="color:var(--gold2)">${V2.gold}냥</span></h3>
+    <table class="camptable">${invRowsHTML()}</table>
+    <div class="btnrow"><button class="btn" onclick="document.getElementById('inv-modal').remove()">닫기</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+/* ── 전투 중 장비 교체 (즉시 반영, 행동 미소모) ── */
+function equipOpts(cid,k){
+  const kind=k==='w'?'weapon':'acc';
+  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  let o=`<option value="">— 없음 —</option>`;
+  for(const id in ITEMS){
+    if(ITEMS[id].kind!==kind) continue;
+    if(eq[k]===id) o+=`<option value="${id}" selected>${ITEMS[id].name} (장착 중)</option>`;
+    else if((V2.inv[id]||0)>0) o+=`<option value="${id}">${ITEMS[id].name} ×${V2.inv[id]}</option>`;
+  }
+  return o;
+}
+function unitApplyItemDiff(u, oldIt, newIt){
+  const d=k=>((newIt&&newIt[k])||0)-((oldIt&&oldIt[k])||0);
+  u.eqAtk+=d('atk'); u.eqHit+=d('hit'); u.eqCrit+=d('crit');
+  u.stats.def+=d('def'); u.stats.res+=d('res');
+  u.stats.mov=Math.max(1,u.stats.mov+d('mov'));
+  const dhp=d('hp');
+  if(dhp){ u.maxhp+=dhp; u.stats.hp+=dhp; if(dhp>0) u.hp+=dhp; u.hp=Math.max(1,Math.min(u.maxhp,u.hp)); }
+}
+function openEquipModal(u){
+  const html=`<div class="modal-back" id="eq-modal">
+    <div class="modal"><h3>장비 교체 — ${u.name}</h3>
+      <p style="font-size:12.5px;color:var(--dim);margin-bottom:8px">교체 즉시 능력치에 반영됩니다. (행동은 소모되지 않습니다)</p>
+      <div style="margin:8px 0">병기 <select onchange="battleEquip('${u.cid}','w',this.value)">${equipOpts(u.cid,'w')}</select></div>
+      <div style="margin:8px 0">보구 <select onchange="battleEquip('${u.cid}','a',this.value)">${equipOpts(u.cid,'a')}</select></div>
+      <div style="font-size:12.5px;color:var(--gold2)">공격+${u.eqAtk} · 명중+${u.eqHit} · 필살+${u.eqCrit} · 방어 ${u.stats.def} · 정신 ${u.stats.res} · 이동 ${u.stats.mov} · HP ${u.hp}/${u.maxhp}</div>
+      <div class="btnrow"><button class="btn" onclick="closeEquipModal()">닫기</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function closeEquipModal(){
+  const m=document.getElementById('eq-modal'); if(m) m.remove();
+  if(B&&B.sel) backToMenu();
+}
+function battleEquip(cid,slot,id){
+  const u=B?B.units.find(x=>x.cid===cid&&x.alive):null;
+  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  const oldId=eq[slot]||null;
+  if(oldId===(id||null)) return;
+  if(oldId){ V2.inv[oldId]=(V2.inv[oldId]||0)+1; eq[slot]=null; }
+  if(id){
+    if((V2.inv[id]||0)<=0) return;
+    V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+    eq[slot]=id;
+  }
+  if(u) unitApplyItemDiff(u, oldId?ITEMS[oldId]:null, id?ITEMS[id]:null);
+  v2Save();
+  renderBattle(true);
+  const m=document.getElementById('eq-modal');
+  if(m&&u){ m.remove(); openEquipModal(u); }
+}
+
 /* ── 부팅 및 전역(인라인 onclick) 노출 ── */
 export function boot(){
   buildPortraitDefs();
@@ -1504,4 +1596,5 @@ export const GLOBALS = {
   showCampaignSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
+  openInvModal, closeEquipModal, battleEquip,
 };

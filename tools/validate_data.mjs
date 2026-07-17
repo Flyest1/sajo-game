@@ -51,9 +51,11 @@ const ITEMS = J('items.json');
     if (n.options) n.options.forEach(o => targets.push(o.to));
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
     if (n.kind === 'battle') {
-      if (n.map.length !== 10) errs.push(`${tag}: map rows=${n.map.length}`);
+      const H = n.map.length, W = n.map[0].length;
+      if (H < 8 || H > 16) errs.push(`${tag}: map rows=${H} (8~16)`);
+      if (W < 12 || W > 24) errs.push(`${tag}: map cols=${W} (12~24)`);
       n.map.forEach((row, y) => {
-        if (row.length !== 14) errs.push(`${tag} row${y}: len=${row.length}`);
+        if (row.length !== W) errs.push(`${tag} row${y}: len=${row.length} != ${W}`);
         for (const c of row) if (!TILE[c]) errs.push(`${tag} row${y}: unknown tile '${c}'`);
       });
       const blocked = (x, y) => { const t = n.map[y] && n.map[y][x]; return !t || TILE[t].cost >= 99; };
