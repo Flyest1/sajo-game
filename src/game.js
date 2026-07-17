@@ -5,6 +5,7 @@ import HWASAN from './data/stages_hwasan.json';
 import SAJO from './data/stages_sajo.json';
 import SINJO from './data/stages_sinjo.json';
 import UICHEON from './data/stages_uicheon.json';
+import CHUNRYONG from './data/stages_chunryong.json';
 
 /* ============================================================
    전투 엔진
@@ -851,17 +852,21 @@ function startChapter(idx, skipPre){
 }
 
 /* ── 출전 준비 화면 ── */
+function deployPool(ch){
+  return (ch.deploy&&ch.deploy.only)?G.party.filter(c=>ch.deploy.only.includes(c)):G.party;
+}
 function showDeploy(){
   const ch=curCh();
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
+  const pool=deployPool(ch);
   if(!G.deploy) G.deploy=[];
-  G.deploy=G.deploy.filter(cid=>G.party.includes(cid));
-  for(const cid of G.party){ if(G.deploy.length<cap&&!G.deploy.includes(cid)) G.deploy.push(cid); }
+  G.deploy=G.deploy.filter(cid=>pool.includes(cid));
+  for(const cid of pool){ if(G.deploy.length<cap&&!G.deploy.includes(cid)) G.deploy.push(cid); }
   const forced=[...((ch.deploy&&ch.deploy.forced)||[])];
   const leader=partyLeader();
-  if(leader&&!forced.includes(leader)) forced.unshift(leader);
+  if(leader&&pool.includes(leader)&&!forced.includes(leader)) forced.unshift(leader);
   for(const cid of forced.reverse()){
-    if(!G.party.includes(cid)) continue;
+    if(!pool.includes(cid)) continue;
     const i=G.deploy.indexOf(cid); if(i>=0) G.deploy.splice(i,1);
     G.deploy.unshift(cid);
   }
@@ -876,7 +881,7 @@ function renderDeploy(cap){
       const forcedIds=[...new Set([partyLeader(),...((ch.deploy&&ch.deploy.forced)||[])])].filter(c=>c&&G.party.includes(c));
       return forcedIds.length?` · ★필수 출전: ${forcedIds.map(c=>CHARS[c].name).join('·')}`:'';
     })()} · 승리 조건: ${ch.win.text}</div>
-    <div class="dep-grid">${G.party.map(cid=>{
+    <div class="dep-grid">${deployPool(ch).map(cid=>{
       const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
       return `<div class="dep-card ${on?'on':'off'} ${lock?'lock':''}" onclick="toggleDeploy('${cid}',${cap})">
         <div class="pt">${ptSVG(cid)}</div>
@@ -911,6 +916,10 @@ function showVictory(){
   /* v2 캠페인: 스테이지 클리어 */
   if(V2&&V2.curBattle){
     const n=curNode();
+    if(n.judge&&B){ /* 특정 유닛 생존 여부 → 플래그 */
+      const ju=B.units.find(u=>u.team==='P'&&u.cid===n.judge.unit);
+      if(ju&&ju.alive) V2.flags[n.judge.set]=1;
+    }
     const loot=(B&&B.loot)||{gold:0,items:[]};
     V2.gold += (n.goldReward||0) + (loot.gold||0);
     for(const id of (loot.items||[])) V2.inv[id]=(V2.inv[id]||0)+1;
@@ -1206,7 +1215,7 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, hwasan: HWASAN };
+const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNRYONG, hwasan: HWASAN };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
@@ -1320,10 +1329,12 @@ function v2AfterBattle(){
 }
 function v2Advance(n){
   let nx=n?n.next:null;
+  if(n&&n.set) Object.assign(V2.flags,n.set); /* 노드 완료 시 플래그 */
   if(nx&&typeof nx==='object'&&nx.cond){ /* 플래그 조건/비교 분기 */
     let to=nx.else;
     for(const c of nx.cond){
-      if(c.gte){ if((V2.flags[c.gte[0]]||0)>=(V2.flags[c.gte[1]]||0)){ to=c.to; break; } }
+      if(c.and){ if(c.and.every(f=>V2.flags[f])){ to=c.to; break; } }
+      else if(c.gte){ if((V2.flags[c.gte[0]]||0)>=(V2.flags[c.gte[1]]||0)){ to=c.to; break; } }
       else if(c.if&&V2.flags[c.if]){ to=c.to; break; }
     }
     nx=to;
@@ -1336,9 +1347,9 @@ function showChoiceNode(n){
   app().innerHTML=`<div class="result-screen" style="padding:44px 0">
     <h2 style="font-size:26px">${n.title}</h2>
     <p>${n.prompt}</p>
-    ${n.options.map((o,i)=>`<div style="margin:12px 0">
-      <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${i})">${o.label}</button>
-      <div style="color:var(--dim);font-size:12.5px;margin-top:4px">${o.desc||''}</div></div>`).join('')}
+    ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&V2.flags[x.o.hideIf])).map(x=>`<div style="margin:12px 0">
+      <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${x.i})">${x.o.label}</button>
+      <div style="color:var(--dim);font-size:12.5px;margin-top:4px">${x.o.desc||''}</div></div>`).join('')}
   </div>`;
 }
 function pickChoice(i){
@@ -1543,7 +1554,8 @@ function showCampaignSelect(){
     <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
     ${campCard('sajo','제1권')}
     ${campCard('sinjo','제2권')}
-    ${campCard('uicheon','제3권 · NEW')}
+    ${campCard('uicheon','제3권')}
+    ${campCard('chunryong','천룡팔부 · NEW')}
     ${campCard('hwasan','외전 파일럿')}
     <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>

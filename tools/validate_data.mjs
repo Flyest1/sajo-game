@@ -42,8 +42,9 @@ const HWASAN = J('stages_hwasan.json');
 const SAJO = J('stages_sajo.json');
 const SINJO = J('stages_sinjo.json');
 const UICHEON = J('stages_uicheon.json');
+const CHUNRYONG = J('stages_chunryong.json');
 const ITEMS = J('items.json');
-for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON]) {
+for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG]) {
   const S = CAMP.stages;
   const CID = CAMP.id;
   if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);
