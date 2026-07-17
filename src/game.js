@@ -3,6 +3,7 @@ import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG } from './gfx.j
 import ITEMS from './data/items.json';
 import HWASAN from './data/stages_hwasan.json';
 import SAJO from './data/stages_sajo.json';
+import SINJO from './data/stages_sinjo.json';
 
 /* ============================================================
    전투 엔진
@@ -46,8 +47,9 @@ function mkPlayerUnit(cid, x, y){
     }
   }
   const cls=(V2&&V2.promoted&&V2.promoted[cid])||c.cls;
+  const isLd=(V2&&CAMPAIGNS[V2.camp]&&CAMPAIGNS[V2.camp].leader)?(cid===CAMPAIGNS[V2.camp].leader):!!c.leader;
   return {uid:'u'+(uidSeq++), cid, name:c.name, cls, type:c.type, range:c.range,
-    skills:[...c.skills, ...extra], healer:!!c.healer, leader:!!c.leader, team:'P',
+    skills:[...c.skills, ...extra], healer:!!c.healer, leader:isLd, team:'P',
     x, y, stats, maxhp:stats.hp, hp:stats.hp,
     maxki:stats.ki, ki:stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false, poison:0,
     eqAtk, eqHit, eqCrit};
@@ -855,7 +857,7 @@ function showDeploy(){
   G.deploy=G.deploy.filter(cid=>G.party.includes(cid));
   for(const cid of G.party){ if(G.deploy.length<cap&&!G.deploy.includes(cid)) G.deploy.push(cid); }
   const forced=[...((ch.deploy&&ch.deploy.forced)||[])];
-  const leader=G.party.find(cid=>CHARS[cid].leader);
+  const leader=partyLeader();
   if(leader&&!forced.includes(leader)) forced.unshift(leader);
   for(const cid of forced.reverse()){
     if(!G.party.includes(cid)) continue;
@@ -870,7 +872,7 @@ function renderDeploy(cap){
   app().innerHTML=`<div id="deploy">
     <h2>${ch.title} — 출전 준비</h2>
     <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명)${(()=>{
-      const forcedIds=[...new Set([G.party.find(c=>CHARS[c].leader),...((ch.deploy&&ch.deploy.forced)||[])])].filter(c=>c&&G.party.includes(c));
+      const forcedIds=[...new Set([partyLeader(),...((ch.deploy&&ch.deploy.forced)||[])])].filter(c=>c&&G.party.includes(c));
       return forcedIds.length?` · ★필수 출전: ${forcedIds.map(c=>CHARS[c].name).join('·')}`:'';
     })()} · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${G.party.map(cid=>{
@@ -888,7 +890,7 @@ function renderDeploy(cap){
   </div>`;
 }
 function toggleDeploy(cid,cap){
-  if(CHARS[cid].leader) return;
+  if(cid===partyLeader()) return;
   const chD=curCh();
   if(chD.deploy&&chD.deploy.forced&&chD.deploy.forced.includes(cid)) return;
   const i=G.deploy.indexOf(cid);
@@ -911,13 +913,15 @@ function showVictory(){
     const loot=(B&&B.loot)||{gold:0,items:[]};
     V2.gold += (n.goldReward||0) + (loot.gold||0);
     for(const id of (loot.items||[])) V2.inv[id]=(V2.inv[id]||0)+1;
+    for(const id of (n.rewardItems||[])) V2.inv[id]=(V2.inv[id]||0)+1;
     if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
     V2.curBattle=null;
     v2Save();
     const lootTxt=[
       n.goldReward?`보수 ${n.goldReward}냥`:'',
       loot.gold?`보물 ${loot.gold}냥`:'',
-      ...(loot.items||[]).map(id=>ITEMS[id].name)
+      ...(loot.items||[]).map(id=>ITEMS[id].name),
+      ...(n.rewardItems||[]).map(id=>`전리품 ${ITEMS[id].name}`)
     ].filter(Boolean).join(' · ');
     app().innerHTML=`<div class="result-screen">
       <h2 style="color:#ffd94a">勝 利</h2>
@@ -1201,13 +1205,20 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { sajo: SAJO, hwasan: HWASAN };
+const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, hwasan: HWASAN };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
 const DEFAULT_SHOP = ['mokgeom','cheolgeom','hosinbu','okpae','geumchang','haedok'];
 
 const v2Key = id => 'kimyong_v2_' + id;
+function partyLeader(){
+  if(V2&&CAMPAIGNS[V2.camp]&&CAMPAIGNS[V2.camp].leader){
+    const ld=CAMPAIGNS[V2.camp].leader;
+    return G.party.includes(ld)?ld:null;
+  }
+  return G.party.find(cid=>CHARS[cid].leader)||null;
+}
 function v2New(campId){
   const C = CAMPAIGNS[campId];
   return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
@@ -1224,15 +1235,29 @@ function v2Bind(){
   G.roster=V2.roster; G.party=V2.party; G.extraSkills=V2.extraSkills; G.deploy=V2.deploy;
 }
 function initRosterCharV2(cid){
-  if(V2.roster[cid]) return;
+  if(V2.roster[cid]){
+    if(!V2.party.includes(cid)) V2.party.push(cid); /* 이탈했던 동료 복귀 */
+    return;
+  }
   V2.roster[cid]={cid, lvl:1, exp:0, stats:statObj(CHARS[cid].base)};
   V2.party.push(cid);
 }
 function startCampaignV2(campId, useSave){
   ENDLESS=null; B=null;
   const C=CAMPAIGNS[campId];
-  V2=(useSave&&v2LoadSave(campId))||v2New(campId);
+  const loaded=useSave&&v2LoadSave(campId);
+  V2=loaded||v2New(campId);
   V2.attempted=V2.attempted||{};
+  if(!loaded&&C.inherit){ /* 전권 세이브에서 플래그·보너스 계승 */
+    const src=v2LoadSave(C.inherit.from);
+    if(src){
+      for(const f of (C.inherit.flags||[])) if(src.flags&&src.flags[f]) V2.flags[f]=src.flags[f];
+      if(src.cleared&&src.cleared.includes('end')){
+        V2.gold+=(C.inherit.clearBonusGold||0);
+        V2.flags.prevClear=1;
+      }
+    }
+  }
   if(!V2.party.length){ for(const cid of C.party) initRosterCharV2(cid); }
   v2Bind();
   showRouteMap();
@@ -1257,6 +1282,10 @@ function v2Enter(){
   const n=curNode();
   if(!n){ toTitle(); return; }
   (n.joins||[]).forEach(cid=>initRosterCharV2(cid));
+  (n.leave||[]).forEach(cid=>{
+    const i=V2.party.indexOf(cid); if(i>=0) V2.party.splice(i,1);
+    if(V2.deploy){ const j=V2.deploy.indexOf(cid); if(j>=0) V2.deploy.splice(j,1); }
+  });
   if(n.kind==='talk'){
     const go=()=>v2Advance(n);
     if(V2.attempted[V2.stageId]) go();
@@ -1507,9 +1536,10 @@ function showCampaignSelect(){
   app().innerHTML=`<div id="campsel">
     <h2>신규 캠페인 (베타)</h2>
     <p style="color:var(--dim);font-size:13px;margin-bottom:8px">분기 루트 · 아이템/장비 · 거점 상점 · 승급 시스템이 적용된 캠페인입니다. 클래식(19장)과 세이브가 분리됩니다.</p>
-    ${campCard('sajo','NEW · R2')}
-    ${campCard('hwasan','파일럿')}
-    <div class="camp-card lock"><h3>제2권 신조협려 · 제3권 의천도룡기</h3><p>사조에서 이어지는 연속 캠페인 — 제작 예정 (R3~R4)</p></div>
+    ${campCard('sajo','제1권')}
+    ${campCard('sinjo','제2권 · NEW')}
+    ${campCard('hwasan','외전 파일럿')}
+    <div class="camp-card lock"><h3>제3권 의천도룡기</h3><p>신조에서 이어지는 연속 캠페인 — 제작 예정 (R4)</p></div>
     <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;

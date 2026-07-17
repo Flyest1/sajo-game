@@ -40,8 +40,9 @@ for (const id in CHARS) CHARS[id].skills.forEach(s => { if (!SKILLS[s]) errs.pus
 /* ── v2 캠페인 그래프 검증 ── */
 const HWASAN = J('stages_hwasan.json');
 const SAJO = J('stages_sajo.json');
+const SINJO = J('stages_sinjo.json');
 const ITEMS = J('items.json');
-for (const CAMP of [HWASAN, SAJO]) {
+for (const CAMP of [HWASAN, SAJO, SINJO]) {
   const S = CAMP.stages;
   const CID = CAMP.id;
   if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);

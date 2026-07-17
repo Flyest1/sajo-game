@@ -102,5 +102,20 @@
   "kind": "key",
   "price": 1800,
   "desc": "도화도 무학의 정수. 황용 승급 재료"
+ },
+ "hyeoncheol": {
+  "name": "현철중검",
+  "kind": "weapon",
+  "price": 3200,
+  "atk": 6,
+  "hit": -5,
+  "crit": 0,
+  "desc": "무겁고 날이 없는 검. 검총의 유산. 공격 +6 · 명중 -5"
+ },
+ "geomgyeol": {
+  "name": "검총유결",
+  "kind": "key",
+  "price": 2000,
+  "desc": "검총에 남겨진 검도의 깨달음. 양과 승급 재료"
  }
 }

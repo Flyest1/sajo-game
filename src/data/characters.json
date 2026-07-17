@@ -503,6 +503,19 @@
    "hc": "#2b2119",
    "robe": "#6d7b8a",
    "mouth": "firm"
+  },
+  "promo": {
+   "lvl": 9,
+   "item": "geomgyeol",
+   "cls": "신조대협(神鵰大俠)",
+   "bonus": {
+    "hp": 5,
+    "str": 2,
+    "int": 2,
+    "def": 1,
+    "res": 1,
+    "skl": 1
+   }
   }
  },
  "zbt": {
@@ -2476,6 +2489,132 @@
    "beard": "goatee",
    "bc": "#3a2e22",
    "mouth": "smile"
+  }
+ },
+ "gyang": {
+  "name": "곽양",
+  "cls": "소동사(小東邪)",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   24,
+   6,
+   8,
+   4,
+   6,
+   11,
+   10,
+   6,
+   20
+  ],
+  "grow": [
+   55,
+   35,
+   55,
+   30,
+   50,
+   65,
+   60
+  ],
+  "pt": {
+   "skin": "#f7dcbc",
+   "hair": "maiden",
+   "hc": "#241a12",
+   "robe": "#c9a86a",
+   "female": true,
+   "mouth": "smile"
+  }
+ },
+ "gsj": {
+  "name": "공손지",
+  "cls": "절정곡주",
+  "type": "외",
+  "range": [
+   1
+  ],
+  "skills": [
+   "eumyang"
+  ],
+  "base": [
+   42,
+   12,
+   8,
+   9,
+   8,
+   11,
+   10,
+   5,
+   24
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#e8c4a0",
+   "hair": "scholar",
+   "hc": "#3a2e22",
+   "robe": "#e0dccc",
+   "beard": "goatee",
+   "bc": "#3a2e22",
+   "mouth": "smirk"
+  }
+ },
+ "jgj": {
+  "name": "절정곡도",
+  "cls": "녹의 문도",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   24,
+   8,
+   4,
+   5,
+   4,
+   9,
+   7,
+   5,
+   10
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#dcae86",
+   "hair": "band",
+   "hc": "#33281d",
+   "robe": "#4a6a4a",
+   "mouth": "frown"
+  }
+ },
+ "geomhon": {
+  "name": "검총의 환영",
+  "cls": "검혼(劍魂)",
+  "type": "경",
+  "range": [
+   1
+  ],
+  "skills": [],
+  "base": [
+   32,
+   11,
+   6,
+   7,
+   6,
+   11,
+   10,
+   5,
+   12
+  ],
+  "grow": [],
+  "pt": {
+   "skin": "#c8c2b4",
+   "hair": "longwild",
+   "hc": "#8f8578",
+   "robe": "#6b6257",
+   "brow": "fierce",
+   "mouth": "firm"
   }
  }
 }
