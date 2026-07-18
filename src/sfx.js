@@ -18,11 +18,35 @@ function ctx() {
   if (AC.state === 'suspended') AC.resume().catch(() => {});
   return AC;
 }
-/* 브라우저 정책: 첫 사용자 입력에서 오디오 잠금 해제 */
-document.addEventListener('pointerdown', () => {
+/* 브라우저 정책: 사용자 입력에서 오디오 잠금 해제
+   — iOS 는 touchstart/pointerdown 을 유효 제스처로 인정하지 않는 경우가 있어
+     touchend/click/keydown 까지 전부에서 해제를 시도한다 */
+let IOS_SESSION_DONE = false;
+function iosAudioSession() {
+  /* iOS 무음 스위치 대응: 짧은 무음 HTML5 오디오를 재생해
+     오디오 세션을 미디어(playback) 카테고리로 전환 (unmute 기법) */
+  if (IOS_SESSION_DONE) return;
+  IOS_SESSION_DONE = true;
+  try {
+    const a = document.createElement('audio');
+    a.setAttribute('playsinline', '');
+    a.preload = 'auto';
+    /* 0.05초 무음 wav (44바이트 헤더 + 무음) */
+    a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+    a.volume = 0.01;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+}
+function unlockAudio() {
   if (!ctx()) return;
+  if (AC.state === 'suspended') AC.resume().catch(() => {});
+  iosAudioSession();
   if (BGMS.mood && !BGMS.timer) startTimer();
-}, true);
+}
+for (const ev of ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown']) {
+  document.addEventListener(ev, unlockAudio, true);
+}
 
 function tone(o) {
   if (!AC) return;

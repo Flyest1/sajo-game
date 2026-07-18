@@ -51,9 +51,36 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 .dlg-title-card h2{font-size:36px;margin-bottom:10px;}
 .dlg-title-card p{color:var(--dim);font-size:16px;}
 
-/* ── 전투 ── */
+/* ── 전투 (전체 화면 + 오버레이 HUD) ── */
 #battle{display:flex;gap:12px;align-items:flex-start;}
-#mapcol{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;}
+#battle.full{display:block;}
+#app:has(#battle.full){width:100vw;max-width:100vw;padding:0 4px;}
+body:has(#battle.full){align-items:flex-start;}
+#battle.full #topbar{position:sticky;top:0;z-index:40;background:rgba(26,21,14,.94);
+  padding:7px 6px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;backdrop-filter:blur(3px);}
+#battlebody{position:relative;}
+#battle.full #mapscroll{max-height:calc(100vh - 66px);}
+/* 팝업 HUD */
+#ucard-pop.pop,#info-pop.pop{position:absolute;z-index:30;padding:12px 13px;font-size:13.5px;
+  box-shadow:0 8px 28px rgba(0,0,0,.55);animation:scrfade .18s ease;overflow:auto;background:rgba(38,32,23,.96);}
+#ucard-pop.pop{right:4px;top:4px;width:272px;max-width:82vw;max-height:calc(100vh - 130px);}
+#info-pop.pop{left:4px;top:126px;width:284px;max-width:86vw;max-height:calc(100vh - 200px);}
+#ucard-pop.hidden,#info-pop.hidden{display:none;}
+.pop-x{position:absolute;right:6px;top:6px;background:none;border:1px solid var(--line);color:var(--dim);
+  border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;}
+.pop-x:hover{color:var(--gold2);border-color:var(--gold);}
+#info-pop .row{display:flex;justify-content:space-between;margin-top:4px;color:var(--dim);gap:8px;}
+#info-pop .row b{color:var(--text);}
+#info-pop .ch-t{font-size:15px;color:var(--gold2);font-weight:700;margin-bottom:2px;padding-right:26px;}
+#info-pop #log{max-height:180px;}
+/* 미니맵 */
+#minimap{position:absolute;left:4px;top:4px;z-index:28;border:1px solid var(--gold);border-radius:6px;
+  overflow:hidden;background:#141008;opacity:.93;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);line-height:0;}
+#minimap:hover{opacity:1;}
+/* 통합 세이브 허브 */
+.hub-last{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel2);
+  border:1px solid var(--gold);border-radius:6px;padding:9px 12px;margin-bottom:10px;font-size:13.5px;}
+.hub-sub{font-size:11.5px;color:var(--dim);margin-top:2px;}
 #topbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--dim);flex-wrap:wrap;}
 #topbar .btn.small{padding:7px 13px;}
 #mapscroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%;border-radius:6px;}

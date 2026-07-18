@@ -387,6 +387,7 @@ function onTile(x,y){
   if(!B||B.busy||B.over||B.phase!=='P') return;
   const u=unitAt(x,y);
   B.tileSel={x,y};
+  if(u) UCARD_HIDE=false; /* 유닛 클릭 → 팝업 카드 다시 표시 */
   if(B.mode==='idle'){
     if(u&&u.team==='P'&&!u.acted) selectUnit(u);
     else if(u&&u.team==='E') inspectEnemy(u);
@@ -675,9 +676,11 @@ function fitMap(){
   const fit=Math.min(1, avail/mw);
   let sc;
   if(MAPZOOM===0){
-    sc=fit;
-    if(fit<0.6) sc=Math.min(1, 34/TS); /* 세로 화면: 타일이 너무 작아지면 가로 스크롤 방식으로 전환 */
-  }else sc=Math.min(2, fit*MAPZOOM);
+    /* 전체 화면 채우기: 가로·세로에 맞춰 확대(최대 1.45배)·축소 */
+    const availH=Math.max(300, window.innerHeight-84);
+    sc=Math.min(avail/mw, availH/mh, 1.45);
+    if(sc<0.6) sc=Math.min(1, 34/TS); /* 세로 화면: 타일이 너무 작아지면 가로 스크롤 방식으로 전환 */
+  }else sc=Math.min(2.4, fit*MAPZOOM);
   CURSCALE=sc;
   wrap.style.transform=`scale(${sc})`;
   sizer.style.width=(mw*sc)+'px';
@@ -696,21 +699,26 @@ function uiCancel(){
 }
 window.addEventListener('resize',()=>{ if(B) fitMap(); });
 
-/* ── 전투 화면 골격 ── */
+/* ── 전투 화면 골격 (전체 화면 + 오버레이 HUD) ── */
+let UCARD_HIDE=false, INFO_OPEN=false;
+function toggleInfoPop(){ INFO_OPEN=!INFO_OPEN; SFX.play('ui'); if(B) renderSide(); }
+function hideUcard(){ UCARD_HIDE=true; if(B) renderSide(); }
 function renderScreenBattle(){
   const mw=curCh().map[0].length*TS, mh=curCh().map.length*TS;
+  UCARD_HIDE=false; INFO_OPEN=false;
   app().innerHTML=`
-  <div id="battle">
-    <div id="mapcol">
-      <div id="topbar">
-        <span id="tb-info"></span>
-        <span style="flex:1"></span>
-        ${V2?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
-        <button class="btn small snd-btn" onclick="sndToggleUI()">${sndOn()?'♪':'∅'}</button>
-        <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
-        <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
-        <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
-      </div>
+  <div id="battle" class="full">
+    <div id="topbar">
+      <span id="tb-info"></span>
+      <span style="flex:1"></span>
+      ${V2?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
+      <button class="btn small snd-btn" onclick="sndToggleUI()">${sndOn()?'♪':'∅'}</button>
+      <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
+      <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
+      <button class="btn small" id="tb-detail" onclick="toggleInfoPop()">정보</button>
+      <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
+    </div>
+    <div id="battlebody">
       <div id="mapscroll"><div id="mapsizer">
         <div id="mapwrap" style="width:${mw}px;height:${mh}px">
           <svg id="mapsvg" width="${mw}" height="${mh}"></svg>
@@ -718,8 +726,10 @@ function renderScreenBattle(){
           <div id="banner"></div>
         </div>
       </div></div>
+      <div id="minimap" title="미니맵 — 클릭하면 그 위치로 이동"></div>
+      <div id="ucard-pop" class="hidden"></div>
+      <div id="info-pop" class="hidden"></div>
     </div>
-    <div id="side"></div>
   </div>`;
   const wrap=document.getElementById('mapwrap');
   wrap.addEventListener('click',e=>{
@@ -733,8 +743,40 @@ function renderScreenBattle(){
     e.preventDefault();
     uiCancel();
   });
+  const ms=document.getElementById('mapscroll');
+  ms.addEventListener('scroll',()=>renderMinimap());
+  const mm=document.getElementById('minimap');
+  mm.addEventListener('click',e=>{
+    if(!B) return;
+    const r=mm.getBoundingClientRect();
+    const fx=(e.clientX-r.left)/r.width, fy=(e.clientY-r.top)/r.height;
+    ms.scrollLeft=fx*B.w*TS*CURSCALE-ms.clientWidth/2;
+    ms.scrollTop=fy*B.h*TS*CURSCALE-ms.clientHeight/2;
+  });
   fitMap();
   renderBattle();
+}
+
+/* ── 미니맵 ── */
+function renderMinimap(){
+  const mm=document.getElementById('minimap'); if(!mm||!B) return;
+  const t2=Math.max(3,Math.min(7,Math.floor(150/B.w)));
+  const w=B.w*t2, h=B.h*t2;
+  let s=`<svg width="${w}" height="${h}" style="display:block">`;
+  for(let y=0;y<B.h;y++) for(let x=0;x<B.w;x++)
+    s+=`<rect x="${x*t2}" y="${y*t2}" width="${t2}" height="${t2}" fill="${TILE[tileChar(x,y)].color}"/>`;
+  for(const t of (B.treasures||[])) if(!t.taken)
+    s+=`<rect x="${t.x*t2}" y="${t.y*t2}" width="${t2}" height="${t2}" fill="#ffd94a" stroke="#8a6a10" stroke-width=".6"/>`;
+  for(const u of B.units) if(u.alive)
+    s+=`<circle cx="${u.x*t2+t2/2}" cy="${u.y*t2+t2/2}" r="${t2*0.48}" fill="${u.team==='P'?'#4a9ae0':(u.boss?'#ffd94a':'#e05a44')}" stroke="rgba(0,0,0,.4)" stroke-width=".5"/>`;
+  const ms=document.getElementById('mapscroll'), sc=CURSCALE||1;
+  if(ms){
+    const vx=ms.scrollLeft/sc/TS*t2, vw=Math.min(w,ms.clientWidth/sc/TS*t2);
+    const vy=ms.scrollTop/sc/TS*t2, vh=Math.min(h,ms.clientHeight/sc/TS*t2);
+    if(vw<w-1||vh<h-1) s+=`<rect x="${vx}" y="${vy}" width="${Math.max(6,vw)}" height="${Math.max(6,vh)}" fill="none" stroke="#f0d49a" stroke-width="1.6"/>`;
+  }
+  s+='</svg>';
+  mm.innerHTML=s;
 }
 
 /* ── 전투 렌더 (svg + 사이드) ── */
@@ -789,61 +831,74 @@ function renderBattle(light){
 }
 
 function statRow(lbl,val){ return `<div>${lbl} <b>${val}</b></div>`; }
-function renderSide(){
-  const side=document.getElementById('side');
-  if(!side) return;
-  const ch=curCh();
-  const u=B.sel||B.inspect||(B.tileSel?unitAt(B.tileSel.x,B.tileSel.y):null);
-  let card='<div style="color:var(--dim);padding:14px 4px;text-align:center;">유닛을 선택하세요</div>';
-  if(u){
-    const hpPct=Math.round(u.hp/u.maxhp*100), kiPct=Math.round(u.ki/u.maxki*100);
-    card=`
-    <div class="uc-head">
-      <div class="uc-pt ${u.team==='E'?'enemy':''}">${ptSVG(u.cid)}</div>
-      <div style="flex:1">
-        <div class="uc-name">${u.name}${u.boss?' ★':''}<span class="typebadge type-${u.type}">${TYPE_NAME[u.type]}</span></div>
-        <div class="uc-sub">${u.cls} · Lv.${u.lvl}${u.team==='P'?` · EXP ${u.exp}`:''}${u.poison?` · <span style="color:#c07ae0">☠ 중독 ${u.poison}턴</span>`:''}</div>
-        <div class="bar hp ${hpPct<=35?'low':''}"><i style="width:${hpPct}%"></i></div>
-        <div class="uc-sub" style="display:flex;justify-content:space-between"><span>HP ${u.hp}/${u.maxhp}</span><span>기 ${u.ki}/${u.maxki}</span></div>
-        <div class="bar ki"><i style="width:${kiPct}%"></i></div>
-      </div>
+function terrLine(){
+  if(!B.tileSel) return '';
+  const T=TILE[tileChar(B.tileSel.x,B.tileSel.y)];
+  return `지형: <b>${T.name}</b> — 회피 +${T.avoid} · 방어 +${T.def}${T.heal?' · 매턴 HP 회복':''}`;
+}
+function ucardHTML(u){
+  const hpPct=Math.round(u.hp/u.maxhp*100), kiPct=Math.round(u.ki/u.maxki*100);
+  return `
+  <button class="pop-x" onclick="hideUcard()">×</button>
+  <div class="uc-head">
+    <div class="uc-pt ${u.team==='E'?'enemy':''}">${ptSVG(u.cid)}</div>
+    <div style="flex:1">
+      <div class="uc-name">${u.name}${u.boss?' ★':''}<span class="typebadge type-${u.type}">${TYPE_NAME[u.type]}</span></div>
+      <div class="uc-sub">${u.cls} · Lv.${u.lvl}${u.team==='P'?` · EXP ${u.exp}`:''}${u.poison?` · <span style="color:#c07ae0">☠ 중독 ${u.poison}턴</span>`:''}</div>
+      <div class="bar hp ${hpPct<=35?'low':''}"><i style="width:${hpPct}%"></i></div>
+      <div class="uc-sub" style="display:flex;justify-content:space-between"><span>HP ${u.hp}/${u.maxhp}</span><span>기 ${u.ki}/${u.maxki}</span></div>
+      <div class="bar ki"><i style="width:${kiPct}%"></i></div>
     </div>
-    <div class="uc-stats">
-      ${statRow('힘',u.stats.str)}${statRow('내공',u.stats.int)}${statRow('기술',u.stats.skl)}
-      ${statRow('방어',u.stats.def)}${statRow('정신',u.stats.res)}${statRow('속도',u.stats.spd)}
-      ${statRow('이동',u.stats.mov)}${statRow('사거리',u.range.join('·'))}<div></div>
-    </div>
-    ${u.skills.map(sid=>{const sk=SKILLS[sid];return `<div class="uc-skill">◆ ${sk.name} — ${sk.desc} (기 ${sk.cost})</div>`;}).join('')}`;
-  }
-  let terr='';
-  if(B.tileSel){
-    const T=TILE[tileChar(B.tileSel.x,B.tileSel.y)];
-    terr=`지형: <b>${T.name}</b> — 회피 +${T.avoid} · 방어 +${T.def}${T.heal?' · 매턴 HP 회복':''}`;
-  }
-  const surviveTxt = ch.win.type==='survive' ? `<div class="row"><span>남은 방어</span><b>${Math.max(0,ch.win.turns-B.turn+1)}턴</b></div>` : '';
-  side.innerHTML=`
-  <div class="panel" id="chinfo">
-    <div class="ch-t">${ch.title}</div>
-    <div class="row"><span>턴</span><b>${B.turn}</b></div>
-    <div class="row"><span>페이즈</span><b>${B.phase==='P'?'아군':'적군'}</b></div>
-    <div class="row"><span>승리</span><b>${ch.win.text}</b></div>
-    ${surviveTxt}
-    <div class="row"><span>패배</span><b>${ch.lose}</b></div>
-    <div class="row"><span>병력</span><b>아군 ${players().length} · 적 ${foes().length}</b></div>
   </div>
-  <div class="panel" id="unitcard">${card}</div>
-  <div class="panel" id="terrinfo">${terr||'타일을 클릭하면 지형 정보가 표시됩니다'}</div>
-  <div id="sidebtns">
-    <button class="btn small" onclick="endPlayerPhase()" ${B.phase!=='P'||B.busy?'disabled':''}>턴 종료</button>
+  <div class="uc-stats">
+    ${statRow('힘',u.stats.str)}${statRow('내공',u.stats.int)}${statRow('기술',u.stats.skl)}
+    ${statRow('방어',u.stats.def)}${statRow('정신',u.stats.res)}${statRow('속도',u.stats.spd)}
+    ${statRow('이동',u.stats.mov)}${statRow('사거리',u.range.join('·'))}<div></div>
+  </div>
+  ${u.skills.map(sid=>{const sk=SKILLS[sid];return `<div class="uc-skill">◆ ${sk.name} — ${sk.desc} (기 ${sk.cost})</div>`;}).join('')}
+  <div class="uc-sub" style="margin-top:6px">${terrLine()}</div>`;
+}
+function infoHTML(ch){
+  const surviveTxt = ch.win.type==='survive' ? `<div class="row"><span>남은 방어</span><b>${Math.max(0,ch.win.turns-B.turn+1)}턴</b></div>` : '';
+  return `
+  <button class="pop-x" onclick="toggleInfoPop()">×</button>
+  <div class="ch-t">${ch.title}</div>
+  <div class="row"><span>턴</span><b>${B.turn}</b></div>
+  <div class="row"><span>페이즈</span><b>${B.phase==='P'?'아군':'적군'}</b></div>
+  <div class="row"><span>승리</span><b>${ch.win.text}</b></div>
+  ${surviveTxt}
+  <div class="row"><span>패배</span><b>${ch.lose}</b></div>
+  <div class="row"><span>병력</span><b>아군 ${players().length} · 적 ${foes().length}</b></div>
+  <div class="row"><span>${terrLine()||'타일 클릭 → 지형 정보'}</span></div>
+  <div class="btnrow" style="margin:8px 0 6px">
     <button class="btn small" onclick="showHelp()">도움말</button>
     <button class="btn small danger" onclick="confirmToTitle()">타이틀로</button>
   </div>
-  <div class="panel"><div id="log">${B.log.map(l=>`<div class="${l.imp?'imp':''}">${l.msg}</div>`).join('')}</div></div>`;
-  /* 상단 바 갱신 */
+  <div id="log">${B.log.map(l=>`<div class="${l.imp?'imp':''}">${l.msg}</div>`).join('')}</div>`;
+}
+function renderSide(){
+  if(!B) return;
+  const ch=curCh();
+  /* 상단 바 */
+  const surviveTop = ch.win.type==='survive' ? ` · 방어 ${Math.max(0,ch.win.turns-B.turn+1)}턴` : '';
   const tbi=document.getElementById('tb-info');
-  if(tbi) tbi.innerHTML=`${B.turn}턴 · ${B.phase==='P'?'아군':'<span style="color:#e09080">적군</span>'} 페이즈 · 적 ${foes().length}`;
+  if(tbi) tbi.innerHTML=`${B.turn}턴 · ${B.phase==='P'?'아군':'<span style="color:#e09080">적군</span>'}${surviveTop} · 적 ${foes().length}`;
   const te=document.getElementById('tb-end'); if(te) te.disabled=(B.phase!=='P'||B.busy);
   const tc=document.getElementById('tb-cancel'); if(tc) tc.disabled=(B.mode==='idle'&&!B.inspect);
+  /* 유닛 팝업 카드 (필요시만 표시) */
+  const pop=document.getElementById('ucard-pop');
+  if(pop){
+    const u=B.sel||B.inspect||(B.tileSel?unitAt(B.tileSel.x,B.tileSel.y):null);
+    if(u&&!UCARD_HIDE){ pop.className='panel pop'; pop.innerHTML=ucardHTML(u); }
+    else pop.className='hidden';
+  }
+  /* 정보 팝업 (버튼 토글) */
+  const ip=document.getElementById('info-pop');
+  if(ip){
+    if(INFO_OPEN){ ip.className='panel pop'; ip.innerHTML=infoHTML(ch); }
+    else ip.className='hidden';
+  }
+  renderMinimap();
 }
 
 /* ── 대화 화면 (무드 4종: 새벽/낮/황혼/밤 — 스테이지 시드로 결정) ── */
@@ -1127,12 +1182,62 @@ function showEnding(){
 
 /* ── 저장/불러오기 ── */
 const SAVE_KEY='kimyong_srpg_save_v1';
+const LASTPLAY_KEY='kimyong_lastplay';
+function markPlay(kind,camp){ try{ localStorage.setItem(LASTPLAY_KEY, JSON.stringify({k:kind, c:camp||null, t:Date.now()})); }catch(e){} }
+function lastPlay(){ try{ return JSON.parse(localStorage.getItem(LASTPLAY_KEY)||'null'); }catch(e){ return null; } }
 function saveGame(nextCh){
   try{
     const prev=loadGame();
     const ch=Math.max(nextCh, prev?(prev.ch||0):0); /* 회상 재도전 시 진행도 후퇴 방지 */
     localStorage.setItem(SAVE_KEY, JSON.stringify({ch, roster:G.roster, party:G.party, extra:G.extraSkills, deploy:G.deploy}));
+    markPlay('classic');
   }catch(e){}
+}
+/* ── 통합 세이브 허브 (클래식 v1 + 캠페인 v2 + 무한 모드) ── */
+function saveHubResume(){
+  const lp=lastPlay();
+  const m=document.getElementById('hub-modal'); if(m) m.remove();
+  if(!lp){ continueGame(); return; }
+  if(lp.k==='classic') continueGame();
+  else if(lp.k==='v2'&&lp.c&&v2LoadSave(lp.c)) startCampaignV2(lp.c,true);
+  else if(lp.k==='endless') startEndless();
+  else continueGame();
+}
+function hubContinue(kind,camp){
+  const m=document.getElementById('hub-modal'); if(m) m.remove();
+  if(kind==='classic') continueGame();
+  else if(kind==='v2') startCampaignV2(camp,true);
+  else if(kind==='endless') startEndless();
+}
+function showSaveHub(){
+  SFX.play('ui');
+  const lp=lastPlay();
+  const lpName = lp ? (lp.k==='classic'?'클래식 (전 19장)':(lp.k==='v2'&&CAMPAIGNS[lp.c]?CAMPAIGNS[lp.c].name:'영웅집결 무한 모드')) : null;
+  const rows=[];
+  const cs=loadGame();
+  if(cs){
+    const prog = cs.ch>=CHAPTERS.length ? '전 장 클리어' : `${Math.min(cs.ch+1,CHAPTERS.length)}장 진행 중`;
+    rows.push(`<tr><td style="text-align:left"><b>클래식</b> — 전 19장 + 크로스오버<div class="hub-sub">${prog}</div></td>
+      <td><button class="btn small" onclick="hubContinue('classic')">이어하기</button></td></tr>`);
+  }
+  for(const id in CAMPAIGNS){
+    const sv=v2LoadSave(id);
+    if(!sv) continue;
+    const done=sv.cleared&&sv.cleared.some(x=>String(x).startsWith('end'));
+    rows.push(`<tr><td style="text-align:left"><b>${CAMPAIGNS[id].name}</b><div class="hub-sub">${done?'완주':'진행 '+(sv.cleared?sv.cleared.length:0)+'단계'} · ${sv.gold||0}냥</div></td>
+      <td><button class="btn small" onclick="hubContinue('v2','${id}')">이어하기</button></td></tr>`);
+  }
+  if(bestWave()>0){
+    rows.push(`<tr><td style="text-align:left"><b>영웅집결 무한 모드</b><div class="hub-sub">역대 최고 ${bestWave()}파</div></td>
+      <td><button class="btn small" onclick="hubContinue('endless')">도전</button></td></tr>`);
+  }
+  const html=`<div class="modal-back" id="hub-modal" onclick="if(event.target===this)this.remove()">
+    <div class="modal"><h3>이어하기 — 통합 기록</h3>
+    ${lpName?`<div class="hub-last"><span>최근 플레이: <b>${lpName}</b></span><button class="btn small" onclick="saveHubResume()">바로 이어하기 ▶</button></div>`:''}
+    ${rows.length?`<table class="camptable">${rows.join('')}</table>`:'<p style="color:var(--dim)">저장된 기록이 없습니다.</p>'}
+    <div class="btnrow"><button class="btn" onclick="document.getElementById('hub-modal').remove()">닫기</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
 }
 function loadGame(){
   try{
@@ -1217,6 +1322,7 @@ function makeEndlessWave(wave){
     enemies, win:{type:'rout', text:`제${wave}파 전멸`}, lose:'곽정이 쓰러지면 패배', pre:[], post:[] };
 }
 function startEndless(){
+  markPlay('endless');
   /* 전 영웅 집결: 스토리 진행과 무관하게 모든 아군을 Lv.10으로 소집 */
   ENDLESS=null; V2=null;
   G.chapterIdx=0; G.roster={}; G.party=[]; G.deploy=null;
@@ -1244,13 +1350,14 @@ function sndToggleUI(){
 function showTitle(){
   BGM.start('calm');
   const hasSave=!!loadGame();
+  const hasAny=hasSave || Object.keys(CAMPAIGNS).some(id=>v2LoadSave(id)) || bestWave()>0;
   app().innerHTML=`<div id="title-screen">
     ${titleArtSVG()}
     <div class="title-main">사조영웅전<span style="font-size:24px;color:var(--dim)"> ─ </span>강호의 별</div>
     <div class="title-sub">射鵰英雄傳 · 김용 무협 시뮬레이션 RPG</div>
     <div class="title-menu">
       <div><button class="btn" onclick="newGame()">새로운 협객행 (새 게임)</button></div>
-      <div><button class="btn" onclick="continueGame()" ${hasSave?'':'disabled'}>이어하기</button></div>
+      <div><button class="btn" onclick="showSaveHub()" ${hasAny?'':'disabled'}>이어하기 <span style="font-size:12px;color:var(--dim)">통합 기록</span></button></div>
       <div><button class="btn" onclick="showChapterSelect()" ${hasSave?'':'disabled'}>장 선택 (회상)</button></div>
       <div><button class="btn" onclick="showCampaignSelect()">신규 캠페인 <span style="font-size:12px;color:var(--gold2)">분기·아이템 (베타)</span></button></div>
       <div><button class="btn" onclick="startEndless()">영웅집결 무한 모드${bestWave()?` <span style="font-size:12px;color:var(--dim)">최고 ${bestWave()}파</span>`:''}</button></div>
@@ -1346,6 +1453,7 @@ function v2New(campId){
            cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null };
 }
 function v2Save(){
+  markPlay('v2', V2&&V2.camp);
   if(!V2) return;
   try{ const {curBattle, ...st}=V2; localStorage.setItem(v2Key(V2.camp), JSON.stringify(st)); }catch(e){}
 }
@@ -1386,6 +1494,7 @@ function startCampaignV2(campId, useSave){
     if(C.startSkills) for(const k in C.startSkills) V2.extraSkills[k]=[...(C.startSkills[k]||[])];
   }
   v2Bind();
+  v2Save(); /* 시작 즉시 저장 → 통합 이어하기 허브에 노출 */
   showRouteMap();
 }
 function curNode(){ return V2?CAMPAIGNS[V2.camp].stages[V2.stageId]:null; }
@@ -1800,4 +1909,5 @@ export const GLOBALS = {
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
+  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume,
 };
