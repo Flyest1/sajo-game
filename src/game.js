@@ -1581,6 +1581,13 @@ function showSettings(){
         <span style="color:var(--dim);font-size:12px">적군 턴 연출을 가속합니다</span></div></div>
     <div class="set-sec"><div class="set-h">사운드</div>
       <div class="set-line"><button class="btn small snd-btn" data-long="1" onclick="sndToggleUI()">사운드 ${sndOn()?'♪ 켜짐':'꺼짐'}</button></div></div>
+    <div class="set-sec"><div class="set-h">세이브 백업</div>
+      <div class="set-line">
+        <button class="btn small" onclick="exportSave()">내보내기</button>
+        <button class="btn small" onclick="triggerImport()">가져오기</button>
+        <span style="color:var(--dim);font-size:11.5px">전 기록을 파일로 저장·복원 (기기 이동)</span></div></div>
+    <div class="set-sec"><div class="set-h">조작 안내</div>
+      <div style="color:var(--dim);font-size:12px;line-height:1.7">방향키/WASD 커서 · Enter/Space 선택·확정 · Esc 취소 · Tab 다음 유닛 · E 턴 종료 · I 정보 · Z 배율<br>게임패드: 방향패드 이동 · A 확정 · B 취소 · Start 턴 종료 · Y 다음 유닛</div></div>
     <div class="btnrow"><button class="btn" onclick="document.getElementById('set-modal').remove()">닫기</button></div>
     </div></div>`;
   document.body.insertAdjacentHTML('beforeend',html);
@@ -1664,16 +1671,119 @@ function showHelp(){
   document.body.insertAdjacentHTML('beforeend',html);
 }
 
-/* ── 부팅 ── */
+/* ── 키보드 조작 (전투) ── */
+function anyModalOpen(){ return !!document.querySelector('.modal-back'); }
+function keyCursor(dx,dy){
+  if(!B||B.busy||B.over||B.phase!=='P') return;
+  const c=B.tileSel||(B.sel?{x:B.sel.x,y:B.sel.y}:{x:0,y:0});
+  const nx=Math.max(0,Math.min(B.w-1,c.x+dx)), ny=Math.max(0,Math.min(B.h-1,c.y+dy));
+  B.tileSel={x:nx,y:ny};
+  focusUnit({x:nx,y:ny});
+  renderBattle();
+}
+function keyConfirm(){
+  if(!B||B.busy||B.over) return;
+  const fc=document.getElementById('fc-modal'); if(fc){ confirmAttack(); return; }
+  if(B.phase!=='P') return;
+  const c=B.tileSel; if(c) onTile(c.x,c.y);
+}
+function keyCancel(){
+  const fc=document.getElementById('fc-modal'); if(fc){ cancelForecast(); return; }
+  const hm=document.querySelector('.modal-back'); if(hm&&hm.id!=='fc-modal'){ hm.remove(); return; }
+  if(B&&!B.busy) uiCancel();
+}
+function keyNextUnit(){
+  if(!B||B.busy||B.over||B.phase!=='P') return;
+  const ps=players().filter(u=>!u.acted);
+  if(!ps.length) return;
+  const cur=B.tileSel?unitAt(B.tileSel.x,B.tileSel.y):null;
+  let idx=cur?ps.indexOf(cur):-1;
+  const u=ps[(idx+1)%ps.length];
+  clearSel(); B.tileSel={x:u.x,y:u.y}; focusUnit(u); selectUnit(u);
+}
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    const fm=document.getElementById('fc-modal');
-    if(fm){ cancelForecast(); return; }
-    const hm=document.getElementById('help-modal');
-    if(hm){ hm.remove(); return; }
-    if(B&&!B.busy&&B.mode!=='idle') clearSel();
+  /* 모달/입력 중이면 전투 조작키 무시 (Esc/Enter만 처리) */
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||'');
+  if(typing) return;
+  switch(e.key){
+    case 'Escape': keyCancel(); e.preventDefault(); return;
+    case 'Enter': keyConfirm(); e.preventDefault(); return;
+    case 'ArrowUp': case 'w': case 'W': keyCursor(0,-1); e.preventDefault(); return;
+    case 'ArrowDown': case 's': case 'S': keyCursor(0,1); e.preventDefault(); return;
+    case 'ArrowLeft': case 'a': case 'A': keyCursor(-1,0); e.preventDefault(); return;
+    case 'ArrowRight': case 'd': case 'D': keyCursor(1,0); e.preventDefault(); return;
+    case ' ': keyConfirm(); e.preventDefault(); return;
+    case 'Tab': keyNextUnit(); e.preventDefault(); return;
+    case 'e': case 'E': if(B&&!B.busy&&B.phase==='P'){ endPlayerPhase(); e.preventDefault(); } return;
+    case 'i': case 'I': if(B){ toggleInfoPop(); e.preventDefault(); } return;
+    case 'z': case 'Z': if(B){ cycleZoom(); e.preventDefault(); } return;
   }
 });
+
+/* ── 게임패드 기본 조작 ── */
+let GP_PREV={};
+function gamepadPoll(){
+  const pads=(navigator.getGamepads&&navigator.getGamepads())||[];
+  const gp=[...pads].find(p=>p);
+  if(gp&&B&&!B.busy&&!B.over){
+    const b=gp.buttons, ax=gp.axes;
+    const pressed=i=>b[i]&&b[i].pressed;
+    const edge=(i)=>{ const p=pressed(i); const was=GP_PREV[i]; GP_PREV[i]=p; return p&&!was; };
+    /* 방향: dpad(12~15) 또는 좌스틱 */
+    if(edge(12)||(ax[1]<-0.6&&!GP_PREV.up)){ keyCursor(0,-1); }
+    GP_PREV.up = ax[1]<-0.6;
+    if(edge(13)||(ax[1]>0.6&&!GP_PREV.down)){ keyCursor(0,1); }
+    GP_PREV.down = ax[1]>0.6;
+    if(edge(14)||(ax[0]<-0.6&&!GP_PREV.left)){ keyCursor(-1,0); }
+    GP_PREV.left = ax[0]<-0.6;
+    if(edge(15)||(ax[0]>0.6&&!GP_PREV.right)){ keyCursor(1,0); }
+    GP_PREV.right = ax[0]>0.6;
+    if(edge(0)) keyConfirm();          /* A */
+    if(edge(1)) keyCancel();           /* B */
+    if(edge(9)&&B.phase==='P') endPlayerPhase(); /* Start */
+    if(edge(3)) keyNextUnit();         /* Y */
+  } else if(!B){ GP_PREV={}; }
+  requestAnimationFrame(gamepadPoll);
+}
+requestAnimationFrame(gamepadPoll);
+
+/* ── 세이브 백업 (내보내기/가져오기) ── */
+function exportSave(){
+  SFX.play('ui');
+  const data={};
+  for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('kimyong')===0) data[k]=localStorage.getItem(k); }
+  const payload={app:'kangho', v:1, ts:Date.now(), data};
+  const blob=new Blob([JSON.stringify(payload,null,1)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  const d=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  a.href=url; a.download=`강호의별_백업_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function triggerImport(){
+  let inp=document.getElementById('save-import-file');
+  if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.id='save-import-file'; inp.style.display='none';
+    inp.addEventListener('change',()=>importSaveFile(inp)); document.body.appendChild(inp); }
+  inp.value=''; inp.click();
+}
+function importSaveFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const obj=JSON.parse(rd.result);
+      const d=obj&&obj.data?obj.data:obj;
+      if(!d||typeof d!=='object') throw 0;
+      let n=0;
+      for(const k in d){ if(k.indexOf('kimyong')===0){ localStorage.setItem(k, d[k]); n++; } }
+      if(!n) throw 0;
+      alert(`${n}개 기록을 복원했습니다. 게임을 새로고침합니다.`);
+      location.reload();
+    }catch(e){ alert('가져오기 실패 — 올바른 백업 파일이 아닙니다.'); }
+  };
+  rd.readAsText(f);
+}
+
 /* 부팅은 main.js 의 boot() 에서 수행 */
 
 
@@ -2273,4 +2383,5 @@ export const GLOBALS = {
   toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, viewSupport,
   showSettings, setDiff, setSpeed, toggleFastEnemy,
   showAchievements, chooseNgPlus, ngStart,
+  exportSave, triggerImport,
 };

@@ -11,6 +11,7 @@
     "validate": "node tools/validate_data.mjs"
   },
   "devDependencies": {
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }
