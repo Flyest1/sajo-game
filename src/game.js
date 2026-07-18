@@ -9,6 +9,10 @@ import UICHEON from './data/stages_uicheon.json';
 import CHUNRYONG from './data/stages_chunryong.json';
 import HOOILDAM from './data/stages_hooildam.json';
 import JINFINAL from './data/stages_jinfinal.json';
+import WOLNYEO from './data/stages_wolnyeo.json';
+import DOKGO from './data/stages_dokgo.json';
+import HWALSA from './data/stages_hwalsa.json';
+import PUNGREUNG from './data/stages_pungreung.json';
 import SUPPORTS from './data/supports.json';
 
 /* ── 인연(지원) 시스템 ── */
@@ -1571,7 +1575,7 @@ document.addEventListener('keydown',e=>{
 /* ============================================================
    v2 캠페인 엔진 — 그래프·플래그·아이템·거점·승급·보물
    ============================================================ */
-const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNRYONG, hwasan: HWASAN, hooildam: HOOILDAM, jinfinal: JINFINAL };
+const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNRYONG, hwasan: HWASAN, hooildam: HOOILDAM, wolnyeo: WOLNYEO, dokgo: DOKGO, hwalsa: HWALSA, pungreung: PUNGREUNG, jinfinal: JINFINAL };
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
@@ -1965,10 +1969,12 @@ function lockedCard(id, badge){
   const C=CAMPAIGNS[id];
   const req=C.requireAll||[];
   const done=req.filter(campCleared).length;
-  return `<div class="camp-card lock"><h3>${C.name} ${badge?`<span style="font-size:12px;color:var(--gold2)">${badge}</span>`:''}</h3>
+  const reqNames=req.map(r=>`${CAMPAIGNS[r]?CAMPAIGNS[r].name.replace(/^(해금 외전|외전.·|외전.|사조삼부곡 [^—]*—) /,'').trim():r}${campCleared(r)?' ✓':''}`).join(' · ');
+  return `<div class="camp-card lock"><h3>🔒 ${C.name} ${badge?`<span style="font-size:12px;color:var(--gold2)">${badge}</span>`:''}</h3>
     <p>${C.desc}</p>
-    <p style="color:var(--gold2);font-size:12.5px">해금 조건: 본편·외전 5개 캠페인 완주 (${done}/${req.length})</p></div>`;
+    <p style="color:var(--gold2);font-size:12.5px">해금 조건 (${done}/${req.length}): ${reqNames}</p></div>`;
 }
+function unlocked(id){ return (CAMPAIGNS[id].requireAll||[]).every(campCleared); }
 function campCard(id, badge){
   const C=CAMPAIGNS[id], sv=v2LoadSave(id);
   return `<div class="camp-card">
@@ -1988,8 +1994,13 @@ function showCampaignSelect(){
     ${campCard('uicheon','제3권')}
     ${campCard('chunryong','천룡팔부')}
     ${campCard('hwasan','외전Ⅰ · 6막 완성판')}
-    ${campCard('hooildam','외전Ⅱ · NEW')}
-    ${(CAMPAIGNS.jinfinal.requireAll||[]).every(campCleared)?campCard('jinfinal','진최종전 · 해금!'):lockedCard('jinfinal','진최종전')}
+    ${campCard('hooildam','외전Ⅱ')}
+    <div class="camp-sep">해금 외전 <span style="font-size:12px;color:var(--dim)">— 본편·외전을 완주하면 열립니다</span></div>
+    ${unlocked('wolnyeo')?campCard('wolnyeo','해금!'):lockedCard('wolnyeo')}
+    ${unlocked('dokgo')?campCard('dokgo','해금!'):lockedCard('dokgo')}
+    ${unlocked('hwalsa')?campCard('hwalsa','해금!'):lockedCard('hwalsa')}
+    ${unlocked('pungreung')?campCard('pungreung','해금!'):lockedCard('pungreung')}
+    ${unlocked('jinfinal')?campCard('jinfinal','진최종전 · 해금!'):lockedCard('jinfinal','진최종전')}
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;
 }

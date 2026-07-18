@@ -265,7 +265,8 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 .camp-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .camp-cols h3{font-size:15px;margin-bottom:6px;color:var(--gold2);}
 .camp-card{background:var(--panel);border:1px solid var(--gold);border-radius:8px;padding:14px 16px;margin:10px 0;}
-.camp-card.lock{opacity:.55;border-color:var(--line);}
+.camp-card.lock{opacity:.62;border-color:var(--line);}
+.camp-sep{margin:16px 0 4px;color:var(--gold2);font-weight:700;font-size:15px;border-top:1px solid var(--line);padding-top:12px;}
 .camp-card h3{font-size:17px;margin-bottom:4px;}
 .camp-card p{color:var(--dim);font-size:13px;margin-bottom:10px;line-height:1.6;}
 .route-list{display:flex;flex-direction:column;gap:6px;max-width:660px;}

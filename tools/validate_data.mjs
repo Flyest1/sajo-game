@@ -45,8 +45,12 @@ const UICHEON = J('stages_uicheon.json');
 const CHUNRYONG = J('stages_chunryong.json');
 const HOOILDAM = J('stages_hooildam.json');
 const JINFINAL = J('stages_jinfinal.json');
+const WOLNYEO = J('stages_wolnyeo.json');
+const DOKGO = J('stages_dokgo.json');
+const HWALSA = J('stages_hwalsa.json');
+const PUNGREUNG = J('stages_pungreung.json');
 const ITEMS = J('items.json');
-for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, JINFINAL]) {
+for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL]) {
   const S = CAMP.stages;
   const CID = CAMP.id;
   if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);
