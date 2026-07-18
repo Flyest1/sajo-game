@@ -63,8 +63,12 @@ body:has(#battle.full){align-items:flex-start;}
 /* 팝업 HUD */
 #ucard-pop.pop,#info-pop.pop{position:absolute;z-index:30;padding:12px 13px;font-size:13.5px;
   box-shadow:0 8px 28px rgba(0,0,0,.55);animation:scrfade .18s ease;overflow:auto;background:rgba(38,32,23,.96);}
-#ucard-pop.pop{right:4px;top:4px;width:272px;max-width:82vw;max-height:calc(100vh - 130px);}
-#info-pop.pop{left:4px;top:126px;width:284px;max-width:86vw;max-height:calc(100vh - 200px);}
+#ucard-pop.pop{width:272px;max-width:82vw;max-height:calc(100vh - 130px);top:4px;right:4px;}
+#info-pop.pop{width:284px;max-width:86vw;max-height:calc(100vh - 160px);top:4px;left:4px;}
+/* 유닛 반대쪽 배치 클래스 */
+#ucard-pop.pop.left,#info-pop.pop.left{left:4px;right:auto;}
+#ucard-pop.pop.right,#info-pop.pop.right{right:4px;left:auto;}
+#info-pop.pop.bottom{top:auto;bottom:4px;}
 #ucard-pop.hidden,#info-pop.hidden{display:none;}
 .pop-x{position:absolute;right:6px;top:6px;background:none;border:1px solid var(--line);color:var(--dim);
   border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;}
@@ -187,6 +191,7 @@ body:has(#battle.full){align-items:flex-start;}
 .fc-grid .hd{color:var(--gold2);font-weight:700;font-size:15px;}
 .fc-grid .lbl{color:var(--dim);}
 .fc-grid .val{font-weight:700;font-size:16px;}
+.fc-exp{font-size:12.5px;color:#c9a86a;font-weight:400;margin-left:6px;white-space:nowrap;}
 .modal .btnrow{text-align:center;margin-top:14px;}
 .modal .btnrow .btn{margin:0 6px;}
 .helptable{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;}
@@ -267,6 +272,27 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 .camp-card{background:var(--panel);border:1px solid var(--gold);border-radius:8px;padding:14px 16px;margin:10px 0;}
 .camp-card.lock{opacity:.62;border-color:var(--line);}
 .camp-sep{margin:16px 0 4px;color:var(--gold2);font-weight:700;font-size:15px;border-top:1px solid var(--line);padding-top:12px;}
+/* 업적·통계 화면 */
+#achv-screen{padding:8px 0;}
+#achv-screen h2{font-size:22px;margin-bottom:10px;}
+.stat-box{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.stat-tile{flex:1;min-width:82px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 6px;text-align:center;}
+.stat-tile b{display:block;font-size:22px;color:var(--gold2);}
+.stat-tile span{font-size:11.5px;color:var(--dim);}
+.achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;}
+.achv-row{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 11px;opacity:.6;}
+.achv-row.on{opacity:1;border-color:var(--gold);}
+.achv-ic{font-size:22px;flex:0 0 auto;}
+.achv-row b{font-size:14px;color:var(--gold2);}
+.achv-row.on b{color:var(--gold2);}
+.achv-d{font-size:11.5px;color:var(--dim);margin-top:2px;}
+/* 업적 토스트 */
+.achv-toast{position:fixed;left:50%;top:54px;transform:translate(-50%,-20px);z-index:200;
+  background:linear-gradient(180deg,#5d4f37,#3a3123);border:1px solid var(--gold);border-radius:8px;
+  padding:10px 20px;text-align:center;color:var(--gold2);font-size:14px;opacity:0;
+  transition:all .35s cubic-bezier(.2,1.4,.4,1);box-shadow:0 6px 24px rgba(0,0,0,.5);pointer-events:none;}
+.achv-toast.show{opacity:1;transform:translate(-50%,0);}
+@media(max-width:760px){ .achv-grid{grid-template-columns:1fr;} }
 .camp-card h3{font-size:17px;margin-bottom:4px;}
 .camp-card p{color:var(--dim);font-size:13px;margin-bottom:10px;line-height:1.6;}
 .route-list{display:flex;flex-direction:column;gap:6px;max-width:660px;}
