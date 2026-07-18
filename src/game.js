@@ -42,6 +42,53 @@ let B = null;       // 현재 전투 상태
 let ENDLESS = null; // 영웅집결 무한 모드 상태 {wave, ch}
 let uidSeq = 0;
 
+/* ── 설정(난이도·속도) ── */
+const DIFFS = {
+  story: { name:'이야기', enemy:0.85, exp:1.3, gold:1.2, desc:'적 능력 -15% · 경험치 +30% · 자금 +20% — 편하게 이야기를 감상' },
+  std:   { name:'표준',   enemy:1.0,  exp:1.0, gold:1.0, desc:'균형 잡힌 기본 난이도' },
+  hero:  { name:'협객',   enemy:1.15, exp:0.9, gold:0.7, desc:'적 능력 +15% · 경험치 -10% · 자금 -30% — 도전적인 강호' },
+};
+const SPEEDS = [1, 1.5, 2];
+function loadSettings(){
+  try{ const s=JSON.parse(localStorage.getItem('kimyong_settings')||'null'); if(s) return Object.assign({diff:'std',speed:1,fastEnemy:false},s); }catch(e){}
+  return { diff:'std', speed:1, fastEnemy:false };
+}
+let SETTINGS = loadSettings();
+function saveSettings(){ try{ localStorage.setItem('kimyong_settings', JSON.stringify(SETTINGS)); }catch(e){} }
+/* 현재 전투의 난이도(세이브에 고정) */
+function curDiff(){
+  const id = (B&&B.diff) || (V2&&V2.diff) || (ENDLESS&&ENDLESS.diff) || (G&&G.diff) || 'std';
+  return DIFFS[id]||DIFFS.std;
+}
+/* 연출 속도: 적 페이즈 스킵 시 가속 */
+function effSpeed(){
+  let s=SETTINGS.speed||1;
+  if(B&&B.phase==='E'&&SETTINGS.fastEnemy) s=Math.max(s,3);
+  return s;
+}
+const aSleep = ms => sleep(ms/effSpeed());
+
+/* ── 무공 숙련도 (전 모드 공유, 스킬별 사용 횟수 누적) ── */
+const MASTERY_STEPS = [0, 8, 20, 40, 70]; // 숙련 단계(0~4) 진입 누적 사용 횟수
+let SKILL_USE = (()=>{ try{ return JSON.parse(localStorage.getItem('kimyong_mastery')||'{}')||{}; }catch(e){ return {}; } })();
+function masteryTier(sid){
+  const n=SKILL_USE[sid]||0;
+  let t=0; for(let i=MASTERY_STEPS.length-1;i>=0;i--){ if(n>=MASTERY_STEPS[i]){ t=i; break; } }
+  return t;
+}
+function masteryLabel(sid){ const t=masteryTier(sid); return t?('숙련 '+['','★','★★','★★★','極'][t]):''; }
+/* 숙련 보정: 위력 배수 +0.04/단계, 명중 +2/단계, 기 소모 -1/2단계 */
+function masteryMultBonus(sid){ return masteryTier(sid)*0.04; }
+function masteryHitBonus(sid){ return masteryTier(sid)*2; }
+function masteryCost(sid){ const sk=SKILLS[sid]; return Math.max(1, (sk.cost||0) - Math.floor(masteryTier(sid)/2)); }
+function bumpMastery(sid){
+  const before=masteryTier(sid);
+  SKILL_USE[sid]=(SKILL_USE[sid]||0)+1;
+  try{ localStorage.setItem('kimyong_mastery', JSON.stringify(SKILL_USE)); }catch(e){}
+  const after=masteryTier(sid);
+  return after>before ? after : 0; // 상승한 새 단계(없으면 0)
+}
+
 /* 현재 챕터(스토리) 또는 현재 웨이브(무한 모드) 정의 반환 */
 function curCh(){ return ENDLESS ? ENDLESS.ch : (V2 && V2.curBattle ? V2.curBattle : CHAPTERS[G.chapterIdx]); }
 
@@ -84,7 +131,9 @@ function mkPlayerUnit(cid, x, y){
 }
 function mkEnemyUnit(def){
   const c=CHARS[def.cid], st=statObj(c.base);
+  const dm=curDiff().enemy;
   if(def.boost) for(const k in st) st[k]=Math.round(st[k]*def.boost);
+  if(dm!==1) for(const k of ['hp','str','int','def','res']) st[k]=Math.max(1,Math.round(st[k]*dm));
   return {uid:'u'+(uidSeq++), cid:def.cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
     skills:c.skills, healer:false, leader:false, team:'E',
     x:def.x, y:def.y, stats:st, maxhp:st.hp, hp:st.hp, maxki:st.ki, ki:st.ki,
@@ -136,11 +185,15 @@ function calcStrike(a,d,skillId){
   const dT=TILE[tileChar(d.x,d.y)];
   const supA=adjAllies(a), supD=adjAllies(d); /* 협공: 인접 아군 보정 */
   const bA=adjBond(a), bD=adjBond(d);        /* 인연: 인접 인연 아군 보정 (랭크 비례) */
-  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA + bA + (a.eqAtk||0) - mit - dT.def);
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
+  /* 무공 숙련도 보정 (아군 시전 시) */
+  const mst=(sk&&a.team==='P')?masteryTier(skillId):0;
+  const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
+  const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
+  let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) - mit - dT.def);
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
-  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD};
+  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst};
 }
 function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 
@@ -158,7 +211,7 @@ async function banner(txt, enemy){
   const b=document.getElementById('banner'); if(!b) return;
   SFX.play('phase');
   b.textContent=txt; b.className='show'+(enemy?' enemy':'');
-  await sleep(950); b.className='';
+  await aSleep(950); b.className='';
 }
 /* 유닛 이동 트윈: 현재 좌표로 렌더 후, 이전 좌표에서 미끄러져 오는 연출 */
 async function animMove(u, ox, oy){
@@ -168,13 +221,14 @@ async function animMove(u, ox, oy){
   const steps=Math.max(Math.abs(ox-u.x),Math.abs(oy-u.y));
   const dur=Math.min(460, 80*steps+130);
   SFX.play('move');
-  if(!g){ await sleep(160); return; }
+  if(!g){ await aSleep(160); return; }
   g.style.transition='none';
   g.style.transform=`translate(${(ox-u.x)*TS}px,${(oy-u.y)*TS}px)`;
   g.getBoundingClientRect(); /* reflow 강제 */
-  g.style.transition=`transform ${dur}ms cubic-bezier(.3,.7,.4,1)`;
+  const adur=dur/effSpeed();
+  g.style.transition=`transform ${adur}ms cubic-bezier(.3,.7,.4,1)`;
   g.style.transform='translate(0,0)';
-  await sleep(dur+50);
+  await sleep(adur+40);
 }
 /* 선택 유닛을 (nx,ny)로 트윈 이동시킨 뒤 후속 동작 실행 */
 function moveSelTo(nx,ny,after){
@@ -189,7 +243,7 @@ async function lunge(a,d){
   const dx=d.x-a.x, dy=d.y-a.y, m=Math.max(1,Math.abs(dx),Math.abs(dy));
   g.style.transition='transform .09s ease-in';
   g.style.transform=`translate(${dx/m*12}px,${dy/m*12}px)`;
-  await sleep(100);
+  await aSleep(100);
   if(g.isConnected){ g.style.transition='transform .16s ease-out'; g.style.transform='translate(0,0)'; }
 }
 /* 피격 섬광 */
@@ -217,7 +271,7 @@ function log(msg,imp){
 /* ── 경험치/레벨 ── */
 function grantExp(u, amt){
   if(u.team!=='P'||!u.alive) return;
-  u.exp+=amt;
+  u.exp+=Math.round(amt*curDiff().exp);
   while(u.exp>=100){
     u.exp-=100; u.lvl++;
     const ups=rollLevel(u);
@@ -253,7 +307,12 @@ function poisonTick(team){
 async function strike(a,d,skillId,followup){
   const c=calcStrike(a,d,skillId);
   const sk=skillId?SKILLS[skillId]:null;
-  if(sk&&!followup){ a.ki-=sk.cost; fx(a.x,a.y,sk.name,'label'); SFX.play('skill'); await sleep(420); }
+  if(sk&&!followup){
+    a.ki-=(a.team==='P'?masteryCost(skillId):sk.cost);
+    fx(a.x,a.y,sk.name,'label'); SFX.play('skill');
+    if(a.team==='P'){ const up=bumpMastery(skillId); if(up){ fx(a.x,a.y-0.4,'숙련 상승!','label'); SFX.play('levelup'); log(`<b>${a.name}</b>의 ${sk.name} — 숙련 ${['','★','★★','★★★','極'][up]} 단계 도달!`,true); } }
+    await aSleep(420);
+  }
   const roll=Math.random()*100;
   await lunge(a,d);
   if(roll<c.hit){
@@ -291,9 +350,9 @@ async function strike(a,d,skillId,followup){
     fx(d.x,d.y,'회피!','miss');
     log(`${a.name}의 공격, ${d.name}이(가) 회피`);
   }
-  await sleep(260); /* 런지 복귀·회피 모션이 끝난 뒤 렌더 */
+  await aSleep(260); /* 런지 복귀·회피 모션이 끝난 뒤 렌더 */
   renderBattle(true);
-  await sleep(300);
+  await aSleep(300);
 }
 
 /* ── 교전(공격+반격+추격) ── */
@@ -325,17 +384,20 @@ async function combat(a,d,skillId){
 /* ── 치료 ── */
 async function healAction(a,t,skillId){
   B.busy=true;
-  const sk=SKILLS[skillId||a.skills[0]];
-  a.ki-=sk.cost;
-  const amt=a.stats.int+sk.healPow;
+  const sid=skillId||a.skills[0];
+  const sk=SKILLS[sid];
+  a.ki-=(a.team==='P'?masteryCost(sid):sk.cost);
+  const mstAmt=(a.team==='P')?masteryTier(sid):0;
+  const amt=a.stats.int+sk.healPow+mstAmt;
   t.hp=Math.min(t.maxhp,t.hp+amt);
   fx(a.x,a.y,sk.name,'label'); SFX.play('skill');
-  await sleep(380);
+  if(a.team==='P'){ const up=bumpMastery(sid); if(up){ fx(a.x,a.y-0.4,'숙련 상승!','label'); SFX.play('levelup'); log(`<b>${a.name}</b>의 ${sk.name} — 숙련 ${['','★','★★','★★★','極'][up]} 단계 도달!`,true); } }
+  await aSleep(380);
   fx(t.x,t.y,'+'+amt,'heal'); SFX.play('heal');
   log(`${a.name}의 ${sk.name} — ${t.name} ${amt} 회복`);
   grantExp(a,14);
   renderBattle(true);
-  await sleep(450);
+  await aSleep(450);
   B.busy=false;
 }
 
@@ -460,12 +522,14 @@ function openMenu(){
   if(enemiesNear.length) html+=`<button class="btn" onclick="menuAct('attack')">공격</button>`;
   u.skills.forEach((sid,i)=>{
     const sk=SKILLS[sid];
-    if(u.ki<sk.cost) return;
+    const cost=masteryCost(sid), ml=masteryLabel(sid);
+    const mlTxt=ml?` <span style="color:#e8c96a;font-size:11px">${ml}</span>`:'';
+    if(u.ki<cost) return;
     if(sk.heal){
       const hurt=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp);
-      if(hurt.length) html+=`<button class="btn" onclick="menuAct('heal',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
+      if(hurt.length) html+=`<button class="btn" onclick="menuAct('heal',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
     }else if(enemiesNear.length){
-      html+=`<button class="btn" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${sk.cost}</span></button>`;
+      html+=`<button class="btn" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
     }
   });
   if(V2&&v2Usables().length){
@@ -611,6 +675,8 @@ async function enemyPhase(){
       if(!near && u.hp===u.maxhp) continue;
       u.wait=0;
     }
+    focusUnit(u); /* 행동할 적에게 화면 이동 */
+    if(!(SETTINGS.fastEnemy&&SETTINGS.speed>=2)) await aSleep(160);
     const mr=moveRange(u);
     let best=null;
     for(const k of mr.keys()){
@@ -665,6 +731,7 @@ function startBattle(){
     units:[], turn:1, phase:'P', mode:'idle',
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
     busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
+    diff:(V2&&V2.diff)||(ENDLESS&&ENDLESS.diff)||(G&&G.diff)||'std',
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
@@ -710,8 +777,10 @@ function fitMap(){
   sizer.style.width=(mw*sc)+'px';
   sizer.style.height=(mh*sc)+'px';
 }
+const ZOOM_CYCLE=[0,1.25,1.5,2];
 function cycleZoom(){
-  MAPZOOM = MAPZOOM===0 ? 1.5 : (MAPZOOM===1.5 ? 2 : 0);
+  const i=ZOOM_CYCLE.indexOf(MAPZOOM);
+  MAPZOOM = ZOOM_CYCLE[(i+1)%ZOOM_CYCLE.length];
   const z=document.getElementById('tb-zoom');
   if(z) z.textContent = MAPZOOM===0 ? '자동' : ('×'+MAPZOOM);
   fitMap();
@@ -720,6 +789,16 @@ function uiCancel(){
   if(!B||B.busy) return;
   if(B.mode!=='idle') clearSel();
   else if(B.inspect){ B.inspect=null; B.mr=null; renderBattle(); }
+}
+/* 유닛을 화면 중앙으로 스크롤 (적 턴 카메라 추적) */
+function focusUnit(u){
+  const ms=document.getElementById('mapscroll'); if(!ms||!u) return;
+  const sc=CURSCALE||1;
+  const cx=(u.x+0.5)*TS*sc, cy=(u.y+0.5)*TS*sc;
+  const tl=Math.max(0, cx-ms.clientWidth/2), tt=Math.max(0, cy-ms.clientHeight/2);
+  if(Math.abs(ms.scrollLeft-tl)<8 && Math.abs(ms.scrollTop-tt)<8) return; // 이미 보임
+  try{ ms.scrollTo({left:tl, top:tt, behavior:'smooth'}); }
+  catch(e){ ms.scrollLeft=tl; ms.scrollTop=tt; }
 }
 window.addEventListener('resize',()=>{ if(B) fitMap(); });
 
@@ -737,6 +816,7 @@ function renderScreenBattle(){
       <span style="flex:1"></span>
       ${V2?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
       <button class="btn small snd-btn" onclick="sndToggleUI()">${sndOn()?'♪':'∅'}</button>
+      <button class="btn small" onclick="showSettings()">⚙</button>
       <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
       <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
       <button class="btn small" id="tb-detail" onclick="toggleInfoPop()">정보</button>
@@ -879,7 +959,7 @@ function ucardHTML(u){
     ${statRow('방어',u.stats.def)}${statRow('정신',u.stats.res)}${statRow('속도',u.stats.spd)}
     ${statRow('이동',u.stats.mov)}${statRow('사거리',u.range.join('·'))}<div></div>
   </div>
-  ${u.skills.map(sid=>{const sk=SKILLS[sid];return `<div class="uc-skill">◆ ${sk.name} — ${sk.desc} (기 ${sk.cost})</div>`;}).join('')}
+  ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})</div>`;}).join('')}
   <div class="uc-sub" style="margin-top:6px">${terrLine()}</div>`;
 }
 function infoHTML(ch){
@@ -1100,7 +1180,8 @@ function showVictory(){
       if(ju&&ju.alive) V2.flags[n.judge.set]=1;
     }
     const loot=(B&&B.loot)||{gold:0,items:[]};
-    V2.gold += (n.goldReward||0) + (loot.gold||0);
+    const gm=curDiff().gold;
+    V2.gold += Math.round(((n.goldReward||0) + (loot.gold||0))*gm);
     for(const id of (loot.items||[])) V2.inv[id]=(V2.inv[id]||0)+1;
     for(const id of (n.rewardItems||[])) V2.inv[id]=(V2.inv[id]||0)+1;
     if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
@@ -1213,7 +1294,7 @@ function saveGame(nextCh){
   try{
     const prev=loadGame();
     const ch=Math.max(nextCh, prev?(prev.ch||0):0); /* 회상 재도전 시 진행도 후퇴 방지 */
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ch, roster:G.roster, party:G.party, extra:G.extraSkills, deploy:G.deploy}));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ch, roster:G.roster, party:G.party, extra:G.extraSkills, deploy:G.deploy, diff:G.diff||'std'}));
     markPlay('classic');
   }catch(e){}
 }
@@ -1271,7 +1352,7 @@ function loadGame(){
 }
 function loadState(s){
   G.roster=s.roster; G.party=s.party;
-  G.extraSkills=s.extra||{}; G.deploy=s.deploy||null;
+  G.extraSkills=s.extra||{}; G.deploy=s.deploy||null; G.diff=s.diff||'std';
 }
 function continueGame(){
   const s=loadGame();
@@ -1357,7 +1438,7 @@ function startEndless(){
   nextWave(1);
 }
 function nextWave(w){
-  ENDLESS={wave:w, ch:makeEndlessWave(w)};
+  ENDLESS={wave:w, ch:makeEndlessWave(w), diff:SETTINGS.diff};
   showDeploy();
 }
 
@@ -1371,6 +1452,38 @@ function sndToggleUI(){
     b.textContent=b.dataset.long?('사운드 '+(on?'♪ 켜짐':'꺼짐')):(on?'♪':'∅');
   });
 }
+/* ── 통합 설정 (난이도·연출 속도·사운드) ── */
+function showSettings(){
+  SFX.play('ui');
+  const inBattle=!!B;
+  const diffRows=Object.keys(DIFFS).map(id=>{
+    const d=DIFFS[id], on=SETTINGS.diff===id;
+    return `<button class="btn small setrow ${on?'on':''}" onclick="setDiff('${id}')">${d.name}${on?' ✓':''}<div class="set-sub">${d.desc}</div></button>`;
+  }).join('');
+  const spdRows=SPEEDS.map(s=>`<button class="btn small ${SETTINGS.speed===s?'on':''}" onclick="setSpeed(${s})">×${s}${SETTINGS.speed===s?' ✓':''}</button>`).join('');
+  const html=`<div class="modal-back" id="set-modal" onclick="if(event.target===this)this.remove()">
+    <div class="modal"><h3>설정</h3>
+    <div class="set-sec"><div class="set-h">난이도 ${inBattle?'<span style="color:var(--dim);font-size:11px">(다음 전투/새 시작부터 적용)</span>':''}</div>
+      <div class="set-col">${diffRows}</div></div>
+    <div class="set-sec"><div class="set-h">전투 연출 속도</div>
+      <div class="set-line">${spdRows}</div></div>
+    <div class="set-sec"><div class="set-h">적 페이즈 빠르게</div>
+      <div class="set-line">
+        <button class="btn small ${SETTINGS.fastEnemy?'on':''}" onclick="toggleFastEnemy()">${SETTINGS.fastEnemy?'켜짐 ✓':'꺼짐'}</button>
+        <span style="color:var(--dim);font-size:12px">적군 턴 연출을 가속합니다</span></div></div>
+    <div class="set-sec"><div class="set-h">사운드</div>
+      <div class="set-line"><button class="btn small snd-btn" data-long="1" onclick="sndToggleUI()">사운드 ${sndOn()?'♪ 켜짐':'꺼짐'}</button></div></div>
+    <div class="btnrow"><button class="btn" onclick="document.getElementById('set-modal').remove()">닫기</button></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function setDiff(id){ SETTINGS.diff=id; saveSettings(); SFX.play('select');
+  /* 현재 전투 중이 아니면 진행 중 세이브에도 즉시 반영 */
+  const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings(); }
+function setSpeed(s){ SETTINGS.speed=s; saveSettings(); SFX.play('ui');
+  const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings(); }
+function toggleFastEnemy(){ SETTINGS.fastEnemy=!SETTINGS.fastEnemy; saveSettings(); SFX.play('ui');
+  const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings(); }
 function showTitle(){
   BGM.start('calm');
   const hasSave=!!loadGame();
@@ -1386,7 +1499,7 @@ function showTitle(){
       <div><button class="btn" onclick="showCampaignSelect()">신규 캠페인 <span style="font-size:12px;color:var(--gold2)">분기·아이템 (베타)</span></button></div>
       <div><button class="btn" onclick="startEndless()">영웅집결 무한 모드${bestWave()?` <span style="font-size:12px;color:var(--dim)">최고 ${bestWave()}파</span>`:''}</button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
-      <div><button class="btn small snd-btn" data-long="1" onclick="sndToggleUI()">사운드 ${sndOn()?'♪ 켜짐':'꺼짐'}</button></div>
+      <div><button class="btn" onclick="showSettings()">설정 <span style="font-size:12px;color:var(--dim)">난이도 ${DIFFS[SETTINGS.diff].name} · ×${SETTINGS.speed}</span></button></div>
     </div>
     <div class="title-note">
       본 게임은 AI(Claude)가 제작한 김용(金庸) 원작 팬메이드 데모입니다.<br>
@@ -1396,7 +1509,7 @@ function showTitle(){
   </div>`;
 }
 function newGame(){
-  G.chapterIdx=0; G.roster={}; G.party=[]; G.extraSkills={}; G.deploy=null;
+  G.chapterIdx=0; G.roster={}; G.party=[]; G.extraSkills={}; G.deploy=null; G.diff=SETTINGS.diff;
   startChapter(0);
 }
 
@@ -1462,7 +1575,7 @@ const CAMPAIGNS = { sajo: SAJO, sinjo: SINJO, uicheon: UICHEON, chunryong: CHUNR
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
 let CAMP_TAB = 'unit';
-const DEFAULT_SHOP = ['mokgeom','cheolgeom','hosinbu','okpae','geumchang','haedok'];
+const DEFAULT_SHOP = ['mokgeom','cheolgeom','gangcheol','yuyeopdo','panhwanpil','hosinbu','okpae','yeonwoogap','chilseongpae','gyeonggong','bihohye','ungdam','geumchang','sohwandan','haedok','byeokhahwan','jeongsimdan'];
 
 const v2Key = id => 'kimyong_v2_' + id;
 function partyLeader(){
@@ -1476,7 +1589,7 @@ function v2New(campId){
   const C = CAMPAIGNS[campId];
   return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
            cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null,
-           supports:{}, supportLock:{} };
+           supports:{}, supportLock:{}, diff:SETTINGS.diff };
 }
 function v2Save(){
   markPlay('v2', V2&&V2.camp);
@@ -1656,7 +1769,8 @@ function v2UseTool(id){
   if(!u||!it||(V2.inv[id]||0)<=0){ backToMenu(); return; }
   V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
   if(it.cure&&u.poison){ u.poison=0; log(`${u.name} — 해독되었다`); }
-  if(it.heal){ const amt=Math.min(u.maxhp-u.hp, it.heal); u.hp+=amt; fx(u.x,u.y,'+'+amt,'heal'); log(`${u.name} — ${it.name} 사용 (HP ${amt} 회복)`); }
+  if(it.heal){ const amt=Math.min(u.maxhp-u.hp, it.heal); u.hp+=amt; fx(u.x,u.y,'+'+amt,'heal'); SFX.play('heal'); log(`${u.name} — ${it.name} 사용 (HP ${amt} 회복)`); }
+  if(it.ki){ const amt=Math.min(u.maxki-u.ki, it.ki); u.ki+=amt; fx(u.x,u.y,'기+'+amt,'label'); SFX.play('skill'); log(`${u.name} — ${it.name} 사용 (기 ${amt} 회복)`); }
   v2Save();
   renderBattle(true);
   finishUnit(u);
@@ -1673,7 +1787,13 @@ function campTab(t){ CAMP_TAB=t; renderCamp(); }
 function campFromDeploy(){ showCamp(null,'deploy'); }
 function campFromRoute(){ showCamp(null,'route'); }
 function campBack(){ if(CAMP_CTX&&CAMP_CTX.back==='deploy'){ v2Deploy(curNode()); } else showRouteMap(); }
-function campShopList(){ return (CAMP_CTX&&CAMP_CTX.node&&CAMP_CTX.node.shop)||DEFAULT_SHOP; }
+function campShopList(){
+  /* 거점 고유 품목 + 기본 카탈로그(신규 아이템 포함)를 합쳐 항상 노출 */
+  const themed=(CAMP_CTX&&CAMP_CTX.node&&CAMP_CTX.node.shop)||[];
+  const seen=new Set(), out=[];
+  for(const id of [...themed, ...DEFAULT_SHOP]){ if(!seen.has(id)&&ITEMS[id]){ seen.add(id); out.push(id); } }
+  return out;
+}
 function ownedCount(id){ return V2.inv[id]||0; }
 function renderCamp(){
   const n=CAMP_CTX.node;
@@ -1981,4 +2101,5 @@ export const GLOBALS = {
   campTab, campBack, campFromDeploy, campFromRoute,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
   toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, viewSupport,
+  showSettings, setDiff, setSpeed, toggleFastEnemy,
 };

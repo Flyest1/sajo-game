@@ -132,5 +132,85 @@
   "hit": 8,
   "crit": 8,
   "desc": "천하를 호령하는 보검. 공격 +5 · 명중 +8 · 필살 +8"
+ },
+ "yuyeopdo": {
+  "name": "유엽도",
+  "kind": "weapon",
+  "price": 900,
+  "atk": 4,
+  "hit": 6,
+  "crit": 2,
+  "desc": "버들잎처럼 예리한 도. 공격 +4 · 명중 +6 · 필살 +2"
+ },
+ "panhwanpil": {
+  "name": "판관필",
+  "kind": "weapon",
+  "price": 1100,
+  "atk": 3,
+  "hit": 2,
+  "crit": 14,
+  "desc": "혈도를 노리는 점혈 병기. 공격 +3 · 필살 +14"
+ },
+ "seolryong": {
+  "name": "설룡검",
+  "kind": "weapon",
+  "price": 2000,
+  "atk": 5,
+  "hit": 6,
+  "crit": 4,
+  "desc": "한기를 머금은 명검. 공격 +5 · 명중 +6 · 필살 +4"
+ },
+ "yeonwoogap": {
+  "name": "연위갑",
+  "kind": "acc",
+  "price": 1000,
+  "def": 4,
+  "desc": "가벼운 연환 보갑. 방어 +4"
+ },
+ "geumsagap": {
+  "name": "금사연갑",
+  "kind": "acc",
+  "price": 1600,
+  "def": 3,
+  "res": 2,
+  "hp": 4,
+  "desc": "금사로 짠 보갑. 방어 +3 · 정신 +2 · 최대 HP +4"
+ },
+ "chilseongpae": {
+  "name": "칠성패",
+  "kind": "acc",
+  "price": 700,
+  "res": 3,
+  "desc": "북두를 새긴 옥패. 정신 +3"
+ },
+ "bihohye": {
+  "name": "비호혜",
+  "kind": "acc",
+  "price": 1300,
+  "mov": 1,
+  "hp": 5,
+  "desc": "제비처럼 가벼운 신. 이동 +1 · 최대 HP +5"
+ },
+ "sohwandan": {
+  "name": "소환단",
+  "kind": "use",
+  "price": 260,
+  "heal": 40,
+  "desc": "중급 영약. HP 40 회복"
+ },
+ "byeokhahwan": {
+  "name": "벽하환",
+  "kind": "use",
+  "price": 300,
+  "cure": true,
+  "heal": 30,
+  "desc": "해독과 회복을 겸한 영약. 중독 치료 + HP 30"
+ },
+ "jeongsimdan": {
+  "name": "정심단",
+  "kind": "use",
+  "price": 220,
+  "ki": 8,
+  "desc": "기력을 북돋는 단약. 기(氣) 8 회복"
  }
 }

@@ -81,6 +81,14 @@ body:has(#battle.full){align-items:flex-start;}
 .hub-last{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel2);
   border:1px solid var(--gold);border-radius:6px;padding:9px 12px;margin-bottom:10px;font-size:13.5px;}
 .hub-sub{font-size:11.5px;color:var(--dim);margin-top:2px;}
+/* 설정 모달 */
+.set-sec{margin:10px 0;}
+.set-h{font-size:13.5px;color:var(--gold2);font-weight:700;margin-bottom:6px;}
+.set-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.set-col{display:flex;flex-direction:column;gap:6px;}
+.set-col .setrow{text-align:left;padding:8px 12px;}
+.setrow.on,.set-line .btn.on{background:linear-gradient(180deg,#5d4f37,#40372a);box-shadow:0 0 8px rgba(217,179,108,.3);}
+.set-sub{font-size:11px;color:var(--dim);margin-top:3px;font-weight:400;letter-spacing:0;}
 #topbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--dim);flex-wrap:wrap;}
 #topbar .btn.small{padding:7px 13px;}
 #mapscroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%;border-radius:6px;}
@@ -288,7 +296,13 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
   .result-screen{padding:20px 0;}
   .result-screen h2{font-size:28px;margin-bottom:8px;}
 }
-/* ── 세로 모바일: 전투 맵 풀-블리드 ── */
+/* ── 세로 모바일: 전투 맵 풀-블리드 + 정보/상태 팝업을 맵 아래로 ── */
 @media (max-width:760px){
   #mapscroll{margin:0 -6px;max-width:100vw;}
+  #battle.full #mapscroll{max-height:58vh;}
+  /* 팝업 HUD를 절대배치 대신 맵 아래 흐름으로 (빈 공간 활용) */
+  #ucard-pop.pop,#info-pop.pop{position:relative;left:auto!important;right:auto!important;top:auto!important;
+    width:100%!important;max-width:100%!important;max-height:none!important;margin-top:8px;
+    box-shadow:none;border:1px solid var(--line);}
+  #info-pop #log{max-height:120px;}
 }
