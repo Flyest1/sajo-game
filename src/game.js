@@ -168,6 +168,17 @@ function recordBattleWin(){
 /* 현재 챕터(스토리) 또는 현재 웨이브(무한 모드) 정의 반환 */
 function curCh(){ return ENDLESS ? ENDLESS.ch : (V2 && V2.curBattle ? V2.curBattle : CHAPTERS[G.chapterIdx]); }
 
+/* 현재 맥락의 BGM 테마 (캠페인별 분위기) */
+const BGM_THEME = { sajo:'heroic', sinjo:'heroic', uicheon:'heroic', chunryong:'chunryong',
+  hwasan:'hwasan', hwalsa:'hwasan', wolnyeo:'heroic', dokgo:'gomyo', pungreung:'gomyo',
+  hooildam:'heroic', jinfinal:'jinfinal' };
+function bgmTheme(){
+  if(V2&&V2.camp) return BGM_THEME[V2.camp]||'default';
+  if(ENDLESS) return 'jinfinal';
+  return 'default';
+}
+function startBGM(mood){ BGM.start(mood, bgmTheme()); }
+
 const app = () => document.getElementById('app');
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const deepClone = o => JSON.parse(JSON.stringify(o));
@@ -268,7 +279,8 @@ function calcStrike(a,d,skillId){
   const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
   const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
   let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) - mit - dT.def);
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
+  const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid + wHit));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
   return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst};
@@ -823,6 +835,7 @@ function startBattle(){
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
     busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
     diff:(V2&&V2.diff)||(ENDLESS&&ENDLESS.diff)||(G&&G.diff)||'std',
+    weather:pickWeather(),
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
@@ -834,7 +847,7 @@ function startBattle(){
   B.loot={gold:0,items:[]};
   if(V2&&V2.curBattle){ V2.deploy=G.deploy.slice(); v2Save(); }
   for(const def of ch.enemies) B.units.push(mkEnemyUnit(def));
-  BGM.start('battle');
+  startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${ch.win.text}`,true);
   startPlayerPhase(true);
@@ -893,6 +906,40 @@ function focusUnit(u){
 }
 window.addEventListener('resize',()=>{ if(B) fitMap(); });
 
+/* ── 전장 날씨/시간 연출 ── */
+const WEATHER_NAME={clear:'맑음',snow:'설한(雪寒)',rain:'우천(雨天)',fog:'운무(雲霧)',night:'야전(夜戰)'};
+const WEATHER_HIT={clear:0,snow:-3,rain:-3,fog:-6,night:0}; /* 양측 공통 명중 보정 */
+/* 스테이지 데이터의 weather 우선, 없으면 캠페인·시드로 자동 배정 */
+function pickWeather(){
+  const ch=curCh();
+  if(ch&&ch.weather) return ch.weather;
+  const camp=(V2&&V2.camp)||'';
+  const seed=strSeed((camp||'x')+'_'+((V2&&V2.stageId)||G.chapterIdx||0));
+  if(camp==='hwasan'||camp==='hwalsa'||camp==='dokgo') return (seed%3===0)?'snow':(seed%3===1?'fog':'clear');
+  if(camp==='pungreung') return (seed%2===0)?'rain':'night';
+  if(camp==='chunryong') return (seed%3===0)?'snow':(seed%3===1?'night':'clear');
+  if(camp==='jinfinal') return 'night';
+  return (seed%5===0)?'fog':(seed%5===1?'rain':'clear');
+}
+function renderWeather(){
+  const el=document.getElementById('weather'); if(!el||!B) return;
+  const w=B.weather||'clear';
+  el.className='w-'+w;
+  if(w==='clear'){ el.innerHTML=''; return; }
+  if(el.dataset.w===w) return; /* 이미 그려짐 */
+  el.dataset.w=w;
+  let s='';
+  if(w==='snow'){
+    for(let i=0;i<50;i++){ const x=(i*37)%100, d=6+((i*13)%7), dl=-(i*0.4)%6, sz=2+((i*7)%3); s+=`<span class="flake" style="left:${x}%;width:${sz}px;height:${sz}px;animation-duration:${d}s;animation-delay:${dl}s"></span>`; }
+  }else if(w==='rain'){
+    for(let i=0;i<60;i++){ const x=(i*29)%100, d=0.5+((i*11)%4)/10, dl=-(i*0.15)%1.5; s+=`<span class="drop" style="left:${x}%;animation-duration:${d}s;animation-delay:${dl}s"></span>`; }
+  }else if(w==='fog'){
+    s='<span class="fogband f1"></span><span class="fogband f2"></span>';
+  }
+  el.innerHTML=s;
+}
+function weatherLine(){ const w=(B&&B.weather)||'clear'; const h=WEATHER_HIT[w]; return `날씨: <b>${WEATHER_NAME[w]}</b>${h?` <span style="color:#e0a84a">명중 ${h}</span>`:''}`; }
+
 /* ── 전투 화면 골격 (전체 화면 + 오버레이 HUD) ── */
 let UCARD_HIDE=false, INFO_OPEN=false;
 function toggleInfoPop(){ INFO_OPEN=!INFO_OPEN; SFX.play('ui'); if(B) renderSide(); }
@@ -917,6 +964,7 @@ function renderScreenBattle(){
       <div id="mapscroll"><div id="mapsizer">
         <div id="mapwrap" style="width:${mw}px;height:${mh}px">
           <svg id="mapsvg" width="${mw}" height="${mh}"></svg>
+          <div id="weather"></div>
           <div id="fx"></div>
           <div id="banner"></div>
         </div>
@@ -1022,6 +1070,7 @@ function renderBattle(light){
   for(const u of B.units.filter(u=>u.alive&&u!==B.sel)) s+=unitSVG(u);
   if(B.sel&&B.sel.alive) s+=unitSVG(B.sel,true);
   svg.innerHTML=s;
+  renderWeather();
   renderSide();
 }
 
@@ -1076,6 +1125,7 @@ function infoHTML(ch){
   <div class="row"><span>패배</span><b>${ch.lose}</b></div>
   <div class="row"><span>병력</span><b>아군 ${players().length} · 적 ${foes().length}</b></div>
   <div class="row"><span>${terrLine()||'타일 클릭 → 지형 정보'}</span></div>
+  <div class="row"><span>${weatherLine()}</span></div>
   <div class="btnrow" style="margin:8px 0 6px">
     <button class="btn small" onclick="showHelp()">도움말</button>
     <button class="btn small danger" onclick="confirmToTitle()">타이틀로</button>
@@ -1153,9 +1203,86 @@ function dlgBgSVG(){
   </g>
   </svg>`;
 }
+/* ── 이벤트 컷신 (프리셋 배경 + 카메라 팬 + 캡션) ── */
+function cutBgSVG(bg){
+  const B0='0 0 1000 560';
+  if(bg==='siege'){ return `<svg viewBox="${B0}" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs><linearGradient id="cs1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2438"/><stop offset=".6" stop-color="#6a3a30"/><stop offset="1" stop-color="#2a1a18"/></linearGradient></defs>
+    <rect width="1000" height="560" fill="url(#cs1)"/>
+    <circle cx="180" cy="120" r="60" fill="#f0c060" opacity=".5"/>
+    <rect x="0" y="360" width="1000" height="200" fill="#241418"/>
+    <g fill="#1a1012"><rect x="60" y="300" width="120" height="120"/><rect x="240" y="280" width="120" height="140"/><rect x="440" y="300" width="140" height="120"/><rect x="640" y="270" width="120" height="150"/><rect x="820" y="300" width="120" height="120"/></g>
+    <g fill="#0e0808"><rect x="90" y="270" width="30" height="30"/><rect x="290" y="250" width="30" height="30"/><rect x="680" y="240" width="30" height="30"/></g>
+    <g stroke="#e08040" stroke-width="3" opacity=".8"><path d="M120,300 q10,-40 -6,-70" fill="none"/><path d="M300,280 q14,-50 -4,-84" fill="none"/><path d="M700,270 q10,-46 -8,-78" fill="none"/></g>
+    <g fill="#c05030" opacity=".7"><circle cx="120" cy="220" r="7"/><circle cx="300" cy="192" r="8"/><circle cx="700" cy="188" r="7"/></g>
+  </svg>`; }
+  if(bg==='duel'){ return `<svg viewBox="${B0}" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs><radialGradient id="cs2" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#4a4260"/><stop offset="1" stop-color="#161020"/></radialGradient></defs>
+    <rect width="1000" height="560" fill="url(#cs2)"/>
+    <circle cx="500" cy="200" r="120" fill="#f0e0b8" opacity=".14"/>
+    <path d="M0,430 Q500,400 1000,430 L1000,560 L0,560 Z" fill="#100c18"/>
+    <g fill="#0a0710"><path d="M360,430 q-20,-90 6,-150 q10,-20 18,2 q16,60 -4,148 Z"/><path d="M356,300 l-40,26 M382,300 l44,24"/><path d="M360,410 l-30,40 M378,410 l28,44"/></g>
+    <g fill="#0a0710"><path d="M640,430 q22,-90 -4,-152 q-10,-20 -20,2 q-16,62 4,150 Z"/></g>
+    <path d="M384,320 L470,250" stroke="#e8e0c0" stroke-width="4" stroke-linecap="round"/>
+    <path d="M616,320 L530,250" stroke="#e8e0c0" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="500" cy="250" r="10" fill="#fff" opacity=".8"/>
+  </svg>`; }
+  if(bg==='throne'){ return `<svg viewBox="${B0}" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs><linearGradient id="cs3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1c30"/><stop offset="1" stop-color="#160e18"/></linearGradient></defs>
+    <rect width="1000" height="560" fill="url(#cs3)"/>
+    <g fill="#3a2a3e"><rect x="120" y="120" width="40" height="400"/><rect x="300" y="120" width="40" height="400"/><rect x="660" y="120" width="40" height="400"/><rect x="840" y="120" width="40" height="400"/></g>
+    <g fill="#241a28"><rect x="112" y="110" width="56" height="20"/><rect x="292" y="110" width="56" height="20"/><rect x="652" y="110" width="56" height="20"/><rect x="832" y="110" width="56" height="20"/></g>
+    <path d="M430,520 L430,300 Q500,250 570,300 L570,520 Z" fill="#5a3a2e"/>
+    <path d="M448,300 Q500,262 552,300 L552,340 Q500,312 448,340 Z" fill="#7a5038"/>
+    <circle cx="500" cy="230" r="26" fill="#f0d060" opacity=".85"/>
+    <g stroke="#c8a040" stroke-width="2" opacity=".6"><path d="M500,150 L500,110 M470,200 L440,170 M530,200 L560,170"/></g>
+  </svg>`; }
+  if(bg==='snow'){ return `<svg viewBox="${B0}" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs><linearGradient id="cs4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4560"/><stop offset=".6" stop-color="#8a97a8"/><stop offset="1" stop-color="#c8d0da"/></linearGradient></defs>
+    <rect width="1000" height="560" fill="url(#cs4)"/>
+    <path d="M0,380 L200,220 L340,340 L480,200 L640,360 L820,240 L1000,360 L1000,560 L0,560 Z" fill="#6a7688"/>
+    <path d="M200,220 L260,300 L150,320 Z M480,200 L540,270 L430,300 Z M820,240 L880,310 L770,330 Z" fill="#eef2f6"/>
+    <path d="M0,440 Q500,410 1000,445 L1000,560 L0,560 Z" fill="#dde4ec"/>
+    <g fill="#5a6678"><path d="M300,440 q0,-30 4,-40 M304,400 q-10,6 -18,4 M304,400 q10,6 18,4"/></g>
+  </svg>`; }
+  /* peak (기본) */
+  return `<svg viewBox="${B0}" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs><linearGradient id="cs5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2438"/><stop offset=".55" stop-color="#3a3450"/><stop offset="1" stop-color="#8a5a48"/></linearGradient></defs>
+    <rect width="1000" height="560" fill="url(#cs5)"/>
+    <circle cx="760" cy="120" r="54" fill="#f0e0b8" opacity=".9"/>
+    <path d="M0,420 L160,220 L300,380 L460,180 L640,420 L1000,380 L1000,560 L0,560 Z" fill="#2a2438"/>
+    <path d="M380,440 L560,240 L760,420 L1000,320 L1000,560 L380,560 Z" fill="#1a1626"/>
+    <path d="M0,470 Q500,440 1000,475 L1000,560 L0,560 Z" fill="#120e1c"/>
+  </svg>`;
+}
+let CUT=null;
+function showCutscene(cut, done){
+  startBGM('calm');
+  CUT={lines:cut.lines||[], idx:0, done};
+  app().innerHTML=`<div id="cut-screen">
+    <div id="cut-bg" class="ken">${cutBgSVG(cut.bg)}</div>
+    <div id="cut-vignette"></div>
+    <div id="cut-cap"><div id="cut-text"></div><div id="cut-hint">클릭하여 진행 ▼</div></div>
+  </div>`;
+  const scr=document.getElementById('cut-screen');
+  scr.addEventListener('click',advanceCut);
+  showCutLine();
+}
+function showCutLine(){
+  const t=document.getElementById('cut-text'); if(!t) return;
+  t.classList.remove('cin'); void t.offsetWidth; t.classList.add('cin');
+  t.textContent=CUT.lines[CUT.idx]||'';
+}
+function advanceCut(){
+  SFX.play('ui');
+  CUT.idx++;
+  if(CUT.idx>=CUT.lines.length){ const d=CUT.done; CUT=null; d(); return; }
+  showCutLine();
+}
+
 let DLG=null;
 function showDialogue(lines, done, titleCard){
-  BGM.start('calm');
+  startBGM('calm');
   DLG={lines, idx:-1, done, titleCard, lastL:null, lastR:null};
   app().innerHTML=`<div id="dlg-screen">
     <div id="dlg-bg">${dlgBgSVG()}</div>
@@ -1276,7 +1403,7 @@ function sealSVG(ch,color){
 function showVictory(){
   const ch=curCh();
   applyRoster();
-  SFX.play('victory'); BGM.start('calm');
+  SFX.play('victory'); startBGM('calm');
   recordBattleWin();
   /* v2 캠페인: 스테이지 클리어 */
   if(V2&&V2.curBattle){
@@ -1348,7 +1475,7 @@ function afterVictory(next){
   });
 }
 function showDefeat(){
-  SFX.play('defeat'); BGM.start('calm');
+  SFX.play('defeat'); startBGM('calm');
   if(V2&&V2.curBattle){
     V2.curBattle=null;
     app().innerHTML=`<div class="result-screen">
@@ -1385,7 +1512,7 @@ function retryChapter(){
   startChapter(G.chapterIdx, true);
 }
 function showEnding(){
-  SFX.play('victory'); BGM.start('calm');
+  SFX.play('victory'); startBGM('calm');
   app().innerHTML=`<div class="result-screen">
     ${sealSVG('終','#d9b36c')}<h2>終 幕</h2>
     <p>${ENDING.join('<br>')}</p>
@@ -1600,7 +1727,7 @@ function setSpeed(s){ SETTINGS.speed=s; saveSettings(); SFX.play('ui');
 function toggleFastEnemy(){ SETTINGS.fastEnemy=!SETTINGS.fastEnemy; saveSettings(); SFX.play('ui');
   const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings(); }
 function showTitle(){
-  BGM.start('calm');
+  startBGM('calm');
   const hasSave=!!loadGame();
   const hasAny=hasSave || Object.keys(CAMPAIGNS).some(id=>v2LoadSave(id)) || bestWave()>0;
   app().innerHTML=`<div id="title-screen">
@@ -1887,16 +2014,19 @@ function v2Enter(){
     const i=V2.party.indexOf(cid); if(i>=0) V2.party.splice(i,1);
     if(V2.deploy){ const j=V2.deploy.indexOf(cid); if(j>=0) V2.deploy.splice(j,1); }
   });
+  /* 첫 진입 시 컷신 → 대사 순으로 (재도전 시 생략) */
+  const firstTime = !V2.attempted[V2.stageId] && !V2.cleared.includes(V2.stageId);
+  const withCut = (after)=>{ if(firstTime && n.cut) showCutscene(n.cut, after); else after(); };
   if(n.kind==='talk'){
     const go=()=>v2Advance(n);
     if(V2.attempted[V2.stageId]) go();
-    else { V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
+    else { V2.attempted[V2.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), go, n.title)); }
     return;
   }
   if(n.kind==='battle'){
     const dep=()=>v2Deploy(n);
     if(V2.attempted[V2.stageId]) dep();
-    else { V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), dep, n.title); }
+    else { V2.attempted[V2.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), dep, n.title)); }
   }else if(n.kind==='camp'){
     const go=()=>showCamp(n,'route');
     if(n.pre&&!V2.cleared.includes(V2.stageId)&&!V2.attempted[V2.stageId]){ V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
@@ -1954,7 +2084,7 @@ function showV2End(n){
   if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
   v2Save();
   recordCampaignClear(V2.camp, V2.stageId);
-  SFX.play('victory'); BGM.start('calm');
+  SFX.play('victory'); startBGM('calm');
   app().innerHTML=`<div class="result-screen">
     ${sealSVG('終','#d9b36c')}<h2>終 幕</h2>
     <p>${(n.text||[]).join('<br>')}</p>
@@ -2007,7 +2137,7 @@ function v2UseTool(id){
 function showCamp(node, back){
   CAMP_CTX={node:node||null, back:back||'route'};
   CAMP_TAB='unit';
-  BGM.start('calm');
+  startBGM('calm');
   renderCamp();
 }
 function campTab(t){ CAMP_TAB=t; renderCamp(); }
@@ -2160,7 +2290,7 @@ function viewSupport(key){
 
 /* ── 루트 맵 ── */
 function showRouteMap(){
-  BGM.start('calm');
+  startBGM('calm');
   const C=CAMPAIGNS[V2.camp];
   const rows=C.order.map(id=>{
     const n=C.stages[id];

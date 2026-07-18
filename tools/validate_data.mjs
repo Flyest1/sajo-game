@@ -92,6 +92,9 @@ for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, 
         if (t.item && !ITEMS[t.item]) errs.push(`${tag} treasure unknown item ${t.item}`);
       });
       if (n.win.boss && !n.enemies.some(e => e.cid === n.win.boss)) errs.push(`${tag} boss ${n.win.boss} not on map`);
+      if (n.weather && !['clear','snow','rain','fog','night'].includes(n.weather)) errs.push(`${tag} unknown weather ${n.weather}`);
+      if (n.cut && (!Array.isArray(n.cut.lines) || !n.cut.lines.length)) errs.push(`${tag} cut.lines invalid`);
+      if (n.cut && n.cut.bg && !['siege','duel','throne','snow','peak'].includes(n.cut.bg)) errs.push(`${tag} cut.bg unknown ${n.cut.bg}`);
       if (n.deploy && n.deploy.forced) n.deploy.forced.forEach(c => { if (!CHARS[c]) errs.push(`${tag} forced unknown ${c}`); });
       [...(n.pre || []), ...(n.post || [])].forEach((d, i) => { if (d.s && !CHARS[d.s]) errs.push(`${tag} dlg${i}: unknown speaker ${d.s}`); });
     }

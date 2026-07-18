@@ -5,7 +5,7 @@
 const LS_KEY = 'kimyong_snd';
 let AC = null, MASTER = null, BGMBUS = null;
 let MUTED = (() => { try { return localStorage.getItem(LS_KEY) === 'off'; } catch (e) { return false; } })();
-const BGMS = { mood: null, timer: null, step: 0, note: 4 };
+const BGMS = { mood: null, theme: 'default', timer: null, step: 0, note: 4 };
 
 function ctx() {
   const C = window.AudioContext || window.webkitAudioContext;
@@ -117,18 +117,28 @@ export const SFX = {
   }
 };
 
-/* ── BGM: 오음계 절차 생성 (궁상각치우 느낌의 A 펜타토닉) ── */
-const SCALE = [220, 261.6, 293.7, 329.6, 392, 440, 523.3, 587.3, 659.3];
+/* ── BGM: 오음계 절차 생성 + 캠페인별 테마(스케일·템포·질감) ── */
 const MOODS = {
   calm:   { tempo: 340, density: 0.55, vol: 0.11, perc: false },
   battle: { tempo: 245, density: 0.72, vol: 0.13, perc: true },
 };
+/* 테마: scale=오음계 주파수, tempoMul(<1 빠름·>1 느림), perc 가중, drone 저음 세기 */
+const THEMES = {
+  default:   { scale: [220, 261.6, 293.7, 329.6, 392, 440, 523.3, 587.3, 659.3], tempoMul: 1.0,  droneMul: 1.0, percMul: 1.0 },
+  heroic:    { scale: [246.9, 293.7, 329.6, 392, 440, 493.9, 587.3, 659.3, 784], tempoMul: 0.95, droneMul: 1.05, percMul: 1.1 }, /* 사조삼부곡 — 웅혼 */
+  chunryong: { scale: [146.8, 174.6, 196, 220, 261.6, 293.7, 349.2, 392, 440],   tempoMul: 1.18, droneMul: 1.35, percMul: 0.9 }, /* 천룡 — 비장·장중 */
+  hwasan:    { scale: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2, 523.3, 587.3], tempoMul: 1.08, droneMul: 0.9, percMul: 0.7 }, /* 화산·활사인묘 — 고풍·청아 */
+  gomyo:     { scale: [261.6, 293.7, 349.2, 392, 440, 523.3, 587.3, 698.5, 784],  tempoMul: 1.12, droneMul: 0.8, percMul: 0.6 }, /* 풍릉·고묘 — 유현 */
+  jinfinal:  { scale: [130.8, 164.8, 196, 220, 261.6, 329.6, 392, 440, 523.3],    tempoMul: 0.88, droneMul: 1.5, percMul: 1.4 }, /* 진최종전 — 장엄 */
+};
 function bgmStep() {
   if (!AC || AC.state !== 'running' || MUTED) return;
   const m = MOODS[BGMS.mood]; if (!m) return;
+  const T = THEMES[BGMS.theme] || THEMES.default;
+  const SCALE = T.scale;
   const s = BGMS.step++;
-  if (s % 8 === 0) pluck(SCALE[0] / 2, 0, 1.6, 0.5); /* 저음 드론 */
-  if (m.perc && s % 4 === 2) noise({ dur: 0.06, vol: 0.05, hp: 3000, bus: BGMBUS });
+  if (s % 8 === 0) pluck(SCALE[0] / 2, 0, 1.6, 0.5 * T.droneMul); /* 저음 드론 */
+  if (m.perc && s % 4 === 2 && Math.random() < T.percMul) noise({ dur: 0.06, vol: 0.05 * T.percMul, hp: 3000, bus: BGMBUS });
   if (Math.random() < m.density) {
     /* 멜로디: 음계 위 랜덤 워크 */
     let n = BGMS.note + [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random() * 7)];
@@ -141,12 +151,14 @@ function bgmStep() {
 function startTimer() {
   clearInterval(BGMS.timer);
   const m = MOODS[BGMS.mood]; if (!m) return;
-  BGMS.timer = setInterval(bgmStep, m.tempo);
+  const T = THEMES[BGMS.theme] || THEMES.default;
+  BGMS.timer = setInterval(bgmStep, Math.round(m.tempo * T.tempoMul));
 }
 export const BGM = {
-  start(mood) {
-    if (BGMS.mood === mood && BGMS.timer) return;
-    BGMS.mood = mood; BGMS.step = 0;
+  start(mood, theme) {
+    const th = theme || 'default';
+    if (BGMS.mood === mood && BGMS.theme === th && BGMS.timer) return;
+    BGMS.mood = mood; BGMS.theme = th; BGMS.step = 0;
     if (ctx()) startTimer();
   },
   stop() { BGMS.mood = null; clearInterval(BGMS.timer); BGMS.timer = null; },
