@@ -102,6 +102,28 @@ for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, JINFINAL]
   }
 }
 
-console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 검사`);
+/* ── 인연(지원 대화) 검증 ── */
+const SUPPORTS = J('supports.json');
+{
+  const seen = new Set();
+  SUPPORTS.pairs.forEach((p, i) => {
+    const tag = `support#${i} ${p.a}_${p.b}`;
+    if (!CHARS[p.a]) errs.push(`${tag}: unknown a ${p.a}`);
+    if (!CHARS[p.b]) errs.push(`${tag}: unknown b ${p.b}`);
+    if (p.a === p.b) errs.push(`${tag}: 동일 인물`);
+    const key = [p.a, p.b].sort().join('_');
+    if (seen.has(key)) errs.push(`${tag}: 중복 페어`); seen.add(key);
+    for (const rk of SUPPORTS.ranks) {
+      const conv = p.convs[rk];
+      if (!conv || !conv.length) { errs.push(`${tag}: ${rk} 대화 없음`); continue; }
+      conv.forEach((ln, j) => {
+        if (ln.s && !CHARS[ln.s]) errs.push(`${tag} ${rk}#${j}: unknown speaker ${ln.s}`);
+        if (!ln.t) errs.push(`${tag} ${rk}#${j}: 빈 대사`);
+      });
+    }
+  });
+}
+
+console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
 console.log('DATA VALIDATION OK');

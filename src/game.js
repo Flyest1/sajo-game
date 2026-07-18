@@ -9,6 +9,29 @@ import UICHEON from './data/stages_uicheon.json';
 import CHUNRYONG from './data/stages_chunryong.json';
 import HOOILDAM from './data/stages_hooildam.json';
 import JINFINAL from './data/stages_jinfinal.json';
+import SUPPORTS from './data/supports.json';
+
+/* ── 인연(지원) 시스템 ── */
+function pairKey(a,b){ return a<b ? a+'_'+b : b+'_'+a; }
+const SUPPORT_MAP = {};
+for(const p of SUPPORTS.pairs) SUPPORT_MAP[pairKey(p.a,p.b)] = p;
+const RANK_NAME = ['—','C','B','A'];
+function bondRank(cidA,cidB){
+  if(!V2||!V2.supports) return 0;
+  return V2.supports[pairKey(cidA,cidB)]||0;
+}
+/* 유닛 u 기준, 인접 아군 중 최고 인연 랭크(0~3) */
+function adjBond(u){
+  if(!B||!V2) return 0;
+  let best=0;
+  for(const o of B.units){
+    if(o.alive&&o!==u&&o.team===u.team&&dist(o,u)===1){
+      const r=bondRank(u.cid,o.cid);
+      if(r>best) best=r;
+    }
+  }
+  return best;
+}
 
 /* ============================================================
    전투 엔진
@@ -112,11 +135,12 @@ function calcStrike(a,d,skillId){
   const mit=a.type==='내'?d.stats.res:d.stats.def;
   const dT=TILE[tileChar(d.x,d.y)];
   const supA=adjAllies(a), supD=adjAllies(d); /* 협공: 인접 아군 보정 */
-  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA + (a.eqAtk||0) - mit - dT.def);
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 - supD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
-  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + (a.eqCrit||0));
+  const bA=adjBond(a), bD=adjBond(d);        /* 인연: 인접 인연 아군 보정 (랭크 비례) */
+  let dmg=Math.max(0, Math.round(atk*(sk&&sk.mult?sk.mult:1)) + tri*2 + supA + bA + (a.eqAtk||0) - mit - dT.def);
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid));
+  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
-  return {dmg,hit,crit,dbl,tri,supA,supD};
+  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD};
 }
 function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 
@@ -489,7 +513,7 @@ function openForecast(a,d,skillId){
     <div class="modal">
       <h3>전투 예측 ${sk?`— ${sk.name}`:''}</h3>
       <div class="fc-grid">
-        <div class="hd">${a.name}${my.supA?` <span style="font-size:11px;color:#8fce6a">협공+${my.supA}</span>`:''}</div><div class="lbl">상성 ${triTxt}</div><div class="hd">${d.name}${my.supD?` <span style="font-size:11px;color:#8fce6a">협공+${my.supD}</span>`:''}</div>
+        <div class="hd">${a.name}${my.supA?` <span style="font-size:11px;color:#8fce6a">협공+${my.supA}</span>`:''}${my.bA?` <span style="font-size:11px;color:#e8a0c0">인연 ${RANK_NAME[my.bA]}</span>`:''}</div><div class="lbl">상성 ${triTxt}</div><div class="hd">${d.name}${my.supD?` <span style="font-size:11px;color:#8fce6a">협공+${my.supD}</span>`:''}${my.bD?` <span style="font-size:11px;color:#e8a0c0">인연 ${RANK_NAME[my.bD]}</span>`:''}</div>
         <div class="val">${a.hp} / ${a.maxhp}</div><div class="lbl">HP</div><div class="val">${d.hp} / ${d.maxhp}</div>
         <div class="val">${my.dmg}${my.dbl?' ×2':''}</div><div class="lbl">위력</div><div class="val">${counter?`${counter.dmg}${counter.dbl?' ×2':''}`:'반격 불가'}</div>
         <div class="val">${my.hit}%</div><div class="lbl">명중</div><div class="val">${counter?counter.hit+'%':'—'}</div>
@@ -1405,6 +1429,7 @@ function showHelp(){
       ◆ 속도가 4 이상 높으면 <b style="color:var(--text)">2회 공격</b> (무공 사용 시 제외) · <b style="color:var(--text)">좌우호박</b>은 무공 자체가 2연격<br>
       ◆ <b style="color:#c07ae0">중독</b>되면 3턴간 매턴 피해 (빙백은침·현명신장 등)<br>
       ◆ <b style="color:var(--text)">협공</b>: 인접(상하좌우)한 아군 1명당 명중 +4·피해 +1, 수비 측은 인접 아군 1명당 회피 +3 (최대 3명)<br>
+      ◆ <b style="color:#e8a0c0">인연</b>: 신규 캠페인의 거점 <b style="color:var(--text)">지원 대화</b>로 두 협객의 인연을 C→B→A로 키우면, 전장에서 두 사람이 인접할 때 피해·명중·필살·회피가 랭크만큼 강해집니다 (★표시 인연은 최고 랭크에서 합격 각성)<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
       ◆ 쓰러진 아군은 <b style="color:var(--text)">부상 이탈</b> — 다음 챕터에 복귀 (곽정이 쓰러지면 패배)<br>
@@ -1450,7 +1475,8 @@ function partyLeader(){
 function v2New(campId){
   const C = CAMPAIGNS[campId];
   return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
-           cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null };
+           cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null,
+           supports:{}, supportLock:{} };
 }
 function v2Save(){
   markPlay('v2', V2&&V2.camp);
@@ -1477,6 +1503,7 @@ function startCampaignV2(campId, useSave){
   const loaded=useSave&&v2LoadSave(campId);
   V2=loaded||v2New(campId);
   V2.attempted=V2.attempted||{};
+  V2.supports=V2.supports||{}; V2.supportLock=V2.supportLock||{}; /* 구 세이브 호환 */
   if(!loaded&&C.inherit){ /* 전권 세이브에서 플래그·보너스 계승 */
     const src=v2LoadSave(C.inherit.from);
     if(src){
@@ -1653,13 +1680,16 @@ function renderCamp(){
   let body='';
   if(CAMP_TAB==='unit') body=campUnitHTML();
   else if(CAMP_TAB==='shop') body=campShopHTML();
+  else if(CAMP_TAB==='support') body=campSupportHTML();
   else body=campBagHTML();
+  const nSup=campSupportAvail().filter(p=>(V2.supports[pairKey(p.a,p.b)]||0)<3 && V2.supportLock[pairKey(p.a,p.b)]!==V2.stageId).length;
   app().innerHTML=`<div id="camp">
     <h2>${n?n.title:'거점 — 부대 정비'}</h2>
     <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span></div>
     <div class="camp-tabs">
       <button class="btn small ${CAMP_TAB==='unit'?'on':''}" onclick="campTab('unit')">편성·승급</button>
       <button class="btn small ${CAMP_TAB==='shop'?'on':''}" onclick="campTab('shop')">상점</button>
+      <button class="btn small ${CAMP_TAB==='support'?'on':''}" onclick="campTab('support')">지원 대화${nSup?` <span style="color:#e8a0c0">●${nSup}</span>`:''}</button>
       <button class="btn small ${CAMP_TAB==='bag'?'on':''}" onclick="campTab('bag')">행낭</button>
     </div>
     <div id="camp-body">${body}</div>
@@ -1739,6 +1769,45 @@ function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gol
 function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); SFX.play('gold'); v2Save(); renderCamp(); }
 function campBagHTML(){
   return `<table class="camptable">${invRowsHTML()}</table>`;
+}
+/* ── 지원 대화(인연) 탭 ── */
+function campSupportAvail(){
+  return SUPPORTS.pairs.filter(p=>V2.party.includes(p.a)&&V2.party.includes(p.b));
+}
+function campSupportHTML(){
+  const avail=campSupportAvail();
+  if(!avail.length) return `<p style="color:var(--dim);padding:10px 4px">아직 인연을 나눌 동료가 모이지 않았습니다. 이야기가 진행되면 새 인연이 열립니다.</p>`;
+  const rows=avail.map(p=>{
+    const key=pairKey(p.a,p.b), rank=V2.supports[key]||0;
+    const locked=V2.supportLock[key]===V2.stageId;
+    const maxed=rank>=3;
+    const rankBadge=rank?`<span style="color:#e8a0c0">인연 ${RANK_NAME[rank]}</span>`:`<span style="color:var(--dim)">인연 없음</span>`;
+    let btn;
+    if(maxed) btn=`<span style="color:var(--gold2);font-size:12px">최고 랭크 · 합격 각성</span>`;
+    else if(locked) btn=`<span style="color:var(--dim);font-size:12px">이번 거점에서 시청함</span>`;
+    else btn=`<button class="btn small" onclick="viewSupport('${key}')">지원 대화 (→ ${RANK_NAME[rank+1]})</button>`;
+    return `<tr>
+      <td style="text-align:left"><b style="color:var(--gold2)">${p.label}</b>${p.special?' <span style="font-size:11px;color:#e8a0c0">★합격</span>':''}<div style="font-size:11px;color:var(--dim)">${rankBadge}</div></td>
+      <td>${btn}</td></tr>`;
+  }).join('');
+  return `<p style="color:var(--dim);font-size:12.5px;margin-bottom:8px">인연이 깊을수록 전장에서 두 사람이 <b style="color:#e8a0c0">인접</b>하면 피해·명중·필살·회피가 강해집니다. 거점마다 인연 하나를 한 단계씩 키울 수 있습니다.</p>
+    <table class="camptable"><tr><th>인연</th><th>지원 대화</th></tr>${rows}</table>`;
+}
+function viewSupport(key){
+  const p=SUPPORT_MAP[key]; if(!p) return;
+  const rank=V2.supports[key]||0;
+  if(rank>=3||V2.supportLock[key]===V2.stageId) return;
+  const conv=p.convs[SUPPORTS.ranks[rank]];
+  SFX.play('ui');
+  const done=()=>{
+    V2.supports[key]=rank+1;
+    V2.supportLock[key]=V2.stageId;
+    if(rank+1>=3) SFX.play('levelup'); else SFX.play('heal');
+    v2Save();
+    CAMP_TAB='support';
+    renderCamp();
+  };
+  showDialogue(conv, done, `지원 대화 — ${p.label} (${RANK_NAME[rank+1]})`);
 }
 
 /* ── 루트 맵 ── */
@@ -1898,7 +1967,9 @@ export const DEBUG = {
   get ENDLESS(){ return ENDLESS; },
   get G(){ return G; },
   winCheck(){ return checkEnd(); },
-  CHAPTERS, CHARS, SKILLS, ITEMS,
+  calc(a,d,skill){ return calcStrike(a,d,skill); },
+  adjBond(u){ return adjBond(u); },
+  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS,
 };
 
 export const GLOBALS = {
@@ -1909,5 +1980,5 @@ export const GLOBALS = {
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
-  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume,
+  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, viewSupport,
 };
