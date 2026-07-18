@@ -220,7 +220,7 @@ function unitSVG(u){
   const acted = (u.team==='P'&&u.acted) ? 'opacity:.45;filter:grayscale(.9);' : '';
   const r=TS/2-5;
   const hpw = TS-16, hpr = Math.max(0, u.hp/u.maxhp);
-  let s=`<g class="unit" data-ux="${u.x}" data-uy="${u.y}" style="${acted}cursor:pointer;">`;
+  let s=`<g class="unit" id="ug-${u.uid}" data-ux="${u.x}" data-uy="${u.y}" style="${acted}cursor:pointer;">`;
   s+=`<ellipse cx="${px}" cy="${py+r-2}" rx="${r*0.8}" ry="4" fill="rgba(0,0,0,.3)"/>`;
   s+=`<circle cx="${px}" cy="${py-2}" r="${r}" fill="#3a3226" stroke="${ring}" stroke-width="3"/>`;
   s+=`<clipPath id="clip-${u.uid}"><circle cx="${px}" cy="${py-2}" r="${r-2}"/></clipPath>`;

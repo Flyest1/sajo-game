@@ -73,12 +73,35 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 @keyframes floatup{0%{opacity:0;margin-top:6px}15%{opacity:1}80%{opacity:1}100%{opacity:0;margin-top:-30px}}
 .shake{animation:shake .35s;}
 @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-2px)}80%{transform:translate(3px,2px)}}
+.shake.big{animation:shakebig .42s;}
+@keyframes shakebig{0%,100%{transform:translate(0,0)}15%{transform:translate(-8px,4px)}30%{transform:translate(8px,-4px)}45%{transform:translate(-6px,-3px)}60%{transform:translate(6px,3px)}80%{transform:translate(-3px,2px)}}
+/* 화면 전환 페이드 (2단계 연출) */
+#app>*{animation:scrfade .32s ease;}
+@keyframes scrfade{from{opacity:0}to{opacity:1}}
+/* 피격 섬광 */
+.hitflash{
+  position:absolute;width:48px;height:48px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.95),rgba(255,255,255,0) 70%);
+  animation:hitf .28s ease-out forwards;
+}
+.hitflash.crit{
+  width:64px;height:64px;margin:-8px 0 0 -8px;
+  background:radial-gradient(circle,rgba(255,217,74,.95),rgba(255,140,40,0) 72%);
+  animation:hitf .4s ease-out forwards;
+}
+@keyframes hitf{from{opacity:1;transform:scale(.45)}to{opacity:0;transform:scale(1.65)}}
+/* 유닛 이동 트윈 */
+#mapsvg g.unit{will-change:transform;}
+/* 대화 행 페이드 */
+#dlg-text.linefade{animation:dlgline .24s ease;}
+@keyframes dlgline{from{opacity:.15}to{opacity:1}}
 #banner{
   position:absolute;left:0;right:0;top:42%;text-align:center;font-size:34px;font-weight:900;color:var(--gold2);
   background:linear-gradient(90deg,transparent,rgba(20,15,8,.9) 25%,rgba(20,15,8,.9) 75%,transparent);
   padding:14px 0;letter-spacing:.3em;pointer-events:none;opacity:0;transition:opacity .3s;text-shadow:0 2px 8px #000;
 }
-#banner.show{opacity:1;}
+#banner.show{opacity:1;animation:bannerin .55s ease;}
+@keyframes bannerin{from{opacity:0;letter-spacing:.55em}to{opacity:1;letter-spacing:.3em}}
 #banner.enemy{color:#e09080;}
 #side{flex:1;display:flex;flex-direction:column;gap:10px;min-width:250px;}
 #side .panel{padding:10px 12px;font-size:13.5px;}

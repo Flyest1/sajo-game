@@ -1,5 +1,6 @@
 import { TS, TILE, SKILLS, CHARS, CHAPTERS, ENDING, ENEMY_IDS, TYPE_NAME, triangle } from './data.js';
 import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG } from './gfx.js';
+import { SFX, BGM, toggleSnd, sndOn } from './sfx.js';
 import ITEMS from './data/items.json';
 import HWASAN from './data/stages_hwasan.json';
 import SAJO from './data/stages_sajo.json';
@@ -131,8 +132,55 @@ function fx(x,y,txt,cls){
 }
 async function banner(txt, enemy){
   const b=document.getElementById('banner'); if(!b) return;
+  SFX.play('phase');
   b.textContent=txt; b.className='show'+(enemy?' enemy':'');
   await sleep(950); b.className='';
+}
+/* 유닛 이동 트윈: 현재 좌표로 렌더 후, 이전 좌표에서 미끄러져 오는 연출 */
+async function animMove(u, ox, oy){
+  renderBattle(true);
+  if(ox===u.x&&oy===u.y) return;
+  const g=document.getElementById('ug-'+u.uid);
+  const steps=Math.max(Math.abs(ox-u.x),Math.abs(oy-u.y));
+  const dur=Math.min(460, 80*steps+130);
+  SFX.play('move');
+  if(!g){ await sleep(160); return; }
+  g.style.transition='none';
+  g.style.transform=`translate(${(ox-u.x)*TS}px,${(oy-u.y)*TS}px)`;
+  g.getBoundingClientRect(); /* reflow 강제 */
+  g.style.transition=`transform ${dur}ms cubic-bezier(.3,.7,.4,1)`;
+  g.style.transform='translate(0,0)';
+  await sleep(dur+50);
+}
+/* 선택 유닛을 (nx,ny)로 트윈 이동시킨 뒤 후속 동작 실행 */
+function moveSelTo(nx,ny,after){
+  const u=B.sel, ox=u.x, oy=u.y;
+  u.x=nx; u.y=ny; B.mode='menu'; B.busy=true; hideMenu();
+  animMove(u,ox,oy).then(()=>{ if(!B||!B.sel) return; B.busy=false; renderBattle(); after(); });
+}
+/* 공격 런지(돌진) 모션 */
+async function lunge(a,d){
+  SFX.play('attack');
+  const g=document.getElementById('ug-'+a.uid); if(!g){ await sleep(90); return; }
+  const dx=d.x-a.x, dy=d.y-a.y, m=Math.max(1,Math.abs(dx),Math.abs(dy));
+  g.style.transition='transform .09s ease-in';
+  g.style.transform=`translate(${dx/m*12}px,${dy/m*12}px)`;
+  await sleep(100);
+  if(g.isConnected){ g.style.transition='transform .16s ease-out'; g.style.transform='translate(0,0)'; }
+}
+/* 피격 섬광 */
+function flashTile(x,y,cls){
+  const layer=document.getElementById('fx'); if(!layer) return;
+  const el=document.createElement('div');
+  el.className='hitflash '+(cls||'');
+  el.style.left=(x*TS+TS/2-24)+'px'; el.style.top=(y*TS+TS/2-26)+'px';
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(),450);
+}
+function shakeMap(big){
+  const m=document.getElementById('mapsizer'); if(!m) return;
+  m.classList.add('shake'); if(big) m.classList.add('big');
+  setTimeout(()=>{ m.classList.remove('shake'); m.classList.remove('big'); },big?420:380);
 }
 function log(msg,imp){
   if(!B) return;
@@ -149,7 +197,7 @@ function grantExp(u, amt){
   while(u.exp>=100){
     u.exp-=100; u.lvl++;
     const ups=rollLevel(u);
-    fx(u.x,u.y,'LEVEL UP!','label');
+    fx(u.x,u.y,'LEVEL UP!','label'); SFX.play('levelup');
     log(`<b>레벨 업!</b> ${u.name} Lv.${u.lvl} — ${ups.join('·')} 상승`,true);
   }
 }
@@ -181,25 +229,28 @@ function poisonTick(team){
 async function strike(a,d,skillId,followup){
   const c=calcStrike(a,d,skillId);
   const sk=skillId?SKILLS[skillId]:null;
-  if(sk&&!followup){ a.ki-=sk.cost; fx(a.x,a.y,sk.name,'label'); await sleep(420); }
+  if(sk&&!followup){ a.ki-=sk.cost; fx(a.x,a.y,sk.name,'label'); SFX.play('skill'); await sleep(420); }
   const roll=Math.random()*100;
-  document.getElementById('mapwrap').classList.add('shake');
-  setTimeout(()=>{const m=document.getElementById('mapwrap'); if(m) m.classList.remove('shake');},380);
+  await lunge(a,d);
   if(roll<c.hit){
     let dmg=c.dmg;
     const isCrit=Math.random()*100<c.crit;
     if(isCrit) dmg=Math.round(dmg*1.6);
     d.hp=Math.max(0,d.hp-dmg);
+    SFX.play(isCrit?'crit':'hit');
+    flashTile(d.x,d.y,isCrit?'crit':'');
+    shakeMap(isCrit);
     fx(d.x,d.y,dmg,isCrit?'crit':'');
     if(isCrit) log(`${a.name}의 <b>필살!</b> ${d.name}에게 ${dmg} 피해`);
     else log(`${a.name} → ${d.name} ${dmg} 피해`);
     grantExp(a, 8 + (sk?2:0));
     if(sk&&sk.poison&&d.hp>0&&!d.poison){
-      d.poison=3; fx(d.x,d.y,'중독!','label');
+      d.poison=3; fx(d.x,d.y,'중독!','label'); SFX.play('poison');
       log(`${d.name}이(가) <b>중독</b>되었다! (3턴간 지속 피해)`,true);
     }
     if(d.hp<=0){
       d.alive=false;
+      SFX.play('kill');
       fx(d.x,d.y,'격파!','label');
       if(d.team==='E'){
         grantExp(a, 30 + Math.max(0,(d.lvl-a.lvl))*4 + (d.boss?40:0));
@@ -209,11 +260,16 @@ async function strike(a,d,skillId,followup){
       }
     }
   }else{
+    SFX.play('miss');
+    const gd=document.getElementById('ug-'+d.uid);
+    if(gd){ gd.style.transition='transform .1s ease-out'; gd.style.transform='translate(-7px,0)';
+      setTimeout(()=>{ if(gd.isConnected){ gd.style.transition='transform .14s ease-in'; gd.style.transform='translate(0,0)'; } },110); }
     fx(d.x,d.y,'회피!','miss');
     log(`${a.name}의 공격, ${d.name}이(가) 회피`);
   }
+  await sleep(260); /* 런지 복귀·회피 모션이 끝난 뒤 렌더 */
   renderBattle(true);
-  await sleep(520);
+  await sleep(300);
 }
 
 /* ── 교전(공격+반격+추격) ── */
@@ -249,9 +305,9 @@ async function healAction(a,t,skillId){
   a.ki-=sk.cost;
   const amt=a.stats.int+sk.healPow;
   t.hp=Math.min(t.maxhp,t.hp+amt);
-  fx(a.x,a.y,sk.name,'label');
+  fx(a.x,a.y,sk.name,'label'); SFX.play('skill');
   await sleep(380);
-  fx(t.x,t.y,'+'+amt,'heal');
+  fx(t.x,t.y,'+'+amt,'heal'); SFX.play('heal');
   log(`${a.name}의 ${sk.name} — ${t.name} ${amt} 회복`);
   grantExp(a,14);
   renderBattle(true);
@@ -288,6 +344,7 @@ function clearSel(){
   hideMenu(); renderBattle();
 }
 function selectUnit(u){
+  SFX.play('select');
   B.sel=u; B.orig={x:u.x,y:u.y}; B.mode='move'; B.mr=moveRange(u); B.inspect=null;
   renderBattle();
 }
@@ -340,11 +397,11 @@ function onTile(x,y){
     if(u===B.sel){ openMenu(); return; }
     if(u&&u.team==='E'){
       const pos=pickAttackPos(B.sel,u,B.mr);
-      if(pos){ B.sel.x=pos.x; B.sel.y=pos.y; B.mode='menu'; renderBattle(); openForecast(B.sel,u,null); return; }
+      if(pos){ moveSelTo(pos.x,pos.y,()=>openForecast(B.sel,u,null)); return; }
       clearSel(); inspectEnemy(u); return;
     }
     if(B.mr.has(k)&&stoppable(B.sel,x,y)){
-      B.sel.x=x; B.sel.y=y; B.mode='menu'; renderBattle(); openMenu();
+      moveSelTo(x,y,openMenu);
     } else clearSel();
   }
   else if(B.mode==='target-attack'||B.mode==='target-skill'){
@@ -407,6 +464,7 @@ function openMenu(){
 }
 function hideMenu(){ const m=document.getElementById('amenu'); if(m) m.remove(); }
 function menuAct(act,idx){
+  SFX.play('ui');
   const u=B.sel;
   if(act==='cancel'){ clearSel(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
@@ -450,6 +508,7 @@ function cancelForecast(){
   B.pending=null; backToMenu();
 }
 function confirmAttack(){
+  SFX.play('ui');
   const m=document.getElementById('fc-modal'); if(m) m.remove();
   const p=B.pending; B.pending=null;
   hideMenu(); B.mode='idle'; B.targets=null;
@@ -546,7 +605,7 @@ async function enemyPhase(){
       }
     }
     if(best){
-      if(best.x!==u.x||best.y!==u.y){ u.x=best.x; u.y=best.y; renderBattle(true); await sleep(300); }
+      if(best.x!==u.x||best.y!==u.y){ const ox=u.x,oy=u.y; u.x=best.x; u.y=best.y; await animMove(u,ox,oy); }
       await combat(u,best.p,best.sid);
       if(B.over) return;
     }else{
@@ -560,7 +619,7 @@ async function enemyPhase(){
           const dd=Math.abs(tgt.x-x)+Math.abs(tgt.y-y);
           if(!bt||dd<bt.dd) bt={x,y,dd};
         }
-        if(bt&&(bt.x!==u.x||bt.y!==u.y)){ u.x=bt.x; u.y=bt.y; renderBattle(true); await sleep(220); }
+        if(bt&&(bt.x!==u.x||bt.y!==u.y)){ const ox=u.x,oy=u.y; u.x=bt.x; u.y=bt.y; await animMove(u,ox,oy); }
       }
     }
   }
@@ -592,6 +651,7 @@ function startBattle(){
   B.loot={gold:0,items:[]};
   if(V2&&V2.curBattle){ V2.deploy=G.deploy.slice(); v2Save(); }
   for(const def of ch.enemies) B.units.push(mkEnemyUnit(def));
+  BGM.start('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${ch.win.text}`,true);
   startPlayerPhase(true);
@@ -646,6 +706,7 @@ function renderScreenBattle(){
         <span id="tb-info"></span>
         <span style="flex:1"></span>
         ${V2?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
+        <button class="btn small snd-btn" onclick="sndToggleUI()">${sndOn()?'♪':'∅'}</button>
         <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
         <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
         <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
@@ -804,6 +865,7 @@ function dlgBgSVG(){
 }
 let DLG=null;
 function showDialogue(lines, done, titleCard){
+  BGM.start('calm');
   DLG={lines, idx:-1, done, titleCard, lastL:null, lastR:null};
   app().innerHTML=`<div id="dlg-screen">
     <div id="dlg-bg">${dlgBgSVG()}</div>
@@ -817,6 +879,7 @@ function showDialogue(lines, done, titleCard){
   if(!titleCard) advanceDlg();
 }
 function advanceDlg(){
+  SFX.play('ui');
   const tc=document.getElementById('dlg-tc');
   if(tc){ tc.remove(); if(DLG.idx===-1){ DLG.idx=0; showDlgLine(); } return; }
   DLG.idx++;
@@ -826,6 +889,7 @@ function advanceDlg(){
 function showDlgLine(){
   const L=DLG.lines[DLG.idx];
   const nameEl=document.getElementById('dlg-name'), textEl=document.getElementById('dlg-text');
+  if(textEl){ textEl.classList.remove('linefade'); void textEl.offsetWidth; textEl.classList.add('linefade'); }
   const pL=document.getElementById('dlg-ptL'), pR=document.getElementById('dlg-ptR');
   if(L.s===null){
     nameEl.textContent='— 나레이션 —'; nameEl.className='';
@@ -915,6 +979,7 @@ function applyRoster(){
 function showVictory(){
   const ch=curCh();
   applyRoster();
+  SFX.play('victory'); BGM.start('calm');
   /* v2 캠페인: 스테이지 클리어 */
   if(V2&&V2.curBattle){
     const n=curNode();
@@ -982,6 +1047,7 @@ function afterVictory(next){
   });
 }
 function showDefeat(){
+  SFX.play('defeat'); BGM.start('calm');
   if(V2&&V2.curBattle){
     V2.curBattle=null;
     app().innerHTML=`<div class="result-screen">
@@ -1018,6 +1084,7 @@ function retryChapter(){
   startChapter(G.chapterIdx, true);
 }
 function showEnding(){
+  SFX.play('victory'); BGM.start('calm');
   app().innerHTML=`<div class="result-screen">
     <h2>終 幕</h2>
     <p>${ENDING.join('<br>')}</p>
@@ -1134,7 +1201,15 @@ function nextWave(w){
 /* ── 타이틀 ── */
 function toTitle(){ B=null; ENDLESS=null; V2=null; showTitle(); }
 function confirmToTitle(){ if(confirm('전투를 포기하고 타이틀로 돌아갈까요? (진행 상황은 챕터 시작 시점으로 돌아갑니다)')) toTitle(); }
+function sndToggleUI(){
+  const on=toggleSnd();
+  if(on) SFX.play('select');
+  document.querySelectorAll('.snd-btn').forEach(b=>{
+    b.textContent=b.dataset.long?('사운드 '+(on?'♪ 켜짐':'꺼짐')):(on?'♪':'∅');
+  });
+}
 function showTitle(){
+  BGM.start('calm');
   const hasSave=!!loadGame();
   app().innerHTML=`<div id="title-screen">
     ${titleArtSVG()}
@@ -1147,6 +1222,7 @@ function showTitle(){
       <div><button class="btn" onclick="showCampaignSelect()">신규 캠페인 <span style="font-size:12px;color:var(--gold2)">분기·아이템 (베타)</span></button></div>
       <div><button class="btn" onclick="startEndless()">영웅집결 무한 모드${bestWave()?` <span style="font-size:12px;color:var(--dim)">최고 ${bestWave()}파</span>`:''}</button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
+      <div><button class="btn small snd-btn" data-long="1" onclick="sndToggleUI()">사운드 ${sndOn()?'♪ 켜짐':'꺼짐'}</button></div>
     </div>
     <div class="title-note">
       본 게임은 AI(Claude)가 제작한 김용(金庸) 원작 팬메이드 데모입니다.<br>
@@ -1369,6 +1445,7 @@ function pickChoice(i){
 function showV2End(n){
   if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
   v2Save();
+  SFX.play('victory'); BGM.start('calm');
   app().innerHTML=`<div class="result-screen">
     <h2>終 幕</h2>
     <p>${(n.text||[]).join('<br>')}</p>
@@ -1383,6 +1460,7 @@ function v2Pickup(u){
   const t=B.treasures.find(t=>!t.taken&&t.x===u.x&&t.y===u.y);
   if(!t) return;
   t.taken=true;
+  SFX.play('gold');
   if(t.gold){ B.loot.gold+=t.gold; fx(u.x,u.y,`+${t.gold}냥`,'label'); log(`<b>보물!</b> ${t.gold}냥 획득 (승리 시 확정)`,true); }
   if(t.item){ B.loot.items.push(t.item); fx(u.x,u.y,ITEMS[t.item].name,'label'); log(`<b>보물!</b> ${ITEMS[t.item].name} 획득 (승리 시 확정)`,true); }
   renderBattle(true);
@@ -1419,6 +1497,7 @@ function v2UseTool(id){
 function showCamp(node, back){
   CAMP_CTX={node:node||null, back:back||'route'};
   CAMP_TAB='unit';
+  BGM.start('calm');
   renderCamp();
 }
 function campTab(t){ CAMP_TAB=t; renderCamp(); }
@@ -1484,6 +1563,7 @@ function campUnitHTML(){
   }).join('')+`</table>`;
 }
 function v2Equip(cid, slot, id){
+  SFX.play('equip');
   const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
   if(eq[slot]){ V2.inv[eq[slot]]=(V2.inv[eq[slot]]||0)+1; eq[slot]=null; }
   if(id){
@@ -1513,14 +1593,15 @@ function campShopHTML(){
   return `<div class="camp-cols"><div><h3>구입</h3><table class="camptable">${buy}</table></div>
   <div><h3>매각 <span style="font-size:11px;color:var(--dim)">(정가의 절반)</span></h3><table class="camptable">${sell}</table></div></div>`;
 }
-function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gold-=it.price; V2.inv[id]=(V2.inv[id]||0)+1; v2Save(); renderCamp(); }
-function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); v2Save(); renderCamp(); }
+function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gold-=it.price; V2.inv[id]=(V2.inv[id]||0)+1; SFX.play('gold'); v2Save(); renderCamp(); }
+function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); SFX.play('gold'); v2Save(); renderCamp(); }
 function campBagHTML(){
   return `<table class="camptable">${invRowsHTML()}</table>`;
 }
 
 /* ── 루트 맵 ── */
 function showRouteMap(){
+  BGM.start('calm');
   const C=CAMPAIGNS[V2.camp];
   const rows=C.order.map(id=>{
     const n=C.stages[id];
@@ -1578,7 +1659,6 @@ function showCampaignSelect(){
     ${campCard('hwasan','외전Ⅰ · 6막 완성판')}
     ${campCard('hooildam','외전Ⅱ · NEW')}
     ${(CAMPAIGNS.jinfinal.requireAll||[]).every(campCleared)?campCard('jinfinal','진최종전 · 해금!'):lockedCard('jinfinal','진최종전')}
-    <div class="camp-card lock"><h3>천룡팔부 (독립 캠페인)</h3><p>소봉·단예·허죽 3주인공 루트제 — 제작 예정 (R5)</p></div>
     <div style="text-align:center;margin-top:10px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;
 }
@@ -1657,6 +1737,7 @@ function battleEquip(cid,slot,id){
     eq[slot]=id;
   }
   if(u) unitApplyItemDiff(u, oldId?ITEMS[oldId]:null, id?ITEMS[id]:null);
+  SFX.play('equip');
   v2Save();
   renderBattle(true);
   const m=document.getElementById('eq-modal');
@@ -1685,5 +1766,5 @@ export const GLOBALS = {
   showCampaignSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
-  openInvModal, closeEquipModal, battleEquip,
+  openInvModal, closeEquipModal, battleEquip, sndToggleUI,
 };
