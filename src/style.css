@@ -92,6 +92,16 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 @keyframes hitf{from{opacity:1;transform:scale(.45)}to{opacity:0;transform:scale(1.65)}}
 /* 유닛 이동 트윈 */
 #mapsvg g.unit{will-change:transform;}
+/* 선택 유닛 링 회전 */
+#mapsvg .selring{transform-box:fill-box;transform-origin:center;animation:selspin 7s linear infinite;}
+@keyframes selspin{to{transform:rotate(360deg)}}
+/* 결과 화면 낙관 */
+.result-screen .seal{display:block;margin:0 auto 4px;animation:sealpop .55s cubic-bezier(.2,1.5,.4,1);}
+@keyframes sealpop{from{opacity:0;transform:scale(1.8) rotate(7deg)}60%{opacity:1}to{opacity:1;transform:scale(1) rotate(0)}}
+/* 타이틀 안개 드리프트 */
+#title-art .mist{animation:mistdrift 26s ease-in-out infinite alternate;}
+#title-art .mist.m2{animation-duration:34s;animation-direction:alternate-reverse;}
+@keyframes mistdrift{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
 /* 대화 행 페이드 */
 #dlg-text.linefade{animation:dlgline .24s ease;}
 @keyframes dlgline{from{opacity:.15}to{opacity:1}}

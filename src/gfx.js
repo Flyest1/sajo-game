@@ -166,7 +166,7 @@ function portraitInner(p){
 
 /* 초상화 defs 등록 (1회) */
 function buildPortraitDefs(){
-  let defs='';
+  let defs=gfxDefs();
   for(const id in CHARS){
     defs+=`<g id="pt-${id}">${portraitInner(CHARS[id].pt)}</g>`;
   }
@@ -178,58 +178,134 @@ function ptSVG(cid, cls){ // 원형 초상화 svg 태그
   return `<svg viewBox="0 0 100 100" class="${cls||''}" preserveAspectRatio="xMidYMid meet"><circle cx="50" cy="50" r="50" fill="#463c2e"/><g><use href="#pt-${cid}"/></g></svg>`;
 }
 
-/* ── 타일 렌더링 ── */
+/* ── 공용 그라디언트 defs (buildPortraitDefs 에서 문서에 1회 등록) ── */
+function gfxDefs(){
+  return `
+  <linearGradient id="g-water" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#6fa3c8"/><stop offset="1" stop-color="#4a7ba2"/>
+  </linearGradient>
+  <linearGradient id="g-mtn" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#a89f8d"/><stop offset="1" stop-color="#6f675a"/>
+  </linearGradient>
+  <linearGradient id="g-roof" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#7d5846"/><stop offset="1" stop-color="#5a3c30"/>
+  </linearGradient>
+  <radialGradient id="g-boss" cx=".5" cy=".5" r=".5">
+    <stop offset=".55" stop-color="rgba(255,217,74,0)"/><stop offset=".85" stop-color="rgba(255,190,60,.38)"/><stop offset="1" stop-color="rgba(255,170,40,0)"/>
+  </radialGradient>
+  <linearGradient id="g-ringP" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#6fb2e8"/><stop offset="1" stop-color="#31659a"/>
+  </linearGradient>
+  <linearGradient id="g-ringE" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#e8836f"/><stop offset="1" stop-color="#9a3c31"/>
+  </linearGradient>`;
+}
+
+/* ── 타일 렌더링 (좌표 시드 기반 변형) ── */
+function th(x,y,salt){ /* 결정적 의사난수 0~1 */
+  let n=(x*374761393 + y*668265263 + (salt||0)*1274126177)|0;
+  n=(n^(n>>13))*1274126177; n=(n^(n>>16))>>>0;
+  return n/4294967295;
+}
 function tileSVG(t, x, y){
   const px=x*TS, py=y*TS, T=TILE[t];
-  const alt=((x+y)%2===0)?1:0.94;
-  let s=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="${shade(T.color,alt)}"/>`;
   const cx=px+TS/2, cy=py+TS/2;
-  if(t==='f'){
-    s+=`<ellipse cx="${cx}" cy="${cy+6}" rx="15" ry="5" fill="rgba(0,0,0,.15)"/>`;
-    s+=`<path d="M${cx},${py+7} L${cx+13},${cy+8} L${cx-13},${cy+8} Z" fill="#3f6b35"/>`;
-    s+=`<path d="M${cx},${py+13} L${cx+11},${cy+12} L${cx-11},${cy+12} Z" fill="#4c7d40"/>`;
-    s+=`<rect x="${cx-2.5}" y="${cy+10}" width="5" height="8" fill="#6b4a2e"/>`;
-  }else if(t==='m'){
-    s+=`<path d="M${px+4},${py+TS-6} L${cx-4},${py+10} L${cx+8},${py+TS-6} Z" fill="#7a7264"/>`;
-    s+=`<path d="M${cx-4},${py+10} L${cx+2},${py+20} L${cx-9},${py+24} Z" fill="#c8c2b4"/>`;
-    s+=`<path d="M${cx+2},${py+TS-6} L${cx+16},${py+22} L${px+TS-3},${py+TS-6} Z" fill="#8d8574"/>`;
-  }else if(t==='w'){
-    s+=`<path d="M${px+8},${cy-6} q6,-5 12,0 q6,5 12,0" stroke="#8fc0dd" stroke-width="2" fill="none" opacity=".7"/>`;
-    s+=`<path d="M${px+14},${cy+10} q6,-5 12,0 q6,5 12,0" stroke="#8fc0dd" stroke-width="2" fill="none" opacity=".5"/>`;
-  }else if(t==='h'){
-    s+=`<rect x="${px+10}" y="${cy}" width="${TS-20}" height="${TS/2-6}" fill="#8a6b4e"/>`;
-    s+=`<path d="M${px+5},${cy+2} L${cx},${py+8} L${px+TS-5},${cy+2} Z" fill="#6b4a3a"/>`;
-    s+=`<path d="M${px+5},${cy+2} L${cx},${py+8} L${cx},${cy+2} Z" fill="#7d5846"/>`;
-    s+=`<rect x="${cx-4}" y="${cy+8}" width="8" height="12" fill="#463424"/>`;
-  }else if(t==='#'){
-    s+=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="#5a5148"/>`;
-    s+=`<path d="M${px},${py+TS/3} h${TS} M${px},${py+TS*2/3} h${TS} M${cx},${py} v${TS/3} M${px+TS/4},${py+TS/3} v${TS/3} M${px+TS*3/4},${py+TS/3} v${TS/3} M${cx},${py+TS*2/3} v${TS/3}" stroke="#4a4239" stroke-width="1.6"/>`;
+  const r1=th(x,y,1), r2=th(x,y,2), r3=th(x,y,3);
+  const alt=((x+y)%2===0)?1:0.955;
+  let s='';
+  if(t==='w'){
+    s+=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="url(#g-water)"/>`;
+    const wo=Math.floor(r1*3);
+    s+=`<path d="M${px+4+wo*2},${cy-8} q6,-4 12,0 q6,4 12,0" stroke="#9ecce6" stroke-width="1.8" fill="none" opacity=".65"/>`;
+    s+=`<path d="M${px+10-wo*2},${cy+8} q6,-4 12,0 q6,4 12,0" stroke="#8ec0da" stroke-width="1.6" fill="none" opacity=".45"/>`;
+    if(r2>0.72) s+=`<circle cx="${px+8+r3*32}" cy="${py+8+r1*30}" r="1.3" fill="#d8eef8" opacity=".8"/>`;
+  }else{
+    s+=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="${shade(T.color,alt)}"/>`;
+  }
+  if(t==='.'){
+    /* 평지: 풀 얼룩·풀잎·간혹 들꽃 */
+    if(r1>0.45) s+=`<ellipse cx="${px+10+r2*30}" cy="${py+10+r3*30}" rx="${7+r1*6}" ry="${5+r2*4}" fill="${shade(T.color,1.07)}" opacity=".5"/>`;
+    if(r2>0.4){
+      const gx=px+8+r1*32, gy=py+10+r3*30;
+      s+=`<path d="M${gx},${gy+6} q-1.5,-5 -3,-7 M${gx},${gy+6} q0,-6 1,-8 M${gx},${gy+6} q2,-4 4,-6" stroke="#5f8447" stroke-width="1.4" fill="none" stroke-linecap="round"/>`;
+    }
+    if(r3>0.9) s+=`<circle cx="${px+10+r1*30}" cy="${py+12+r2*26}" r="2" fill="${r1>0.5?'#e8d06a':'#e89ab0'}"/><circle cx="${px+10+r1*30}" cy="${py+12+r2*26}" r="0.9" fill="#8a6a20"/>`;
   }else if(t==='r'){
-    s+=`<circle cx="${px+12}" cy="${py+14}" r="1.6" fill="#b09c74"/><circle cx="${px+34}" cy="${py+36}" r="1.6" fill="#b09c74"/>`;
-  }else if(t==='.'){
-    if((x*7+y*13)%5===0) s+=`<path d="M${px+12},${py+38} q2,-6 4,0 M${px+34},${py+16} q2,-6 4,0" stroke="#6f9457" stroke-width="1.6" fill="none"/>`;
+    /* 길: 흙길 질감·자갈·수레바퀴 자국 */
+    s+=`<path d="M${px},${py+8+r1*6} q${TS/2},${r2*6-3} ${TS},0" stroke="${shade(T.color,0.92)}" stroke-width="3" fill="none" opacity=".6"/>`;
+    s+=`<path d="M${px},${py+TS-10-r2*6} q${TS/2},${3-r1*6} ${TS},0" stroke="${shade(T.color,0.9)}" stroke-width="2.4" fill="none" opacity=".5"/>`;
+    s+=`<circle cx="${px+8+r1*30}" cy="${py+10+r2*28}" r="1.7" fill="#ab9770"/>`;
+    if(r3>0.55) s+=`<circle cx="${px+12+r2*26}" cy="${py+14+r3*22}" r="1.3" fill="#9c8a64"/>`;
+  }else if(t==='f'){
+    /* 숲: 소나무 2형 + 시드 배치, 캐노피 그림자 */
+    s+=`<ellipse cx="${cx}" cy="${cy+9}" rx="16" ry="5.5" fill="rgba(0,0,0,.18)"/>`;
+    const lean=(r1-0.5)*5;
+    if(r2>0.5){
+      s+=`<rect x="${cx-2.5+lean/2}" y="${cy+8}" width="5" height="9" rx="1" fill="#6b4a2e"/>`;
+      s+=`<path d="M${cx+lean},${py+5} L${cx+14},${py+22} L${cx-14+lean},${py+22} Z" fill="#39622f"/>`;
+      s+=`<path d="M${cx+lean/2},${py+12} L${cx+13},${cy+3} L${cx-13},${cy+3} Z" fill="#457539"/>`;
+      s+=`<path d="M${cx},${py+19} L${cx+12},${cy+10} L${cx-12},${cy+10} Z" fill="#528544"/>`;
+      s+=`<path d="M${cx+lean},${py+5} L${cx+6+lean/2},${py+14} L${cx+lean/2},${py+12} Z" fill="#5d9350" opacity=".7"/>`;
+    }else{
+      s+=`<rect x="${cx-2+lean}" y="${cy+6}" width="4.4" height="11" rx="1" fill="#71513a"/>`;
+      s+=`<circle cx="${cx-7+lean}" cy="${cy-4}" r="8.5" fill="#4a7a3c"/>`;
+      s+=`<circle cx="${cx+7+lean}" cy="${cy-2}" r="9" fill="#437136"/>`;
+      s+=`<circle cx="${cx+lean}" cy="${cy-10}" r="9.5" fill="#528544"/>`;
+      s+=`<circle cx="${cx-3+lean}" cy="${cy-12}" r="5" fill="#619752" opacity=".8"/>`;
+    }
+  }else if(t==='m'){
+    /* 산: 능선·설봉·볕/그늘 면 */
+    s+=`<path d="M${px+3},${py+TS-5} L${cx-5},${py+8} L${cx+9},${py+TS-5} Z" fill="url(#g-mtn)"/>`;
+    s+=`<path d="M${cx-5},${py+8} L${cx+1},${py+19} L${cx-10},${py+23} Z" fill="#d8d2c4"/>`;
+    s+=`<path d="M${cx-5},${py+8} L${cx+9},${py+TS-5} L${cx+2},${py+TS-5} Z" fill="#5f584c" opacity=".55"/>`;
+    s+=`<path d="M${cx+3},${py+TS-5} L${cx+15},${py+20+r1*4} L${px+TS-2},${py+TS-5} Z" fill="#837a69"/>`;
+    s+=`<path d="M${cx+15},${py+20+r1*4} L${px+TS-2},${py+TS-5} L${cx+15},${py+TS-5} Z" fill="#6d6455" opacity=".6"/>`;
+    if(r2>0.6) s+=`<path d="M${px+8},${py+TS-8} q3,-4 6,0" stroke="#6d6455" stroke-width="1.4" fill="none"/>`;
+  }else if(t==='h'){
+    /* 가옥: 기와 지붕·처마·문·등롱 */
+    s+=`<ellipse cx="${cx}" cy="${py+TS-7}" rx="18" ry="4.5" fill="rgba(0,0,0,.18)"/>`;
+    s+=`<rect x="${px+10}" y="${cy-1}" width="${TS-20}" height="${TS/2-7}" fill="#b39672"/>`;
+    s+=`<rect x="${px+10}" y="${cy-1}" width="${TS-20}" height="3.5" fill="#8a6b4e"/>`;
+    s+=`<path d="M${px+3},${cy+1} Q${px+5},${cy-3} ${px+9},${cy-4} L${cx},${py+6} L${px+TS-9},${cy-4} Q${px+TS-5},${cy-3} ${px+TS-3},${cy+1} L${px+TS-7},${cy-1} L${cx},${py+10} L${px+7},${cy-1} Z" fill="url(#g-roof)"/>`;
+    s+=`<path d="M${px+7},${cy-1} L${cx},${py+10} L${cx},${cy-4} Z" fill="#8a6350" opacity=".7"/>`;
+    s+=`<path d="M${cx},${py+6} L${cx},${py+10}" stroke="#4a3226" stroke-width="1.4"/>`;
+    s+=`<rect x="${cx-4.5}" y="${cy+7}" width="9" height="13" rx="1" fill="#463424"/>`;
+    s+=`<path d="M${cx},${cy+7} L${cx},${cy+20}" stroke="#2e2218" stroke-width="1"/>`;
+    if(r1>0.5) s+=`<circle cx="${px+13.5}" cy="${cy+9}" r="2.6" fill="#d8543a"/><rect x="${px+12.8}" y="${cy+5.5}" width="1.4" height="2" fill="#8a6b4e"/>`;
+  }else if(t==='#'){
+    /* 담장: 벽돌·상단 하이라이트·이끼 */
+    s+=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="#605850"/>`;
+    s+=`<rect x="${px}" y="${py}" width="${TS}" height="5" fill="#736a60"/>`;
+    s+=`<path d="M${px},${py+TS/3} h${TS} M${px},${py+TS*2/3} h${TS} M${cx},${py+5} v${TS/3-5} M${px+TS/4},${py+TS/3} v${TS/3} M${px+TS*3/4},${py+TS/3} v${TS/3} M${cx},${py+TS*2/3} v${TS/3}" stroke="#4c443c" stroke-width="1.6"/>`;
+    if(r1>0.62) s+=`<circle cx="${px+8+r2*32}" cy="${py+12+r3*28}" r="2.6" fill="#5f6e44" opacity=".55"/>`;
   }
   s+=`<rect x="${px}" y="${py}" width="${TS}" height="${TS}" fill="none" stroke="rgba(0,0,0,.12)"/>`;
   return s;
 }
 
 /* ── 유닛 토큰 ── */
-function unitSVG(u){
+function unitSVG(u, sel){
   const px=u.x*TS+TS/2, py=u.y*TS+TS/2;
-  const ring = u.team==='P' ? '#4a90c8' : '#c8564a';
+  const ringG = u.team==='P' ? 'url(#g-ringP)' : 'url(#g-ringE)';
   const acted = (u.team==='P'&&u.acted) ? 'opacity:.45;filter:grayscale(.9);' : '';
   const r=TS/2-5;
   const hpw = TS-16, hpr = Math.max(0, u.hp/u.maxhp);
-  let s=`<g class="unit" id="ug-${u.uid}" data-ux="${u.x}" data-uy="${u.y}" style="${acted}cursor:pointer;">`;
+  let s=`<g class="unit${sel?' sel':''}" id="ug-${u.uid}" data-ux="${u.x}" data-uy="${u.y}" style="${acted}cursor:pointer;">`;
+  if(u.boss) s+=`<circle cx="${px}" cy="${py-2}" r="${r+8}" fill="url(#g-boss)"/>`;
   s+=`<ellipse cx="${px}" cy="${py+r-2}" rx="${r*0.8}" ry="4" fill="rgba(0,0,0,.3)"/>`;
-  s+=`<circle cx="${px}" cy="${py-2}" r="${r}" fill="#3a3226" stroke="${ring}" stroke-width="3"/>`;
+  if(sel) s+=`<circle class="selring" cx="${px}" cy="${py-2}" r="${r+4}" fill="none" stroke="#f0d49a" stroke-width="2" stroke-dasharray="6 5"/>`;
+  s+=`<circle cx="${px}" cy="${py-2}" r="${r}" fill="#3a3226"/>`;
+  s+=`<circle cx="${px}" cy="${py-2}" r="${r}" fill="none" stroke="${ringG}" stroke-width="3.4"/>`;
   s+=`<clipPath id="clip-${u.uid}"><circle cx="${px}" cy="${py-2}" r="${r-2}"/></clipPath>`;
   const sc=(r-2)*2/100, ox=px-(r-2), oy=py-2-(r-2);
   s+=`<g clip-path="url(#clip-${u.uid})"><g transform="translate(${ox},${oy}) scale(${sc})"><rect width="100" height="100" fill="#4a4032"/><use href="#pt-${u.cid}"/></g></g>`;
+  s+=`<path d="M${px-r+2},${py-2-r*0.55} A${r-2},${r-2} 0 0 1 ${px+r-2},${py-2-r*0.55}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2" clip-path="url(#clip-${u.uid})"/>`;
   if(u.boss) s+=`<path d="M${px-7},${py-r-7} L${px-4},${py-r-2} L${px},${py-r-8} L${px+4},${py-r-2} L${px+7},${py-r-7} L${px+6},${py-r-1} L${px-6},${py-r-1} Z" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;
+  else if(u.leader) s+=`<circle cx="${px}" cy="${py-r-3.5}" r="3" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;
   if(u.poison) s+=`<circle cx="${px-r+3}" cy="${py-r+5}" r="6.5" fill="#8a4ab0" stroke="#141008" stroke-width="1"/><text x="${px-r+3}" y="${py-r+8}" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">독</text>`;
   s+=`<rect x="${px-hpw/2}" y="${py+r-8}" width="${hpw}" height="5" rx="2.5" fill="#141008" stroke="#000" stroke-width=".6"/>`;
-  s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="3.4" rx="1.7" fill="${hpr>0.4?'#7ec860':'#e07a4a'}"/>`;
+  s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="3.4" rx="1.7" fill="${hpr>0.4?'#7ec860':(hpr>0.18?'#e0a84a':'#e0644a')}"/>`;
+  s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="1.4" rx="0.7" fill="rgba(255,255,255,.35)"/>`;
   const tb={'외':'#a05038','경':'#3e8a62','내':'#4a6aa0'}[u.type];
   s+=`<circle cx="${px+r-3}" cy="${py-r+5}" r="7" fill="${tb}" stroke="#141008" stroke-width="1"/>`;
   s+=`<text x="${px+r-3}" y="${py-r+8.5}" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">${u.type}</text>`;
@@ -249,10 +325,21 @@ function titleArtSVG(){
     </linearGradient>
   </defs>
   <rect width="900" height="320" fill="url(#sky)"/>
+  <g opacity=".8">
+    <circle cx="80" cy="40" r="1.2" fill="#e8ecf8"/><circle cx="180" cy="24" r="0.9" fill="#e8ecf8"/>
+    <circle cx="300" cy="52" r="1.1" fill="#e8ecf8"/><circle cx="420" cy="30" r="0.8" fill="#e8ecf8"/>
+    <circle cx="520" cy="60" r="1.3" fill="#e8ecf8"/><circle cx="610" cy="26" r="0.9" fill="#e8ecf8"/>
+    <circle cx="812" cy="44" r="1.1" fill="#e8ecf8"/><circle cx="860" cy="120" r="0.9" fill="#e8ecf8"/>
+    <circle cx="140" cy="96" r="0.8" fill="#e8ecf8"/><circle cx="250" cy="120" r="1" fill="#e8ecf8"/>
+  </g>
+  <circle cx="700" cy="80" r="86" fill="#f0e0b8" opacity=".12"/>
+  <circle cx="700" cy="80" r="62" fill="#f0e0b8" opacity=".14"/>
   <circle cx="700" cy="80" r="46" fill="#f0e0b8" opacity=".9"/>
   <circle cx="686" cy="72" r="40" fill="#4a4458" opacity=".25"/>
   <path d="M0,240 L120,130 L210,220 L300,110 L420,250 L900,250 L900,320 L0,320 Z" fill="url(#mtn)"/>
   <path d="M380,250 L520,150 L640,240 L760,170 L900,260 L900,320 L380,320 Z" fill="#241e30"/>
+  <path class="mist m1" d="M-100,252 Q120,238 320,250 T740,248 T1100,252 L1100,268 Q800,258 500,264 T-100,266 Z" fill="#c9b284" opacity=".1"/>
+  <path class="mist m2" d="M-100,272 Q180,260 420,270 T860,266 T1150,272 L1150,286 Q760,276 420,282 T-100,284 Z" fill="#c9b284" opacity=".08"/>
   <path d="M0,265 Q450,240 900,270 L900,320 L0,320 Z" fill="#181420"/>
   <g opacity=".9">
     <path d="M448,236 q-10,-38 4,-72 q3,-8 8,-1 q12,30 2,73 Z" fill="#100c14"/>

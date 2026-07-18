@@ -783,7 +783,7 @@ function renderBattle(light){
   }
   /* 유닛 (선택 유닛은 맨 위에) */
   for(const u of B.units.filter(u=>u.alive&&u!==B.sel)) s+=unitSVG(u);
-  if(B.sel&&B.sel.alive) s+=unitSVG(B.sel);
+  if(B.sel&&B.sel.alive) s+=unitSVG(B.sel,true);
   svg.innerHTML=s;
   renderSide();
 }
@@ -846,18 +846,44 @@ function renderSide(){
   const tc=document.getElementById('tb-cancel'); if(tc) tc.disabled=(B.mode==='idle'&&!B.inspect);
 }
 
-/* ── 대화 화면 ── */
+/* ── 대화 화면 (무드 4종: 새벽/낮/황혼/밤 — 스테이지 시드로 결정) ── */
+function strSeed(str){ let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return Math.abs(h); }
+function dlgSeed(){
+  if(V2) return strSeed(V2.camp+'_'+V2.stageId);
+  if(ENDLESS) return strSeed('endless'+(ENDLESS.wave||0));
+  return strSeed('classic'+G.chapterIdx);
+}
+const DLG_MOODS=[
+  { /* 새벽 */ sky:['#3a3a55','#6a5a68','#c89a78'], sun:{c:'#f0d8b0',op:.55,r:40,y:150}, m1:'#4a4460', m2:'#332e48', fg:'#1e1a2c', mist:'#c8a888', stars:0 },
+  { /* 낮 */   sky:['#5878a8','#7a98b8','#b8c8b8'], sun:{c:'#f8f0d0',op:.9,r:44,y:95},  m1:'#5a6a58', m2:'#42503f', fg:'#2a3424', mist:'#d8e0d8', stars:0 },
+  { /* 황혼 */ sky:['#2a2440','#4a3a50','#8a6248'], sun:{c:'#f0e0b8',op:.75,r:55,y:110}, m1:'#332a44', m2:'#241e30', fg:'#171220', mist:'#a88868', stars:0 },
+  { /* 밤 */   sky:['#141828','#1e2438','#2a3448'], sun:{c:'#e8e8d8',op:.85,r:36,y:100}, m1:'#1c2234', m2:'#141a28', fg:'#0c101c', mist:'#485878', stars:26 },
+];
 function dlgBgSVG(){
+  const seed=dlgSeed();
+  const M=DLG_MOODS[seed%4];
+  let stars='';
+  for(let i=0;i<M.stars;i++){
+    const sx=(seed*7+i*137)%1000, sy=((seed*13+i*211)%230)+10, sr=((i*29)%10)/10*0.9+0.5;
+    stars+=`<circle cx="${sx}" cy="${sy}" r="${sr}" fill="#e8ecf8" opacity="${0.4+((i*17)%6)/10}"/>`;
+  }
   return `<svg viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
   <defs><linearGradient id="dsky" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#2a2440"/><stop offset=".6" stop-color="#4a3a50"/><stop offset="1" stop-color="#8a6248"/>
-  </linearGradient></defs>
+    <stop offset="0" stop-color="${M.sky[0]}"/><stop offset=".6" stop-color="${M.sky[1]}"/><stop offset="1" stop-color="${M.sky[2]}"/>
+  </linearGradient>
+  <radialGradient id="dglow" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="${M.sun.c}" stop-opacity=".5"/><stop offset="1" stop-color="${M.sun.c}" stop-opacity="0"/>
+  </radialGradient></defs>
   <rect width="1000" height="600" fill="url(#dsky)"/>
-  <circle cx="780" cy="110" r="55" fill="#f0e0b8" opacity=".75"/>
-  <path d="M0,430 L160,300 L300,410 L430,280 L580,440 L1000,420 L1000,600 L0,600 Z" fill="#332a44" opacity=".9"/>
-  <path d="M300,470 L520,340 L700,460 L850,380 L1000,470 L1000,600 L300,600 Z" fill="#241e30"/>
-  <path d="M0,500 Q500,470 1000,505 L1000,600 L0,600 Z" fill="#171220"/>
-  <g stroke="#171220" stroke-width="3" opacity=".7">
+  ${stars}
+  <circle cx="780" cy="${M.sun.y}" r="${M.sun.r*2.4}" fill="url(#dglow)"/>
+  <circle cx="780" cy="${M.sun.y}" r="${M.sun.r}" fill="${M.sun.c}" opacity="${M.sun.op}"/>
+  ${M.stars?`<circle cx="765" cy="${M.sun.y-8}" r="${M.sun.r*0.82}" fill="${M.sky[0]}" opacity=".55"/>`:''}
+  <path d="M0,430 L160,300 L300,410 L430,280 L580,440 L1000,420 L1000,600 L0,600 Z" fill="${M.m1}" opacity=".9"/>
+  <rect x="0" y="405" width="1000" height="42" fill="${M.mist}" opacity=".14"/>
+  <path d="M300,470 L520,340 L700,460 L850,380 L1000,470 L1000,600 L300,600 Z" fill="${M.m2}"/>
+  <path d="M0,500 Q500,470 1000,505 L1000,600 L0,600 Z" fill="${M.fg}"/>
+  <g stroke="${M.fg}" stroke-width="3" opacity=".8">
     <path d="M120,470 q0,-45 6,-60 M126,410 q-14,10 -24,8 M126,410 q12,8 22,6" fill="none"/>
     <ellipse cx="126" cy="398" rx="16" ry="10" fill="#243020" stroke="none"/>
   </g>
@@ -976,6 +1002,13 @@ function applyRoster(){
     r.lvl=u.lvl; r.exp=u.exp; r.stats=deepClone(u.stats);
   }
 }
+/* 낙관(도장) 장식 */
+function sealSVG(ch,color){
+  return `<svg class="seal" viewBox="0 0 64 64" width="60" height="60" aria-hidden="true">
+    <rect x="5" y="5" width="54" height="54" rx="7" fill="none" stroke="${color}" stroke-width="3.2" transform="rotate(-5 32 32)"/>
+    <text x="32" y="45" text-anchor="middle" font-size="34" font-weight="900" fill="${color}" transform="rotate(-5 32 32)">${ch}</text>
+  </svg>`;
+}
 function showVictory(){
   const ch=curCh();
   applyRoster();
@@ -1001,7 +1034,7 @@ function showVictory(){
       ...(n.rewardItems||[]).map(id=>`전리품 ${ITEMS[id].name}`)
     ].filter(Boolean).join(' · ');
     app().innerHTML=`<div class="result-screen">
-      <h2 style="color:#ffd94a">勝 利</h2>
+      ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
       <p>${n.title} — 클리어!${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${V2.gold}냥</p>
       <button class="btn" onclick="v2AfterBattle()">계속</button>
     </div>`;
@@ -1034,7 +1067,7 @@ function showVictory(){
   const next=G.chapterIdx+1;
   saveGame(next);
   app().innerHTML=`<div class="result-screen">
-    <h2 style="color:#ffd94a">勝 利</h2>
+    ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
     <p>${ch.title} — 클리어!${learnMsg}<br>부상당한 동료들도 무사히 회복했습니다.</p>
     <button class="btn" onclick="afterVictory(${next})">계속</button>
   </div>`;
@@ -1051,7 +1084,7 @@ function showDefeat(){
   if(V2&&V2.curBattle){
     V2.curBattle=null;
     app().innerHTML=`<div class="result-screen">
-      <h2 style="color:#e07a5a">敗 北</h2>
+      ${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">敗 北</h2>
       <p>${curNode().title} — 패배… 부대를 정비해 다시 도전하자.<br>(도구 소모는 유지되고, 경험치·전리품은 무효가 됩니다)</p>
       <button class="btn" onclick="v2Enter()">재도전</button>
       <button class="btn small" onclick="showRouteMap()">루트 맵</button>
@@ -1063,7 +1096,7 @@ function showDefeat(){
     const w=ENDLESS.wave;
     setBestWave(w-1);
     app().innerHTML=`<div class="result-screen">
-      <h2 style="color:#e07a5a">敗 北</h2>
+      ${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">敗 北</h2>
       <p>영웅들은 제${w}파의 파도에 삼켜졌다…<br>
       이번 도달: <b>${w-1}파 격퇴</b> · 역대 최고 기록: <b style="color:var(--gold2)">${bestWave()}파</b></p>
       <button class="btn" onclick="startEndless()">처음부터 재도전</button>
@@ -1072,7 +1105,7 @@ function showDefeat(){
     return;
   }
   app().innerHTML=`<div class="result-screen">
-    <h2 style="color:#e07a5a">敗 北</h2>
+    ${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">敗 北</h2>
     <p>곽정이 쓰러졌다… 강호의 이야기는 여기서 끝나지 않는다.</p>
     <button class="btn" onclick="retryChapter()">이 챕터 재도전</button>
     <button class="btn danger" onclick="toTitle()">타이틀로</button>
@@ -1086,7 +1119,7 @@ function retryChapter(){
 function showEnding(){
   SFX.play('victory'); BGM.start('calm');
   app().innerHTML=`<div class="result-screen">
-    <h2>終 幕</h2>
+    ${sealSVG('終','#d9b36c')}<h2>終 幕</h2>
     <p>${ENDING.join('<br>')}</p>
     <button class="btn" onclick="toTitle()">타이틀로</button>
   </div>`;
@@ -1447,7 +1480,7 @@ function showV2End(n){
   v2Save();
   SFX.play('victory'); BGM.start('calm');
   app().innerHTML=`<div class="result-screen">
-    <h2>終 幕</h2>
+    ${sealSVG('終','#d9b36c')}<h2>終 幕</h2>
     <p>${(n.text||[]).join('<br>')}</p>
     <button class="btn" onclick="showRouteMap()">루트 맵</button>
     <button class="btn danger" onclick="toTitle()">타이틀로</button>
