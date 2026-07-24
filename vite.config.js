@@ -9,14 +9,17 @@ export default defineConfig({
     assetsInlineLimit: 8192,
   },
   server: { host: true },
+  define: {
+    __APP_VERSION__: JSON.stringify((process.env.GITHUB_SHA||'local').slice(0,7)),
+  },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'],
       manifest: {
-        name: '사조영웅전: 강호의 별',
+        name: '강호의 별 — 통합 강호연대기',
         short_name: '강호의 별',
-        description: '김용 원작 팬메이드 무협 SRPG (AI 제작 데모)',
+        description: '시대와 인물 계보를 잇는 비공식·비영리 팬메이드 무협 SRPG',
         lang: 'ko',
         theme_color: '#1b1712',
         background_color: '#1b1712',
@@ -35,6 +38,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,json,woff2}'],
         navigateFallback: '/sajo-game/index.html',
         cleanupOutdatedCaches: true,
+        clientsClaim: true,
       },
     }),
   ],

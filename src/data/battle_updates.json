@@ -1,0 +1,62 @@
+{
+  "campaigns": {
+    "sajo": {
+      "s6": {
+        "objective": {
+          "type": "subdue",
+          "target": "ogg",
+          "threshold": 0.2,
+          "text": "구양극을 죽이지 않고 HP 20% 이하로 제압"
+        },
+        "bossPhases": [
+          { "target": "ogg", "at": 0.68, "name": "백타유신보", "stats": { "spd": 0.16, "skl": 0.1 }, "guardRatio": 0.18, "tactic": "hunter" },
+          { "target": "ogg", "at": 0.32, "name": "영사반격", "stats": { "str": 0.2, "skl": 0.12 }, "guardRatio": 0.22, "tactic": "execute" }
+        ]
+      }
+    },
+    "sinjo": {
+      "s10": {
+        "objective": {
+          "type": "all",
+          "text": "곽도를 격파하고 성루의 곽양을 구출",
+          "objectives": [
+            { "type": "boss", "boss": "gwd", "text": "곽도 격파" },
+            { "type": "seize", "tiles": [[9, 1]], "text": "성루 구출 지점 확보" }
+          ]
+        },
+        "bossPhases": [
+          { "target": "gwd", "at": 0.7, "name": "광풍신법", "stats": { "spd": 0.18, "skl": 0.08 }, "guardRatio": 0.18, "tactic": "hunter" },
+          { "target": "gwd", "at": 0.34, "name": "금륜호법", "stats": { "str": 0.18, "def": 0.12 }, "guardRatio": 0.26, "tactic": "leader" }
+        ]
+      }
+    },
+    "uicheon": {
+      "s6b": {
+        "objective": {
+          "type": "survive",
+          "turns": 7,
+          "boss": "myeoljeol",
+          "text": "광명정 정문을 7턴 방어하거나 멸절사태 격퇴"
+        },
+        "bossPhases": [
+          { "target": "myeoljeol", "at": 0.66, "name": "아미검진", "stats": { "int": 0.14, "res": 0.12 }, "guardRatio": 0.22, "tactic": "leader" },
+          { "target": "myeoljeol", "at": 0.3, "name": "의천검의", "stats": { "int": 0.22, "skl": 0.14 }, "guardRatio": 0.25, "tactic": "execute" }
+        ]
+      }
+    },
+    "chunryong": {
+      "t6": {
+        "objective": {
+          "type": "subdue",
+          "target": "gmj",
+          "threshold": 0.18,
+          "text": "구마지를 죽이지 않고 HP 18% 이하로 제압"
+        },
+        "bossPhases": [
+          { "target": "gmj", "at": 0.7, "name": "화염도기", "stats": { "int": 0.16, "skl": 0.1 }, "guardRatio": 0.2, "tactic": "leader" },
+          { "target": "gmj", "at": 0.33, "name": "소무상공", "stats": { "int": 0.22, "res": 0.14 }, "guardRatio": 0.26, "tactic": "execute" }
+        ]
+      }
+    }
+  }
+}

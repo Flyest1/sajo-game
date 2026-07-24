@@ -329,6 +329,16 @@ function battleSceneHTML(w,h,weather='clear',time='day',seed=1){
 }
 
 /* ── 유닛 토큰 ── */
+function typeMarkSVG(type,cx,cy){
+  const meta={
+    '외':{name:'외공',color:'#a05038',shape:`<path d="M${cx-4.4},${cy+3.8} L${cx+3.4},${cy-4} M${cx-1.8},${cy-4.2} L${cx+4.2},${cy+1.8} M${cx-4.5},${cy+4.2} L${cx-1.6},${cy+3.5}"/>`},
+    '경':{name:'경공',color:'#3e8a62',shape:`<path d="M${cx-4.8},${cy+1.8} Q${cx-1.5},${cy-4.5} ${cx+4.6},${cy-3.5} Q${cx+1.2},${cy-1.7} ${cx-.2},${cy+3.8} Q${cx-2},${cy+.8} ${cx-4.8},${cy+1.8}Z"/><path d="M${cx-2.5},${cy+.8} Q${cx+.5},${cy-1.3} ${cx+3.5},${cy-2.2}"/>`},
+    '내':{name:'내공',color:'#4a6aa0',shape:`<path d="M${cx+4.4},${cy} A4.4,4.4 0 1 1 ${cx-2.3},${cy-3.7} A2.4,2.4 0 1 0 ${cx+1.8},${cy-1.5}"/><circle cx="${cx+.4}" cy="${cy+.2}" r="1.15" fill="#fff" stroke="none"/>`},
+  }[type];
+  if(!meta) return '';
+  return `<g class="unit-type-mark" role="img" aria-label="${meta.name}"><title>${meta.name}</title><circle cx="${cx}" cy="${cy}" r="7" fill="${meta.color}" stroke="#141008" stroke-width="1"/><g fill="none" stroke="#fff" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${meta.shape}</g></g>`;
+}
+
 function unitSVG(u, sel){
   const px=u.x*TS+TS/2, py=u.y*TS+TS/2;
   const ringG = u.team==='P' ? 'url(#g-ringP)' : 'url(#g-ringE)';
@@ -351,9 +361,7 @@ function unitSVG(u, sel){
   s+=`<rect x="${px-hpw/2}" y="${py+r-8}" width="${hpw}" height="5" rx="2.5" fill="#141008" stroke="#000" stroke-width=".6"/>`;
   s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="3.4" rx="1.7" fill="${hpr>0.4?'#7ec860':(hpr>0.18?'#e0a84a':'#e0644a')}"/>`;
   s+=`<rect x="${px-hpw/2+0.8}" y="${py+r-7.2}" width="${(hpw-1.6)*hpr}" height="1.4" rx="0.7" fill="rgba(255,255,255,.35)"/>`;
-  const tb={'외':'#a05038','경':'#3e8a62','내':'#4a6aa0'}[u.type];
-  s+=`<circle cx="${px+r-3}" cy="${py-r+5}" r="7" fill="${tb}" stroke="#141008" stroke-width="1"/>`;
-  s+=`<text x="${px+r-3}" y="${py-r+8.5}" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">${u.type}</text>`;
+  s+=typeMarkSVG(u.type,px+r-3,py-r+5);
   s+=`</g>`;
   return s;
 }

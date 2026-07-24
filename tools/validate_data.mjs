@@ -52,6 +52,7 @@ const PUNGREUNG = J('stages_pungreung.json');
 const ITEMS = J('items.json');
 const CAMPAIGN_MANIFEST = J('campaigns.json');
 const STORY_EXPANSIONS = J('story_expansions.json');
+const BATTLE_UPDATES = J('battle_updates.json');
 const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
 for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
@@ -69,6 +70,14 @@ for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
     });
     const pos=camp.order.indexOf(anchorId);
     if(pos>=0) camp.order.splice(pos+1,0,...ids);
+  }
+}
+for (const [campId,updates] of Object.entries(BATTLE_UPDATES.campaigns||{})) {
+  const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
+  if(!camp){ errs.push(`battle update unknown campaign ${campId}`); continue; }
+  for(const [stageId,patch] of Object.entries(updates)){
+    if(!camp.stages[stageId]){ errs.push(`${campId}: battle update stage missing ${stageId}`); continue; }
+    Object.assign(camp.stages[stageId],JSON.parse(JSON.stringify(patch)));
   }
 }
 const CAMPAIGN_IDS = new Set([...CAMPAIGN_FILES.map(c=>c.id),'chronicle']);
@@ -127,14 +136,21 @@ for (const CAMP of CAMPAIGN_FILES) {
       });
       if (n.win.boss && !n.enemies.some(e => e.cid === n.win.boss)) errs.push(`${tag} boss ${n.win.boss} not on map`);
       const objective=n.objective||n.win;
-      if (!['rout','boss','survive','seize','escape','subdue'].includes(objective.type)) errs.push(`${tag} objective unknown type ${objective.type}`);
-      if (objective.boss && !n.enemies.some(e => e.cid === objective.boss)) errs.push(`${tag} objective boss ${objective.boss} not on map`);
-      if (objective.target && !n.enemies.some(e => e.cid === objective.target)) errs.push(`${tag} objective target ${objective.target} not on map`);
-      (objective.protect||[]).forEach(cid=>{ if(!CHARS[cid]) errs.push(`${tag} objective protect unknown ${cid}`); });
-      (objective.tiles||objective.zones||[]).forEach((t,i)=>{
-        const [x,y]=Array.isArray(t)?t:[t.x,t.y];
-        if(blocked(x,y)) errs.push(`${tag} objective tile${i} (${x},${y}) blocked`);
-      });
+      const validateObjective=(o,path='objective')=>{
+        if (!['rout','boss','survive','seize','escape','subdue','all','any'].includes(o.type)) errs.push(`${tag} ${path} unknown type ${o.type}`);
+        if ((o.type==='all'||o.type==='any')) {
+          if(!Array.isArray(o.objectives)||!o.objectives.length) errs.push(`${tag} ${path} requires objectives`);
+          (o.objectives||[]).forEach((child,i)=>validateObjective(child,`${path}.${i}`));
+        }
+        if (o.boss && !n.enemies.some(e => e.cid === o.boss)) errs.push(`${tag} ${path} boss ${o.boss} not on map`);
+        if (o.target && !n.enemies.some(e => e.cid === o.target)) errs.push(`${tag} ${path} target ${o.target} not on map`);
+        (o.protect||[]).forEach(cid=>{ if(!CHARS[cid]) errs.push(`${tag} ${path} protect unknown ${cid}`); });
+        (o.tiles||o.zones||[]).forEach((t,i)=>{
+          const [x,y]=Array.isArray(t)?t:[t.x,t.y];
+          if(blocked(x,y)) errs.push(`${tag} ${path} tile${i} (${x},${y}) blocked`);
+        });
+      };
+      validateObjective(objective);
       (n.bossPhases||[]).forEach((p,i)=>{
         if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`);
         if(p.target&&!n.enemies.some(e=>e.cid===p.target&&e.boss)) errs.push(`${tag} bossPhase${i} target ${p.target} is not a deployed boss`);

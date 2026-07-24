@@ -38,6 +38,32 @@ test('Tianlong default ending is canon while survival endings stay IF-only', asy
   expect(route.conditionalEndings).not.toContain('u5_tl_canon_end');
 });
 
+test('campaign registry applies special objectives and runtime context', async ({ page }) => {
+  const state=await page.evaluate(() => ({
+    runtime:window.__dbg.runtimeContext(),
+    sajo:window.__dbg.CAMPAIGNS.sajo.stages.s6.objective,
+    sinjo:window.__dbg.CAMPAIGNS.sinjo.stages.s10.objective,
+    uicheon:window.__dbg.CAMPAIGNS.uicheon.stages.s6b.objective,
+    chunryong:window.__dbg.CAMPAIGNS.chunryong.stages.t6.objective,
+  }));
+  expect(state.runtime.mode).toBe('classic');
+  expect(state.sajo.type).toBe('subdue');
+  expect(state.sinjo.type).toBe('all');
+  expect(state.sinjo.objectives).toHaveLength(2);
+  expect(state.uicheon.type).toBe('survive');
+  expect(state.chunryong.type).toBe('subdue');
+});
+
+test('manual update prompt is readable and dismissible', async ({ page }) => {
+  await page.evaluate(() => window.__pwa.showUpdateNotice({kind:'update'}));
+  const notice=page.locator('#update-notice');
+  await expect(notice).toBeVisible();
+  await expect(notice.getByText('새 강호 기록이 도착했습니다')).toBeVisible();
+  await expect(notice.getByRole('button', { name:'업데이트 적용' })).toBeVisible();
+  await notice.getByRole('button', { name:'알림 닫기' }).click();
+  await expect(notice).toHaveCount(0);
+});
+
 test('seeded roam creates a ten-node route and enters deployment', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: /도전과 회상/ }).click();
   await page.getByRole('button', { name: /유람 시작/ }).click();
@@ -51,6 +77,11 @@ test('seeded roam creates a ten-node route and enters deployment', async ({ page
   await expect(page.getByText(/승리 조건: 습격자 격파/)).toBeVisible();
   await page.getByRole('button', { name: '출 전 !' }).click();
   await expect(page.locator('.intent-mark')).toHaveCount(5);
+  await expect(page.locator('.intent-mark text')).toHaveCount(0);
+  await expect(page.locator('.intent-mark title').first()).toHaveText(/공격 예고|이동 예고|대기 예고/);
+  await expect(page.locator('.unit-type-mark')).toHaveCount(9);
+  await expect(page.locator('.unit-type-mark text')).toHaveCount(0);
+  await expect(page.locator('.unit-type-mark title').first()).toHaveText(/외공|경공|내공/);
   await expect(page.locator('#battle-depth .depth-layer')).toHaveCount(3);
   await expect(page.locator('#mapwrap')).toHaveAttribute('data-time', /dawn|day|dusk|night/);
   if(process.env.R16_VISUAL) await page.screenshot({ path:`test-results/r16-${testInfo.project.name}-battle.png`, fullPage:true });
