@@ -1,0 +1,116 @@
+{
+  "groups": [
+    {
+      "id": "chronicles",
+      "name": "강호연대기",
+      "desc": "원작의 시대와 인물 계보를 따라가는 정식 본편",
+      "campaigns": ["chunryong", "sajo", "sinjo", "uicheon"]
+    },
+    {
+      "id": "legends",
+      "name": "강호외전",
+      "desc": "원작 단편과 원작의 공백을 확장한 게임 오리지널 이야기",
+      "campaigns": ["wolnyeo", "hwasan", "hwalsa", "pungreung", "hooildam"]
+    },
+    {
+      "id": "finale",
+      "name": "비정사 종장",
+      "desc": "시대를 넘어 영웅들이 만나는 메타 크로스오버",
+      "campaigns": ["dokgo", "jinfinal"]
+    },
+    {
+      "id": "archive",
+      "name": "회상",
+      "desc": "초기 버전의 빠른 전개를 공통 규칙으로 다시 즐기는 기록",
+      "campaigns": ["chronicle"]
+    }
+  ],
+  "campaigns": {
+    "chunryong": {
+      "era": "북송 후기 · 1090년대",
+      "canon": "원작 본편",
+      "tone": "팔부중생",
+      "order": 10,
+      "source": "천룡팔부"
+    },
+    "sajo": {
+      "era": "남송·몽골 · 1199~1227",
+      "canon": "원작 본편",
+      "tone": "영웅의 탄생",
+      "order": 20,
+      "source": "사조영웅전"
+    },
+    "sinjo": {
+      "era": "남송 말기 · 1236~1260",
+      "canon": "원작 본편",
+      "tone": "사랑과 성장",
+      "order": 30,
+      "source": "신조협려",
+      "continues": "sajo"
+    },
+    "uicheon": {
+      "era": "원말명초 · 14세기",
+      "canon": "원작 본편",
+      "tone": "도검과 천하",
+      "order": 40,
+      "source": "의천도룡기",
+      "continues": "sinjo"
+    },
+    "wolnyeo": {
+      "era": "춘추 말기와 남송의 잔향",
+      "canon": "원작 단편 기반",
+      "tone": "검의 기원",
+      "order": 50,
+      "source": "월녀검"
+    },
+    "hwasan": {
+      "era": "사조 이전",
+      "canon": "원작 공백 기반 창작",
+      "tone": "오절의 기원",
+      "order": 60,
+      "source": "사조영웅전의 회고"
+    },
+    "hwalsa": {
+      "era": "사조 이전",
+      "canon": "원작 공백 기반 창작",
+      "tone": "엇갈린 인연",
+      "order": 61,
+      "source": "신조협려의 회고"
+    },
+    "pungreung": {
+      "era": "신조 이후",
+      "canon": "원작 공백 기반 창작",
+      "tone": "세대의 등불",
+      "order": 62,
+      "source": "신조협려·의천도룡기"
+    },
+    "hooildam": {
+      "era": "명 건국 전후",
+      "canon": "게임 오리지널 외전",
+      "tone": "강호와 권력",
+      "order": 70,
+      "source": "의천도룡기 이후의 역사적 공백"
+    },
+    "dokgo": {
+      "era": "신조의 회상",
+      "canon": "수련 도전",
+      "tone": "검의 다섯 경지",
+      "order": 80,
+      "source": "신조협려의 독고구패 유산"
+    },
+    "jinfinal": {
+      "era": "시대 초월",
+      "canon": "비정사 크로스오버",
+      "tone": "영웅집결",
+      "order": 90,
+      "source": "게임 오리지널"
+    },
+    "chronicle": {
+      "era": "초대판 기록",
+      "canon": "회상·압축 캠페인",
+      "tone": "19전 속성 전개",
+      "order": 100,
+      "source": "초기 강호의 별"
+    }
+  }
+}

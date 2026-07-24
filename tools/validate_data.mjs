@@ -50,9 +50,21 @@ const DOKGO = J('stages_dokgo.json');
 const HWALSA = J('stages_hwalsa.json');
 const PUNGREUNG = J('stages_pungreung.json');
 const ITEMS = J('items.json');
-for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL]) {
+const CAMPAIGN_MANIFEST = J('campaigns.json');
+const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
+const CAMPAIGN_IDS = new Set([...CAMPAIGN_FILES.map(c=>c.id),'chronicle']);
+for (const group of CAMPAIGN_MANIFEST.groups) {
+  if (!group.id || !group.name || !Array.isArray(group.campaigns)) errs.push(`campaign group invalid ${JSON.stringify(group)}`);
+  group.campaigns.forEach(id => { if (!CAMPAIGN_IDS.has(id)) errs.push(`campaign group ${group.id}: unknown ${id}`); });
+}
+for (const id of CAMPAIGN_IDS) {
+  const meta=CAMPAIGN_MANIFEST.campaigns[id];
+  if (!meta || !meta.canon || !meta.era || !meta.source) errs.push(`campaign meta invalid ${id}`);
+}
+for (const CAMP of CAMPAIGN_FILES) {
   const S = CAMP.stages;
   const CID = CAMP.id;
+  const edges = new Map();
   if (!S[CAMP.start]) errs.push(`${CID}: start 노드 없음`);
   for (const id of CAMP.order) if (!S[id]) errs.push(`${CID} order: 미정의 노드 ${id}`);
   for (const id in S) {
@@ -62,6 +74,7 @@ for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, 
     if (n.next && typeof n.next === 'object' && n.next.cond) { n.next.cond.forEach(c => targets.push(c.to)); targets.push(n.next.else); }
     (n.rewardItems || []).forEach(ri => { if (!ITEMS[ri]) errs.push(`${tag} rewardItem unknown ${ri}`); });
     if (n.options) n.options.forEach(o => targets.push(o.to));
+    edges.set(id, targets.filter(Boolean));
     (n.joins || []).forEach(j => { if (!CHARS[j]) errs.push(`${tag} joins unknown ${j}`); });
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
     if (n.kind === 'battle') {
@@ -92,6 +105,16 @@ for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, 
         if (t.item && !ITEMS[t.item]) errs.push(`${tag} treasure unknown item ${t.item}`);
       });
       if (n.win.boss && !n.enemies.some(e => e.cid === n.win.boss)) errs.push(`${tag} boss ${n.win.boss} not on map`);
+      const objective=n.objective||n.win;
+      if (!['rout','boss','survive','seize','escape','subdue'].includes(objective.type)) errs.push(`${tag} objective unknown type ${objective.type}`);
+      if (objective.boss && !n.enemies.some(e => e.cid === objective.boss)) errs.push(`${tag} objective boss ${objective.boss} not on map`);
+      if (objective.target && !n.enemies.some(e => e.cid === objective.target)) errs.push(`${tag} objective target ${objective.target} not on map`);
+      (objective.protect||[]).forEach(cid=>{ if(!CHARS[cid]) errs.push(`${tag} objective protect unknown ${cid}`); });
+      (objective.tiles||objective.zones||[]).forEach((t,i)=>{
+        const [x,y]=Array.isArray(t)?t:[t.x,t.y];
+        if(blocked(x,y)) errs.push(`${tag} objective tile${i} (${x},${y}) blocked`);
+      });
+      (n.bossPhases||[]).forEach((p,i)=>{ if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`); });
       if (n.weather && !['clear','snow','rain','fog','night'].includes(n.weather)) errs.push(`${tag} unknown weather ${n.weather}`);
       if (n.cut && (!Array.isArray(n.cut.lines) || !n.cut.lines.length)) errs.push(`${tag} cut.lines invalid`);
       if (n.cut && n.cut.bg && !['siege','duel','throne','snow','peak'].includes(n.cut.bg)) errs.push(`${tag} cut.bg unknown ${n.cut.bg}`);
@@ -100,6 +123,9 @@ for (const CAMP of [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, 
     }
     if (n.kind === 'camp' && n.shop) n.shop.forEach(it => { if (!ITEMS[it]) errs.push(`${tag} shop unknown item ${it}`); });
   }
+  const seen=new Set(), queue=[CAMP.start];
+  while(queue.length){ const id=queue.shift(); if(seen.has(id)||!S[id])continue; seen.add(id); for(const to of (edges.get(id)||[])) if(!seen.has(to))queue.push(to); }
+  for(const id of CAMP.order) if(!seen.has(id)) errs.push(`${CID}: 시작점에서 도달 불가 ${id}`);
   CAMP.party.forEach(c => { if (!CHARS[c]) errs.push(`${CID} party unknown ${c}`); });
 }
 {
