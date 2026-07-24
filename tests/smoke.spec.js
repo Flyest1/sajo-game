@@ -38,7 +38,7 @@ test('Tianlong default ending is canon while survival endings stay IF-only', asy
   expect(route.conditionalEndings).not.toContain('u5_tl_canon_end');
 });
 
-test('seeded roam creates a ten-node route and enters deployment', async ({ page }) => {
+test('seeded roam creates a ten-node route and enters deployment', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: /도전과 회상/ }).click();
   await page.getByRole('button', { name: /유람 시작/ }).click();
   await page.getByLabel('시드 코드').fill('R17-SMOKE');
@@ -51,6 +51,21 @@ test('seeded roam creates a ten-node route and enters deployment', async ({ page
   await expect(page.getByText(/승리 조건: 습격자 격파/)).toBeVisible();
   await page.getByRole('button', { name: '출 전 !' }).click();
   await expect(page.locator('.intent-mark')).toHaveCount(5);
+  await expect(page.locator('#battle-depth .depth-layer')).toHaveCount(3);
+  await expect(page.locator('#mapwrap')).toHaveAttribute('data-time', /dawn|day|dusk|night/);
+  if(process.env.R16_VISUAL) await page.screenshot({ path:`test-results/r16-${testInfo.project.name}-battle.png`, fullPage:true });
+  await page.evaluate(() => window.__dbg.previewCutin());
+  await expect(page.locator('.martial-cutin')).toBeVisible();
+  await expect(page.locator('.cutin-portrait.main svg')).toHaveAttribute('data-expression', 'awaken');
+  if(process.env.R16_VISUAL) await page.screenshot({ path:`test-results/r16-${testInfo.project.name}-cutin.png`, fullPage:true });
+  await expect(page.locator('.martial-cutin')).toHaveCount(0);
+  await page.getByRole('button', { name:'⚙' }).click();
+  const reduced=page.locator('.set-sec').filter({ hasText:'저효과 모드' });
+  await reduced.getByRole('button', { name:'꺼짐' }).click();
+  await page.getByRole('button', { name:'닫기' }).click();
+  await expect(page.locator('#mapwrap')).toHaveClass(/reduced-fx/);
+  await page.evaluate(() => window.__dbg.previewCutin());
+  await expect(page.locator('.martial-cutin')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '턴 종료' })).toBeEnabled();
 });
 

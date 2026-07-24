@@ -1,5 +1,5 @@
 import { TS, TILE, SKILLS, CHARS, CHAPTERS, ENDING, ENEMY_IDS, TYPE_NAME, triangle } from './data.js';
-import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG } from './gfx.js';
+import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG, battleSceneHTML } from './gfx.js';
 import { SFX, BGM, toggleSnd, sndOn } from './sfx.js';
 import ITEMS from './data/items.json';
 import HWASAN from './data/stages_hwasan.json';
@@ -396,6 +396,7 @@ async function lunge(a,d){
 }
 /* 피격 섬광 */
 function flashTile(x,y,cls){
+  if(SETTINGS.reducedFx) return;
   const layer=document.getElementById('fx'); if(!layer) return;
   const el=document.createElement('div');
   el.className='hitflash '+(cls||'');
@@ -404,9 +405,51 @@ function flashTile(x,y,cls){
   setTimeout(()=>el.remove(),450);
 }
 function shakeMap(big){
+  if(SETTINGS.reducedFx) return;
   const m=document.getElementById('mapsizer'); if(!m) return;
   m.classList.add('shake'); if(big) m.classList.add('big');
   setTimeout(()=>{ m.classList.remove('shake'); m.classList.remove('big'); },big?420:380);
+}
+function inkTrail(a,d,tone='basic',critical=false){
+  const layer=document.getElementById('fx'); if(!layer||SETTINGS.reducedFx||!B) return;
+  const w=B.w*TS,h=B.h*TS,x1=(a.x+.5)*TS,y1=(a.y+.5)*TS,x2=(d.x+.5)*TS,y2=(d.y+.5)*TS;
+  const bend=((a.uid.length+d.uid.length)%2?1:-1)*Math.min(34,Math.max(12,dist(a,d)*5));
+  const cx=(x1+x2)/2+bend,cy=(y1+y2)/2-bend*.45;
+  const el=document.createElement('div');
+  el.className=`ink-strike tone-${tone}${critical?' critical':''}`;
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path class="ink-core" d="M${x1},${y1} Q${cx},${cy} ${x2},${y2}"/><path class="ink-edge" d="M${x1+3},${y1-2} Q${cx-5},${cy+4} ${x2-2},${y2+3}"/><circle cx="${x2}" cy="${y2}" r="${critical?12:7}" class="ink-bloom"/></svg>`;
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(),critical?720:560);
+}
+async function showMartialCutin(a,sk,partner=null,headline=null){
+  if(SETTINGS.reducedFx||!B||!sk) return;
+  const host=document.getElementById('battlebody'); if(!host) return;
+  const el=document.createElement('div');
+  const tone=a.type==='외'?'force':(a.type==='경'?'swift':'inner');
+  el.className=`martial-cutin tone-${tone}${partner?' joint':''}`;
+  el.innerHTML=`<div class="cutin-ink"></div><div class="cutin-portraits">
+    <div class="cutin-portrait main">${ptSVG(a.cid,'','awaken')}</div>
+    ${partner?`<div class="cutin-portrait partner">${ptSVG(partner.cid,'','angry')}</div>`:''}
+    </div><div class="cutin-copy"><small>${partner?`${a.name} · ${partner.name}`:a.name}</small><strong>${headline||sk.name}</strong><i>${partner?'合同奧義':'武功絶技'}</i></div><div class="cutin-stamp">${partner?'合':'武'}</div>`;
+  host.appendChild(el);
+  gsap.fromTo(el,{opacity:0},{opacity:1,duration:.12,ease:'power1.out'});
+  gsap.fromTo(el.querySelector('.cutin-portraits'),{x:-46,scale:.9},{x:0,scale:1,duration:.36,ease:'power3.out'});
+  gsap.fromTo(el.querySelector('.cutin-copy'),{x:54,opacity:0},{x:0,opacity:1,duration:.34,delay:.04,ease:'power3.out'});
+  await aSleep(partner?620:500);
+  if(el.isConnected){ gsap.to(el,{opacity:0,duration:.14}); setTimeout(()=>el.remove(),170); }
+}
+async function showBossReveal(u,title){
+  if(SETTINGS.reducedFx||!u) return;
+  const host=document.getElementById('battlebody'); if(!host) return;
+  const el=document.createElement('div');
+  el.className='boss-reveal';
+  el.innerHTML=`<div class="boss-brush"></div><div class="boss-portrait">${ptSVG(u.cid,'','angry')}</div><div class="boss-copy"><small>强敵出現</small><strong>${u.name}</strong><span>${title||u.cls}</span></div><div class="boss-stamp">敵</div>`;
+  host.appendChild(el);
+  gsap.fromTo(el,{opacity:0},{opacity:1,duration:.16});
+  gsap.fromTo(el.querySelector('.boss-portrait'),{x:60,scale:1.14},{x:0,scale:1,duration:.48,ease:'power3.out'});
+  gsap.fromTo(el.querySelector('.boss-stamp'),{scale:2.4,rotation:12,opacity:0},{scale:1,rotation:-4,opacity:1,duration:.38,delay:.16,ease:'back.out(1.6)'});
+  await aSleep(760);
+  if(el.isConnected){ gsap.to(el,{opacity:0,duration:.16}); setTimeout(()=>el.remove(),190); }
 }
 function log(msg,imp){
   if(!B) return;
@@ -452,11 +495,12 @@ function poisonTick(team){
 }
 
 /* ── 타격 1회 ── */
-async function strike(a,d,skillId,followup){
+async function strike(a,d,skillId,followup,suppressCutin=false){
   const c=calcStrike(a,d,skillId);
   const sk=skillId?SKILLS[skillId]:null;
   if(sk&&!followup){
     a.ki-=(a.team==='P'?masteryCost(skillId):sk.cost);
+    if(!suppressCutin) await showMartialCutin(a,sk,null,c.comboStep?`${sk.name} · ${c.comboStep}連`:null);
     fx(a.x,a.y,sk.name,'label'); SFX.play('skill');
     if(a.team==='P'){ const up=bumpMastery(skillId); if(up){ fx(a.x,a.y-0.4,'숙련 상승!','label'); SFX.play('levelup'); log(`<b>${a.name}</b>의 ${sk.name} — 숙련 ${['','★','★★','★★★','極'][up]} 단계 도달!`,true); } }
     if(c.comboStep){ a.comboCount=c.comboStep; fx(a.x,a.y,`연계 ${c.comboStep}`,'combo'); log(`${a.name} — 서로 다른 초식을 이은 <b>${c.comboStep}단 연계</b>!`,true); }
@@ -470,6 +514,7 @@ async function strike(a,d,skillId,followup){
     let dmg=c.dmg;
     const isCrit=Math.random()*100<c.crit;
     if(isCrit) dmg=Math.round(dmg*1.6);
+    inkTrail(a,d,sk?a.type:'basic',isCrit);
     if(c.guarded){
       const gp=c.guardDmg+(isCrit?2:0);
       d.guard=Math.max(0,d.guard-gp);
@@ -516,6 +561,7 @@ async function strike(a,d,skillId,followup){
     }
     await applyBossPhase(d);
   }else{
+    inkTrail(a,d,sk?a.type:'basic',false);
     SFX.play('miss');
     const gd=document.getElementById('ug-'+d.uid);
     if(gd){ gd.style.transition='transform .1s ease-out'; gd.style.transform='translate(-7px,0)';
@@ -542,6 +588,7 @@ async function applyBossPhase(u){
     for(const k of ['str','int','spd','skl']) u.stats[k]=Math.max(1,Math.round(u.stats[k]*(1+boost)));
     u.ki=u.maxki;
     if(p.guard!==false){ u.guardMax=Math.max(u.guardMax,Math.round(u.maxhp*.2)); u.guard=u.guardMax; u.broken=false; }
+    await showBossReveal(u,p.name||'절기 변환');
     fx(u.x,u.y,p.name||'절기 변환','phase'); shakeMap(true);
     log(`<b>${u.name} — ${p.name||'절기 변환'}!</b> 초식과 기세가 달라졌다.`,true);
     await aSleep(420);
@@ -562,7 +609,8 @@ async function combat(a,d,skillId){
       if(sid){
         const key=pairKey(a.cid,partner.cid); B.joints[key]=true; partner.acted=true;
         fx(a.x,a.y,'合 합동오의','break'); log(`<b>${a.name} · ${partner.name} 합동 오의!</b>`,true);
-        await strike(partner,d,sid);
+        await showMartialCutin(a,SKILLS[sid],partner,'합동 오의');
+        await strike(partner,d,sid,false,true);
         if(checkEnd()) return;
       }
     }
@@ -1015,6 +1063,8 @@ function startBattle(){
     intents:{}, showThreats:true, joints:{},
     diff:(V2&&V2.diff)||(ENDLESS&&ENDLESS.diff)||(G&&G.diff)||'std',
     weather:pickWeather(),
+    sceneSeed:strSeed(((V2&&V2.camp)||'classic')+'_'+((V2&&V2.stageId)||G.chapterIdx||0)),
+    timeBase:pickBattleTime(),
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
@@ -1030,7 +1080,12 @@ function startBattle(){
   startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${ch.win.text}`,true);
-  startPlayerPhase(true);
+  beginBattlePresentation();
+}
+async function beginBattlePresentation(){
+  const boss=foes().find(u=>u.boss);
+  if(boss) await showBossReveal(boss,boss.cls);
+  if(B&&!B.over) startPlayerPhase(true);
 }
 
 /* ============================================================
@@ -1060,6 +1115,7 @@ function fitMap(){
   wrap.style.transform=`scale(${sc})`;
   sizer.style.width=(mw*sc)+'px';
   sizer.style.height=(mh*sc)+'px';
+  updateBattleParallax();
 }
 const ZOOM_CYCLE=[0,1.25,1.5,2];
 function cycleZoom(){
@@ -1089,6 +1145,21 @@ window.addEventListener('resize',()=>{ if(B) fitMap(); });
 /* ── 전장 날씨/시간 연출 ── */
 const WEATHER_NAME={clear:'맑음',snow:'설한(雪寒)',rain:'우천(雨天)',fog:'운무(雲霧)',night:'야전(夜戰)'};
 const WEATHER_HIT={clear:0,snow:-3,rain:-3,fog:-6,night:0}; /* 양측 공통 명중 보정 */
+const TIME_NAME={dawn:'새벽',day:'한낮',dusk:'황혼',night:'밤'};
+const TIME_ORDER=['dawn','day','dusk','night'];
+function pickBattleTime(){
+  const ch=curCh();
+  if(ch&&TIME_ORDER.includes(ch.time)) return ch.time;
+  if(ch&&ch.weather==='night') return 'night';
+  const seed=strSeed(((V2&&V2.camp)||'classic')+'_'+((V2&&V2.stageId)||G.chapterIdx||0)+'_time');
+  return TIME_ORDER[seed%3];
+}
+function currentBattleTime(){
+  if(!B) return 'day';
+  if(B.weather==='night') return 'night';
+  const start=Math.max(0,TIME_ORDER.indexOf(B.timeBase));
+  return TIME_ORDER[(start+Math.floor((B.turn-1)/3))%TIME_ORDER.length];
+}
 /* 스테이지 데이터의 weather 우선, 없으면 캠페인·시드로 자동 배정 */
 function pickWeather(){
   const ch=curCh();
@@ -1105,6 +1176,7 @@ function renderWeather(){
   const el=document.getElementById('weather'); if(!el||!B) return;
   const w=B.weather||'clear';
   el.className='w-'+w;
+  if(SETTINGS.reducedFx){ el.innerHTML=''; el.dataset.w='reduced'; return; }
   if(w==='clear'){ el.innerHTML=''; return; }
   if(el.dataset.w===w) return; /* 이미 그려짐 */
   el.dataset.w=w;
@@ -1118,7 +1190,25 @@ function renderWeather(){
   }
   el.innerHTML=s;
 }
-function weatherLine(){ const w=(B&&B.weather)||'clear'; const h=WEATHER_HIT[w]; return `날씨: <b>${WEATHER_NAME[w]}</b>${h?` <span style="color:#e0a84a">명중 ${h}</span>`:''}`; }
+function renderBattleAtmosphere(){
+  const wrap=document.getElementById('mapwrap'),depth=document.getElementById('battle-depth'),wash=document.getElementById('timewash');
+  if(!wrap||!B) return;
+  const time=currentBattleTime();
+  wrap.dataset.time=time;
+  wrap.classList.toggle('reduced-fx',SETTINGS.reducedFx);
+  if(depth) depth.className=`time-${time} weather-${B.weather}`;
+  if(wash) wash.className=`time-${time}`;
+  updateBattleParallax();
+}
+function updateBattleParallax(){
+  const ms=document.getElementById('mapscroll'),depth=document.getElementById('battle-depth');
+  if(!ms||!depth||SETTINGS.reducedFx) return;
+  const sc=CURSCALE||1,x=ms.scrollLeft/sc,y=ms.scrollTop/sc;
+  depth.style.setProperty('--far-x',`${x*.045}px`); depth.style.setProperty('--far-y',`${y*.025}px`);
+  depth.style.setProperty('--mid-x',`${x*.075}px`); depth.style.setProperty('--mid-y',`${y*.04}px`);
+  depth.style.setProperty('--near-x',`${x*.12}px`); depth.style.setProperty('--near-y',`${y*.065}px`);
+}
+function weatherLine(){ const w=(B&&B.weather)||'clear', time=currentBattleTime(), h=WEATHER_HIT[w]; return `날씨: <b>${WEATHER_NAME[w]}</b> · 시간: <b>${TIME_NAME[time]}</b>${h?` <span style="color:#e0a84a">명중 ${h}</span>`:''}`; }
 
 /* ── 전투 화면 골격 (전체 화면 + 오버레이 HUD) ── */
 let UCARD_HIDE=false, INFO_OPEN=false;
@@ -1145,6 +1235,8 @@ function renderScreenBattle(){
       <div id="mapscroll"><div id="mapsizer">
         <div id="mapwrap" style="width:${mw}px;height:${mh}px">
           <svg id="mapsvg" width="${mw}" height="${mh}"></svg>
+          ${battleSceneHTML(mw,mh,B.weather,currentBattleTime(),B.sceneSeed)}
+          <div id="timewash" class="time-${currentBattleTime()}"></div>
           <div id="weather"></div>
           <div id="fx"></div>
           <div id="banner"></div>
@@ -1168,7 +1260,7 @@ function renderScreenBattle(){
     uiCancel();
   });
   const ms=document.getElementById('mapscroll');
-  ms.addEventListener('scroll',()=>renderMinimap());
+  ms.addEventListener('scroll',()=>{ renderMinimap(); updateBattleParallax(); });
   const mm=document.getElementById('minimap');
   mm.addEventListener('click',e=>{
     if(!B) return;
@@ -1266,6 +1358,7 @@ function renderBattle(light){
     }
   }
   svg.innerHTML=s;
+  renderBattleAtmosphere();
   renderWeather();
   renderSide();
 }
@@ -1288,10 +1381,11 @@ function terrLine(){
 }
 function ucardHTML(u){
   const hpPct=Math.round(u.hp/u.maxhp*100), kiPct=Math.round(u.ki/u.maxki*100);
+  const portraitMood=hpPct<=30?'hurt':(u.broken||u.phaseIndex>0?'angry':'calm');
   return `
   <button class="pop-x" onclick="hideUcard()">×</button>
   <div class="uc-head">
-    <div class="uc-pt ${u.team==='E'?'enemy':''}">${ptSVG(u.cid)}</div>
+    <div class="uc-pt ${u.team==='E'?'enemy':''}">${ptSVG(u.cid,'',portraitMood)}</div>
     <div style="flex:1">
       <div class="uc-name">${u.name}${u.boss?' ★':''}<span class="typebadge type-${u.type}">${TYPE_NAME[u.type]}</span></div>
       <div class="uc-sub">${u.cls} · Lv.${u.lvl}${u.team==='P'?` · EXP ${u.exp}`:''}${u.poison?` · <span style="color:#c07ae0">☠ 중독 ${u.poison}턴</span>`:''}</div>
@@ -1483,7 +1577,7 @@ function advanceCut(){
 let DLG=null;
 function showDialogue(lines, done, titleCard){
   startBGM('calm');
-  DLG={lines, idx:-1, done, titleCard, lastL:null, lastR:null};
+  DLG={lines, idx:-1, done, titleCard, lastL:null, lastR:null, exprL:'calm', exprR:'calm'};
   app().innerHTML=`<div id="dlg-screen">
     <div id="dlg-bg">${dlgBgSVG()}</div>
     <div id="dlg-ptL"></div><div id="dlg-ptR"></div>
@@ -1503,6 +1597,15 @@ function advanceDlg(){
   if(DLG.idx>=DLG.lines.length){ const d=DLG.done; DLG=null; d(); return; }
   showDlgLine();
 }
+function dialogueExpression(line){
+  if(['calm','angry','hurt','awaken','smile'].includes(line.expr)) return line.expr;
+  const t=line.t||'';
+  if(/웃|기쁘|고맙|반갑|행복|하하|후후/.test(t)) return 'smile';
+  if(/부상|상처|죽음|잃|눈물|미안|슬프|통곡|절망/.test(t)) return 'hurt';
+  if(/[!！]|원수|용서하지|끝내|막아|싸우|각오|명령/.test(t)) return 'angry';
+  if(/깨달|완성|약속|지키|영웅|책임|선택/.test(t)) return 'awaken';
+  return 'calm';
+}
 function showDlgLine(){
   const L=DLG.lines[DLG.idx];
   const nameEl=document.getElementById('dlg-name'), textEl=document.getElementById('dlg-text');
@@ -1516,10 +1619,11 @@ function showDlgLine(){
     const isEnemy=ENEMY_IDS.has(L.s);
     nameEl.textContent=c.name+' 「'+c.cls+'」'; nameEl.className=isEnemy?'enemy':'';
     textEl.textContent=L.t;
-    if(L.side==='L'){ DLG.lastL=L.s; } else { DLG.lastR=L.s; }
+    const expression=dialogueExpression(L);
+    if(L.side==='L'){ DLG.lastL=L.s; DLG.exprL=expression; } else { DLG.lastR=L.s; DLG.exprR=expression; }
   }
-  pL.innerHTML=DLG.lastL?`<div class="dlg-pt L ${L.s!==DLG.lastL||L.s===null?'dimmed':''}">${ptSVG(DLG.lastL)}</div>`:'';
-  pR.innerHTML=DLG.lastR?`<div class="dlg-pt R ${L.s!==DLG.lastR||L.s===null?'dimmed':''}">${ptSVG(DLG.lastR)}</div>`:'';
+  pL.innerHTML=DLG.lastL?`<div class="dlg-pt L ${L.s!==DLG.lastL||L.s===null?'dimmed':''}">${ptSVG(DLG.lastL,'',DLG.exprL)}</div>`:'';
+  pR.innerHTML=DLG.lastR?`<div class="dlg-pt R ${L.s!==DLG.lastR||L.s===null?'dimmed':''}">${ptSVG(DLG.lastR,'',DLG.exprR)}</div>`:'';
 }
 
 /* ── 챕터 진행 ── */
@@ -2009,7 +2113,7 @@ function showSettings(){
       <div class="set-line"><button class="btn small snd-btn" data-long="1" onclick="sndToggleUI()">사운드 ${sndOn()?'♪ 켜짐':'꺼짐'}</button></div></div>
     <div class="set-sec"><div class="set-h">저효과 모드</div>
       <div class="set-line"><button class="btn small ${SETTINGS.reducedFx?'on':''}" onclick="toggleReducedFx()">${SETTINGS.reducedFx?'켜짐 ✓':'꺼짐'}</button>
-        <span style="color:var(--dim);font-size:12px">화면 진입 모션과 강한 전환 효과를 줄입니다.</span></div></div>
+        <span style="color:var(--dim);font-size:12px">컷인·패럴랙스·날씨 입자·화면 흔들림을 줄입니다.</span></div></div>
     <div class="set-sec"><div class="set-h">세이브 백업</div>
       <div class="set-line">
         <button class="btn small" onclick="exportSave()">내보내기</button>
@@ -2031,6 +2135,7 @@ function toggleFastEnemy(){ SETTINGS.fastEnemy=!SETTINGS.fastEnemy; saveSettings
 function toggleReducedFx(){
   SETTINGS.reducedFx=!SETTINGS.reducedFx; saveSettings(); SFX.play('ui');
   if(SETTINGS.reducedFx) ScrollTrigger.getAll().forEach(t=>t.kill());
+  if(B){ renderBattleAtmosphere(); renderWeather(); }
   const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings();
 }
 function showTitle(){
@@ -2095,6 +2200,7 @@ function showHelp(){
       ◆ <b style="color:#d9b45b">호신강기·파훼</b>: 강적의 금색 강기 게이지를 상성·필살·연계로 깎으면 방어가 무너집니다. 보스는 체력 구간마다 초식과 능력이 바뀝니다<br>
       ◆ <b style="color:#8fd6c2">전투 목표</b>: 섬멸 외에도 방어·점거·탈출·비살상 제압이 있습니다. 현재 목표와 진행도는 상단과 정보창에서 확인합니다<br>
       ◆ <b style="color:#d8b5ef">무공 편성·연계</b>: 거점에서 협객당 무공 3개를 고릅니다. 서로 다른 초식을 연속 사용하면 연계가, A급 인연 협객이 인접하면 합동 오의가 발동할 수 있습니다<br>
+      ◆ <b style="color:#d9b36c">수묵 전장</b>: 전경·중경·원경이 카메라에 따라 움직이고 세 턴마다 시간대가 흐릅니다. 무공·합동 오의·보스 전환에는 전용 초상 컷인과 먹선 궤적이 표시됩니다<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
       ◆ 쓰러진 아군은 <b style="color:var(--text)">부상 이탈</b> — 다음 챕터에 복귀 (곽정이 쓰러지면 패배)<br>
@@ -2926,6 +3032,7 @@ export const DEBUG = {
   winCheck(){ return checkEnd(); },
   calc(a,d,skill){ return calcStrike(a,d,skill); },
   adjBond(u){ return adjBond(u); },
+  previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
   CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS,
 };
 

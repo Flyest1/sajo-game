@@ -12,7 +12,12 @@ function shade(hex, f){ // f<1 어둡게, f>1 밝게
 }
 
 /* ── 초상화 (100x100 viewBox 기준의 <g> 내부 요소 문자열) ── */
-function portraitInner(p){
+function portraitInner(source, expression='calm'){
+  const p={...source};
+  if(expression==='angry'){ p.brow='fierce'; p.mouth='frown'; }
+  else if(expression==='hurt'){ p.brow='fierce'; p.mouth='firm'; }
+  else if(expression==='awaken'){ p.brow='fierce'; p.mouth='firm'; }
+  else if(expression==='smile'){ p.mouth='smile'; }
   const skin=p.skin, hc=p.hc||'#2b2119', robe=p.robe||'#666', bc=p.bc||hc;
   const skinD=shade(skin,0.82), robeD=shade(robe,0.7), hcD=shade(hc,0.75);
   let s='';
@@ -161,6 +166,15 @@ function portraitInner(p){
   if(p.extra==='scar'){
     s+=`<path d="M60,34 L66,50" stroke="#a05a4a" stroke-width="1.6" opacity=".8"/>`;
   }
+  if(expression==='hurt'){
+    s+=`<path d="M36,47 Q41.5,43 47,47" stroke="${skin}" stroke-width="5.2" fill="none"/>`;
+    s+=`<path d="M37,46 Q41.5,43.5 46,46" stroke="${hcD}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+    s+=`<path d="M62,48 L66,55 M35,53 L31,58" stroke="#9d4e43" stroke-width="1.35" opacity=".8"/>`;
+  }else if(expression==='awaken'){
+    s+=`<circle cx="41.5" cy="44" r="4.5" fill="none" stroke="#f3d47a" stroke-width="1.2" opacity=".9"/>`;
+    s+=`<circle cx="58.5" cy="44" r="4.5" fill="none" stroke="#f3d47a" stroke-width="1.2" opacity=".9"/>`;
+    s+=`<path d="M25,69 Q50,82 75,69" fill="none" stroke="#f3d47a" stroke-width="1.2" opacity=".45"/>`;
+  }
   return s;
 }
 
@@ -174,8 +188,9 @@ function buildPortraitDefs(){
   holder.innerHTML=`<svg width="0" height="0" style="position:absolute"><defs>${defs}</defs></svg>`;
   document.body.appendChild(holder.firstChild);
 }
-function ptSVG(cid, cls){ // 원형 초상화 svg 태그
-  return `<svg viewBox="0 0 100 100" class="${cls||''}" preserveAspectRatio="xMidYMid meet"><circle cx="50" cy="50" r="50" fill="#463c2e"/><g><use href="#pt-${cid}"/></g></svg>`;
+function ptSVG(cid, cls, expression='calm'){ // 원형 초상화 svg 태그
+  const face=expression&&expression!=='calm'?portraitInner(CHARS[cid].pt,expression):`<use href="#pt-${cid}"/>`;
+  return `<svg viewBox="0 0 100 100" class="${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid meet"><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${face}</g></svg>`;
 }
 
 /* ── 공용 그라디언트 defs (buildPortraitDefs 에서 문서에 1회 등록) ── */
@@ -283,6 +298,36 @@ function tileSVG(t, x, y){
   return s;
 }
 
+/* ── 전장 수묵 깊이 레이어 (맵 위에 얹는 전경·중경·원경) ── */
+function ridgePath(w,h,seed,base,amp,steps){
+  let d=`M0 ${base}`;
+  for(let i=1;i<=steps;i++){
+    const x=w*i/steps, n=th(i,seed,11), y=base-(.25+n*.75)*amp;
+    d+=` L${x.toFixed(1)} ${y.toFixed(1)}`;
+  }
+  return d+` L${w} 0 L0 0 Z`;
+}
+function battleSceneHTML(w,h,weather='clear',time='day',seed=1){
+  const far=ridgePath(w,h,seed,h*.23,h*.16,8);
+  const mid=ridgePath(w,h,seed+3,h*.15,h*.08,12);
+  let reeds='', branches='';
+  for(let i=0;i<14;i++){
+    const x=(i<7?i*18:w-(i-7)*19), lean=(th(i,seed,21)-.5)*15, top=h*(.72+th(i,seed,22)*.18);
+    reeds+=`<path d="M${x},${h} Q${x+lean*.35},${top+24} ${x+lean},${top}"/>`;
+  }
+  for(let i=0;i<5;i++){
+    const side=i%2?1:-1, x=side>0?w:w*.01, y=h*(.18+i*.11), reach=w*(.11+th(i,seed,27)*.09);
+    branches+=`<path d="M${x},${y} q${-side*reach*.55},${18+i*4} ${-side*reach},${40+i*7} m${side*reach*.42},${-24} q${-side*18},-22 ${-side*34},-30"/>`;
+  }
+  const roofY=h*.12;
+  return `<div id="battle-depth" class="time-${time} weather-${weather}" aria-hidden="true">
+    <div class="depth-layer depth-far"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge far-ridge" d="${far}"/><circle class="scene-orb" cx="${w*.78}" cy="${h*.11}" r="${Math.max(18,Math.min(w,h)*.07)}"/></svg></div>
+    <div class="depth-layer depth-mid"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge mid-ridge" d="${mid}"/><g class="roofline"><path d="M${w*.05},${roofY} l${w*.08},-${h*.05} l${w*.08},${h*.05} h${w*.04} v${h*.08} h-${w*.2}z"/><path d="M${w*.76},${roofY+h*.035} l${w*.07},-${h*.045} l${w*.08},${h*.045} h${w*.035} v${h*.07} h-${w*.185}z"/></g></svg></div>
+    <div class="depth-layer depth-near"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><g class="ink-branches">${branches}</g><g class="ink-reeds">${reeds}</g><path class="ink-wash" d="M0,${h*.92} Q${w*.24},${h*.86} ${w*.48},${h*.94} T${w},${h*.9} L${w},${h} L0,${h}Z"/></svg></div>
+    <div class="paper-grain"></div>
+  </div>`;
+}
+
 /* ── 유닛 토큰 ── */
 function unitSVG(u, sel){
   const px=u.x*TS+TS/2, py=u.y*TS+TS/2;
@@ -356,4 +401,4 @@ function titleArtSVG(){
 </svg>`;
 }
 
-export { shade, portraitInner, buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG };
+export { shade, portraitInner, buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG, battleSceneHTML };
