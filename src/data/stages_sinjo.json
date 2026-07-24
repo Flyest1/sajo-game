@@ -142,6 +142,12 @@
     "boss": "gwd",
     "text": "곽도 격퇴"
    },
+   "objective": {
+    "type": "subdue",
+    "target": "gwd",
+    "threshold": 0.2,
+    "text": "곽도를 쓰러뜨리지 않고 HP 20% 이하로 제압"
+   },
    "lose": "양과가 쓰러지면 패배",
    "deploy": {
     "cap": 6,
@@ -1738,6 +1744,21 @@
      "x": 1,
      "y": 10,
      "gold": 400
+    }
+   ],
+   "bossPhases": [
+    {
+     "target": "grb",
+     "at": 0.7,
+     "name": "오륜연격",
+     "boost": 0.1
+    },
+    {
+     "target": "grb",
+     "at": 0.35,
+     "name": "법왕의 최후 일격",
+     "boost": 0.15,
+     "guard": false
     }
    ],
    "win": {

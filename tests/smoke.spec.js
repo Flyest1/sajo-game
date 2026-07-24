@@ -13,6 +13,31 @@ test('v3 title has one canonical campaign entry', async ({ page }) => {
   await expect(page.getByText('원작 본편').first()).toBeVisible();
 });
 
+test('canonical bridge scenes are visible on the campaign route', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button', { name: /강호연대기/ }).click();
+  const sajoCard=page.locator('.camp-card').filter({ hasText: '사조영웅전' });
+  await sajoCard.getByRole('button', { name: '시작하기' }).click();
+  await expect(page.getByText('대막의 약속 — 두 개의 고향')).toBeVisible();
+  await expect(page.getByText('이평의 마지막 가르침')).toBeVisible();
+  await expect(page.getByText('이야기 · 정사 보강', { exact:true })).toHaveCount(8);
+});
+
+test('Tianlong default ending is canon while survival endings stay IF-only', async ({ page }) => {
+  const route=await page.evaluate(() => {
+    const stages=window.__dbg.CAMPAIGNS.chunryong.stages;
+    return {
+      defaultEnding:stages.endgate.next.else,
+      canonNext:stages.u5_tl_canon_end.next,
+      conditionalEndings:stages.endgate.next.cond.map(branch => branch.to),
+    };
+  });
+  expect(route.defaultEnding).toBe('u5_tl_canon_end');
+  expect(route.canonNext).toBe('end_tragic');
+  expect(route.conditionalEndings).not.toContain('u5_tl_canon_end');
+});
+
 test('seeded roam creates a ten-node route and enters deployment', async ({ page }) => {
   await page.getByRole('button', { name: /도전과 회상/ }).click();
   await page.getByRole('button', { name: /유람 시작/ }).click();

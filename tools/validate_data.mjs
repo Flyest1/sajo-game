@@ -51,7 +51,26 @@ const HWALSA = J('stages_hwalsa.json');
 const PUNGREUNG = J('stages_pungreung.json');
 const ITEMS = J('items.json');
 const CAMPAIGN_MANIFEST = J('campaigns.json');
+const STORY_EXPANSIONS = J('story_expansions.json');
 const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
+for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
+  const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
+  if(!camp){ errs.push(`story expansion unknown campaign ${campId}`); continue; }
+  for(const [anchorId,defs] of Object.entries(pack.after||{})){
+    const anchor=camp.stages[anchorId];
+    if(!anchor){ errs.push(`${campId}: expansion anchor missing ${anchorId}`); continue; }
+    if(typeof anchor.next!=='string'){ errs.push(`${campId}: expansion anchor next must be string ${anchorId}`); continue; }
+    const oldNext=anchor.next, ids=defs.map(d=>d.id);
+    if(new Set(ids).size!==ids.length) errs.push(`${campId}: expansion duplicate ids after ${anchorId}`);
+    anchor.next=ids[0]||oldNext;
+    defs.forEach((def,i)=>{
+      if(camp.stages[def.id]) errs.push(`${campId}: expansion id already exists ${def.id}`);
+      camp.stages[def.id]={...JSON.parse(JSON.stringify(def)),next:ids[i+1]||oldNext};
+    });
+    const pos=camp.order.indexOf(anchorId);
+    if(pos>=0) camp.order.splice(pos+1,0,...ids);
+  }
+}
 const CAMPAIGN_IDS = new Set([...CAMPAIGN_FILES.map(c=>c.id),'chronicle']);
 for (const group of CAMPAIGN_MANIFEST.groups) {
   if (!group.id || !group.name || !Array.isArray(group.campaigns)) errs.push(`campaign group invalid ${JSON.stringify(group)}`);
@@ -76,6 +95,8 @@ for (const CAMP of CAMPAIGN_FILES) {
     if (n.options) n.options.forEach(o => targets.push(o.to));
     edges.set(id, targets.filter(Boolean));
     (n.joins || []).forEach(j => { if (!CHARS[j]) errs.push(`${tag} joins unknown ${j}`); });
+    if(n.source&&!['canon','short-story','recollection','original','noncanon'].includes(n.source)) errs.push(`${tag}: invalid source ${n.source}`);
+    [...(n.pre || []), ...(n.post || [])].forEach((d, i) => { if (d.s && !CHARS[d.s]) errs.push(`${tag} dlg${i}: unknown speaker ${d.s}`); if(!d.t) errs.push(`${tag} dlg${i}: empty text`); });
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
     if (n.kind === 'battle') {
       const H = n.map.length, W = n.map[0].length;
@@ -114,12 +135,15 @@ for (const CAMP of CAMPAIGN_FILES) {
         const [x,y]=Array.isArray(t)?t:[t.x,t.y];
         if(blocked(x,y)) errs.push(`${tag} objective tile${i} (${x},${y}) blocked`);
       });
-      (n.bossPhases||[]).forEach((p,i)=>{ if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`); });
+      (n.bossPhases||[]).forEach((p,i)=>{
+        if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`);
+        if(p.target&&!n.enemies.some(e=>e.cid===p.target&&e.boss)) errs.push(`${tag} bossPhase${i} target ${p.target} is not a deployed boss`);
+        if(i>0&&p.at>n.bossPhases[i-1].at) errs.push(`${tag} bossPhase${i} thresholds must descend`);
+      });
       if (n.weather && !['clear','snow','rain','fog','night'].includes(n.weather)) errs.push(`${tag} unknown weather ${n.weather}`);
       if (n.cut && (!Array.isArray(n.cut.lines) || !n.cut.lines.length)) errs.push(`${tag} cut.lines invalid`);
       if (n.cut && n.cut.bg && !['siege','duel','throne','snow','peak'].includes(n.cut.bg)) errs.push(`${tag} cut.bg unknown ${n.cut.bg}`);
       if (n.deploy && n.deploy.forced) n.deploy.forced.forEach(c => { if (!CHARS[c]) errs.push(`${tag} forced unknown ${c}`); });
-      [...(n.pre || []), ...(n.post || [])].forEach((d, i) => { if (d.s && !CHARS[d.s]) errs.push(`${tag} dlg${i}: unknown speaker ${d.s}`); });
     }
     if (n.kind === 'camp' && n.shop) n.shop.forEach(it => { if (!ITEMS[it]) errs.push(`${tag} shop unknown item ${it}`); });
   }

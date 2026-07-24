@@ -469,6 +469,12 @@
     "type": "rout",
     "text": "마적단 소탕"
    },
+   "objective": {
+    "type": "escape",
+    "tiles": [[15, 5], [15, 6]],
+    "min": 2,
+    "text": "두 명 이상이 서역 사행로 동쪽 출구에 도달"
+   },
    "lose": "장무기가 쓰러지면 패배",
    "deploy": {
     "cap": 4
@@ -1594,6 +1600,21 @@
      "x": 1,
      "y": 10,
      "gold": 500
+    }
+   ],
+   "bossPhases": [
+    {
+     "target": "njg",
+     "at": 0.68,
+     "name": "현명음기",
+     "boost": 0.1
+    },
+    {
+     "target": "njg",
+     "at": 0.3,
+     "name": "현명이로 합세",
+     "boost": 0.16,
+     "guard": false
     }
    ],
    "win": {

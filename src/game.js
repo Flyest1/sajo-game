@@ -15,6 +15,7 @@ import HWALSA from './data/stages_hwalsa.json';
 import PUNGREUNG from './data/stages_pungreung.json';
 import SUPPORTS from './data/supports.json';
 import CAMPAIGN_MANIFEST from './data/campaigns.json';
+import STORY_EXPANSIONS from './data/story_expansions.json';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -2090,6 +2091,10 @@ function showHelp(){
       ◆ <b style="color:#c07ae0">중독</b>되면 3턴간 매턴 피해 (빙백은침·현명신장 등)<br>
       ◆ <b style="color:var(--text)">협공</b>: 인접(상하좌우)한 아군 1명당 명중 +4·피해 +1, 수비 측은 인접 아군 1명당 회피 +3 (최대 3명)<br>
       ◆ <b style="color:#e8a0c0">인연</b>: 신규 캠페인의 거점 <b style="color:var(--text)">지원 대화</b>로 두 협객의 인연을 C→B→A로 키우면, 전장에서 두 사람이 인접할 때 피해·명중·필살·회피가 랭크만큼 강해집니다 (★표시 인연은 최고 랭크에서 합격 각성)<br>
+      ◆ <b style="color:#e07070">적 의도·위험</b>: 적 머리 위 문양은 다음 행동, 상단 위험 버튼은 다음 턴 공격 가능 범위를 표시합니다<br>
+      ◆ <b style="color:#d9b45b">호신강기·파훼</b>: 강적의 금색 강기 게이지를 상성·필살·연계로 깎으면 방어가 무너집니다. 보스는 체력 구간마다 초식과 능력이 바뀝니다<br>
+      ◆ <b style="color:#8fd6c2">전투 목표</b>: 섬멸 외에도 방어·점거·탈출·비살상 제압이 있습니다. 현재 목표와 진행도는 상단과 정보창에서 확인합니다<br>
+      ◆ <b style="color:#d8b5ef">무공 편성·연계</b>: 거점에서 협객당 무공 3개를 고릅니다. 서로 다른 초식을 연속 사용하면 연계가, A급 인연 협객이 인접하면 합동 오의가 발동할 수 있습니다<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
       ◆ 쓰러진 아군은 <b style="color:var(--text)">부상 이탈</b> — 다음 챕터에 복귀 (곽정이 쓰러지면 패배)<br>
@@ -2246,6 +2251,22 @@ const CAMPAIGNS = {
   hwalsa:HWALSA, pungreung:PUNGREUNG, jinfinal:JINFINAL,
   chronicle:makeChronicleCampaign(),
 };
+function applyStoryExpansions(registry){
+  for(const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})){
+    const camp=registry[campId]; if(!camp) continue;
+    for(const [anchorId,defs] of Object.entries(pack.after||{})){
+      const anchor=camp.stages[anchorId];
+      if(!anchor||typeof anchor.next!=='string'||!Array.isArray(defs)||!defs.length) continue;
+      const oldNext=anchor.next, ids=defs.map(d=>d.id);
+      if(ids.some(id=>camp.stages[id])) continue;
+      anchor.next=ids[0];
+      defs.forEach((def,i)=>{ camp.stages[def.id]={...deepClone(def),next:ids[i+1]||oldNext}; });
+      const pos=camp.order.indexOf(anchorId);
+      if(pos>=0) camp.order.splice(pos+1,0,...ids);
+    }
+  }
+}
+applyStoryExpansions(CAMPAIGNS);
 const CAMPAIGN_META = CAMPAIGN_MANIFEST.campaigns;
 let V2 = null; // 진행 중 캠페인 상태
 let CAMP_CTX = null; // 거점 화면 컨텍스트 {node, back}
@@ -2659,8 +2680,9 @@ function showRouteMap(){
     const icon=cleared?'✓':(cur?'▶':'·');
     const cls=cleared?'done':(cur?'cur':'lock');
     const kindTxt={battle:'전투',camp:'거점',choice:'분기',talk:'이야기',end:'종막'}[n.kind]||'';
+    const sourceTxt=n.source==='canon'?' · 정사 보강':n.source==='original'?' · 창작':'';
     return `<div class="route-row ${cls}" ${cur?`onclick="v2Enter()"`:''}>
-      <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}</span></div>`;
+      <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}${sourceTxt}</span></div>`;
   }).join('');
   const rep=V2.reputation||{hyeop:0,jeong:0,se:0};
   app().innerHTML=`<div id="routemap">
@@ -2904,7 +2926,7 @@ export const DEBUG = {
   winCheck(){ return checkEnd(); },
   calc(a,d,skill){ return calcStrike(a,d,skill); },
   adjBond(u){ return adjBond(u); },
-  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS,
+  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS,
 };
 
 export const GLOBALS = {

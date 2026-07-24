@@ -2128,6 +2128,13 @@
     "type": "rout",
     "text": "사관문 돌파 (시험 — 목숨은 상하지 않는다)"
    },
+   "objective": {
+    "type": "escape",
+    "tiles": [[8, 0], [9, 0]],
+    "min": 1,
+    "cids": ["gj"],
+    "text": "네 시험을 지나 곽정이 산정 출구에 도달"
+   },
    "lose": "곽정이 쓰러지면 패배",
    "deploy": {
     "cap": 6,
@@ -2328,6 +2335,21 @@
      "x": 16,
      "y": 4,
      "item": "bogeom"
+    }
+   ],
+   "bossPhases": [
+    {
+     "target": "oyb",
+     "at": 0.68,
+     "name": "역행진기",
+     "boost": 0.1
+    },
+    {
+     "target": "oyb",
+     "at": 0.32,
+     "name": "천하제일의 광기",
+     "boost": 0.16,
+     "guard": false
     }
    ],
    "win": {
