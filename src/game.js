@@ -3001,7 +3001,7 @@ export const DEBUG = {
   adjBond(u){ return adjBond(u); },
   runtimeContext(){ return runtimeContext(); },
   portraitMarkup(cid='gj',expression='calm'){ return ptSVG(cid,'',expression); },
-  premiumPortraitURL(cid='gj',size='hero'){ return premiumPortraitURL(cid,size); },
+  premiumPortraitURL(cid='gj',size='hero',expression='calm'){ return premiumPortraitURL(cid,size,expression); },
   objectiveProbe(objective,context){ return {won:resolveObjectiveWon(objective,context),progress:resolveObjectiveProgress(objective,context)}; },
   reputationProbe(reputation,factions={}){ return {
     combat:reputationCombatEffects(reputation,factions), price:shopPriceFor(100,reputation),

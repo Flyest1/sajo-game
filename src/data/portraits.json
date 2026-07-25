@@ -1,14 +1,22 @@
 {
-  "version": 1,
+  "version": 2,
   "style": "semi-realistic-wuxia-oil",
+  "coverage": "complete",
+  "ids": [
+    "gj", "hy", "gja", "jc", "hbg", "nhi", "jgb", "hsy", "mo", "hcg", "sb", "yg", "zbt", "yaksa", "syn", "jmk", "jomin", "jsam", "dy", "hj",
+    "dj", "jhp", "mcp", "msa", "gs", "hth", "yjs", "yjo", "plh", "stc", "ygang", "sab", "ogg", "oyb", "imsu", "hnp", "sap", "grb", "gwd", "mgb", "mgs", "hbo", "njg", "sgon", "ydg",
+    "myb", "gmj", "jcc", "ssj", "myg", "gdb", "gds", "yyh", "wjy", "ijy", "djh", "gwi", "hgd", "gsc", "ycs", "dds", "mok", "yeonggo", "dtd", "wanyan", "gbyeong", "gci", "cjb",
+    "eobu", "chobu", "nongbu", "seosaeng", "gyang", "gsj", "jgj", "geomhon", "jjy", "sason", "geumhwa", "psa", "mgyo", "myeoljeol", "jchsan", "unss", "azu", "way", "swon", "mybak", "mumyeong",
+    "gblr", "baekse", "gunung", "chwihyeon", "mlg", "jmg", "danyeon", "ichusu", "shb", "scs", "drb", "wonjang"
+  ],
   "characters": {
-    "gj": { "age": "late-20s", "era": "southern-song", "tone": "honest-resolute", "variants": ["calm"] },
-    "hy": { "age": "early-20s", "era": "southern-song", "tone": "clever-playful", "variants": ["calm"] },
-    "yg": { "age": "around-30", "era": "southern-song", "tone": "solitary-intense", "variants": ["calm"] },
-    "syn": { "age": "mid-20s", "era": "southern-song", "tone": "serene-disciplined", "variants": ["calm"] },
-    "jmk": { "age": "mid-20s", "era": "late-yuan", "tone": "compassionate-resolute", "variants": ["calm"] },
-    "jomin": { "age": "early-20s", "era": "late-yuan", "tone": "confident-strategic", "variants": ["calm"] },
-    "sb": { "age": "mid-30s", "era": "northern-song", "tone": "commanding-tragic", "variants": ["calm"] },
-    "dy": { "age": "early-20s", "era": "northern-song", "tone": "gentle-scholarly", "variants": ["calm"] }
+    "gj": { "age": "late-20s", "era": "southern-song", "tone": "honest-resolute", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "hy": { "age": "early-20s", "era": "southern-song", "tone": "clever-playful", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "yg": { "age": "around-30", "era": "southern-song", "tone": "solitary-intense", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "syn": { "age": "mid-20s", "era": "southern-song", "tone": "serene-disciplined", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "jmk": { "age": "mid-20s", "era": "late-yuan", "tone": "compassionate-resolute", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "jomin": { "age": "early-20s", "era": "late-yuan", "tone": "confident-strategic", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "sb": { "age": "mid-30s", "era": "northern-song", "tone": "commanding-tragic", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
+    "dy": { "age": "early-20s", "era": "northern-song", "tone": "gentle-scholarly", "variants": ["calm", "angry", "hurt", "awaken", "smile"] }
   }
 }

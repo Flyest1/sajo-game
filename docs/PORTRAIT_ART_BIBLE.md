@@ -10,7 +10,7 @@
 
 인물마다 시대, 연령대, 성격, 복식 색, 무기·장신구 한 가지를 덧붙인다. 같은 인물의 후속 표정은 얼굴형·눈·코·입·머리·복식·조명을 고정하고 표정과 작은 상처만 바꾼다.
 
-## 1차 파일럿 8명
+## 주요 8명과 감정 원화
 
 | ID | 인물 | 핵심 시각 언어 | 프로젝트 경로 |
 |---|---|---|---|
@@ -23,7 +23,15 @@
 | `sb` | 소봉 | 호방하고 비극적인 북송 영웅, 모피·갈색 | `public/portraits/hero/sb.webp` |
 | `dy` | 단예 | 온화하고 학구적인 대리 왕자, 상아·청록색 | `public/portraits/hero/dy.webp` |
 
-각 ID에는 같은 이름의 `public/portraits/thumb/*.webp` 전장용 축소본이 있다. 원본 생성 PNG는 배포 저장소에 넣지 않고 제작 기록에서만 보관한다.
+각 ID에는 같은 이름의 `public/portraits/thumb/*.webp` 전장용 축소본과 `public/portraits/expressions/{id}-{angry|hurt|awaken|smile}.webp` 감정 원화가 있다. 감정 원화는 기본 이미지를 정체성 기준으로 삼아 얼굴·연령·머리·복식·구도·조명은 고정하고 표정만 편집했다. 원본 생성 PNG는 배포 저장소에 넣지 않고 제작 기록에서만 보관한다.
+
+## 전수 적용
+
+`src/data/portraits.json`의 `ids`에는 현재 캐릭터 데이터와 일치하는 101개 ID가 명시되어 있다. 고유 영웅뿐 아니라 문파 제자·병사·궁수·관병 같은 공용 병종도 진영·시대·직업별로 별도 얼굴과 복식을 제작했다. 기본 초상은 `public/portraits/hero/`, 원형 전장 토큰용 축소본은 `public/portraits/thumb/`에 같은 ID로 저장한다.
+
+감정 편집 공통 프롬프트는 다음 원칙을 따른다.
+
+> Image 1 is the immutable identity anchor. Change only the requested facial expression. Preserve exact identity, face structure, age, skin tone, hairstyle, ornaments, facial hair, outfit, accessories, crop, pose, camera angle, lighting, painterly ink-and-oil style, palette, and background. One character only; no redesign, text, logo, frame, watermark, new object, or actor likeness.
 
 ## 규격과 검수
 
@@ -31,4 +39,4 @@
 - hero 220KB 이하, thumb 30KB 이하를 CI 기준으로 한다.
 - 얼굴이 작은 원형 토큰에서도 식별되어야 하며, 눈·피부·수염이 과도하게 사진처럼 날카롭지 않아야 한다.
 - 텍스트·낙관·워터마크·현대 소품·배우 유사성·손가락이 강조된 포즈는 불합격이다.
-- 나머지 93명은 작품별 핵심 인물 순으로 묶어 제작하되, 각 묶음마다 데스크톱/모바일 대화창과 전장 토큰을 함께 확인한 뒤 다음 묶음으로 간다.
+- 신규 캐릭터를 추가할 때는 매니페스트 ID, hero/thumb 두 파일, 용량 기준을 같은 커밋에서 충족해야 하며 누락 시 데이터 검증을 실패시킨다.

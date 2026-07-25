@@ -179,14 +179,27 @@ for (const CAMP of CAMPAIGN_FILES) {
 }
 
 /* ── 반실사 초상 자산 검증: 매니페스트·캐릭터·두 해상도 파일을 함께 확인 ── */
-for(const [cid,meta] of Object.entries(PORTRAITS.characters||{})){
+const portraitIds=PORTRAITS.ids||Object.keys(PORTRAITS.characters||{});
+if(new Set(portraitIds).size!==portraitIds.length) errs.push('portrait ids contain duplicates');
+for(const cid of Object.keys(CHARS)) if(!portraitIds.includes(cid)) errs.push(`portrait coverage missing ${cid}`);
+for(const cid of portraitIds){
   if(!CHARS[cid]) errs.push(`portrait unknown character ${cid}`);
-  if(!Array.isArray(meta.variants)||!meta.variants.includes('calm')) errs.push(`portrait ${cid}: calm variant missing`);
   for(const [size,maxBytes] of [['hero',220*1024],['thumb',30*1024]]){
     const url=new URL(`../public/portraits/${size}/${cid}.webp`,import.meta.url);
     if(!fs.existsSync(url)){ errs.push(`portrait ${cid}: ${size} file missing`); continue; }
     const bytes=fs.statSync(url).size;
     if(bytes>maxBytes) errs.push(`portrait ${cid}: ${size} ${bytes} bytes exceeds ${maxBytes}`);
+  }
+}
+let expressionCount=0;
+for(const [cid,meta] of Object.entries(PORTRAITS.characters||{})){
+  if(!portraitIds.includes(cid)) errs.push(`portrait metadata id not covered ${cid}`);
+  if(!Array.isArray(meta.variants)||!meta.variants.includes('calm')) errs.push(`portrait ${cid}: calm variant missing`);
+  for(const expression of (meta.variants||[]).filter(v=>v!=='calm')){
+    expressionCount++;
+    const url=new URL(`../public/portraits/expressions/${cid}-${expression}.webp`,import.meta.url);
+    if(!fs.existsSync(url)){ errs.push(`portrait ${cid}: expression ${expression} missing`); continue; }
+    if(fs.statSync(url).size>220*1024) errs.push(`portrait ${cid}: expression ${expression} exceeds 220KB`);
   }
 }
 
@@ -223,6 +236,6 @@ const SUPPORTS = J('supports.json');
 }
 
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
-console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${Object.keys(PORTRAITS.characters||{}).length}명 검사`);
+console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
 console.log('DATA VALIDATION OK');

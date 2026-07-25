@@ -179,9 +179,15 @@ function portraitInner(source, expression='calm'){
   return s;
 }
 
-const PREMIUM_PORTRAITS=PORTRAITS.characters||{};
-export function premiumPortraitURL(cid,size='hero'){
-  return PREMIUM_PORTRAITS[cid]?`${import.meta.env.BASE_URL}portraits/${size}/${cid}.webp`:null;
+const PREMIUM_PORTRAITS=new Set(PORTRAITS.ids||Object.keys(PORTRAITS.characters||{}));
+const EXPRESSION_PORTRAITS=PORTRAITS.characters||{};
+export function premiumPortraitURL(cid,size='hero',expression='calm'){
+  if(!PREMIUM_PORTRAITS.has(cid)) return null;
+  const variants=EXPRESSION_PORTRAITS[cid]&&EXPRESSION_PORTRAITS[cid].variants;
+  if(size==='hero'&&expression!=='calm'&&variants&&variants.includes(expression)){
+    return `${import.meta.env.BASE_URL}portraits/expressions/${cid}-${expression}.webp`;
+  }
+  return `${import.meta.env.BASE_URL}portraits/${size}/${cid}.webp`;
 }
 function premiumExpressionOverlay(expression){
   if(expression==='hurt') return '<rect width="100" height="100" fill="#40110d" opacity=".2"/><path d="M62 26l9 20M28 55l11 7" stroke="#a53f35" stroke-width="1.4" opacity=".8"/>';
@@ -202,7 +208,7 @@ function buildPortraitDefs(){
   document.body.appendChild(holder.firstChild);
 }
 function ptSVG(cid, cls, expression='calm'){ // 원형 초상화 svg 태그
-  const premium=premiumPortraitURL(cid,'hero');
+  const premium=premiumPortraitURL(cid,'hero',expression);
   if(premium){
     return `<svg viewBox="0 0 100 100" class="portrait-premium ${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="premium-rage"><stop offset=".4" stop-color="#6f1710" stop-opacity="0"/><stop offset="1" stop-color="#6f1710"/></radialGradient></defs><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${portraitInner(CHARS[cid].pt,expression)}</g><image href="${premium}" width="100" height="100" preserveAspectRatio="xMidYMid slice"/>${premiumExpressionOverlay(expression)}</svg>`;
   }

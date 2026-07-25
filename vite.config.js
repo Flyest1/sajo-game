@@ -45,8 +45,8 @@ export default defineConfig({
             urlPattern: ({url}) => url.pathname.includes('/portraits/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'wuxia-portraits-v1',
-              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheName: 'wuxia-portraits-v2',
+              expiration: { maxEntries: 240, maxAgeSeconds: 60 * 60 * 24 * 90 },
             },
           },
         ],

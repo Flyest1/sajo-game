@@ -58,5 +58,5 @@
 - 본편 특수전은 총 14개이며 사조 5, 신조 3, 의천 3, 천룡 3이다. `validate_data.mjs`가 작품당 3개와 전체 12개 하한을 강제한다.
 - `俠` 2 이상은 아군 피해 -1, 점수당 상점 4% 할인(최대 20%). `情` 2 이상은 인연 전투 등급 +1. `勢` 2 이상은 공격 +1, 점수당 전리품 5% 증가(최대 20%). 가장 높은 문파 관계가 2 이상이면 명중 +4다.
 - 전장 테마는 `jianghu`, `jiangnan`, `taohua`, `xiangyang`, `guangming`, `shaolin`, `huashan`만 허용한다. 각 지역은 지형 판정과 별도로 깊이 레이어의 랜드마크·색조를 바꾼다.
-- 반실사 초상 매니페스트는 `src/data/portraits.json`이다. `hero` 768px와 `thumb` 192px WebP를 분리하고, PWA 핵심 프리캐시에서는 제외한 뒤 Cache First로 지연 저장한다. 매니페스트에 없는 인물과 이미지 실패 시 SVG 초상으로 대체한다.
+- 반실사 초상 매니페스트는 `src/data/portraits.json`이다. 101명 모두 `hero` 768px와 `thumb` 192px WebP를 가지며, 주요 8명은 `expressions/{id}-{angry|hurt|awaken|smile}.webp` 32장을 추가로 가진다. PWA 핵심 프리캐시에서는 제외하고 최대 240개를 Cache First로 지연 저장한다. 이미지 실패 시 SVG 초상으로 대체한다.
 - CI는 초상 파일 존재·용량, 테마 열거값, 특수전 수, 커스텀 보스 단계의 능력/호신 압력을 검사한다.
