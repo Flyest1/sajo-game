@@ -5,6 +5,7 @@
 import fs from 'fs';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
+const PORTRAITS = J('portraits.json');
 
 const errs = [];
 CHAPTERS.forEach((ch, ci) => {
@@ -54,6 +55,10 @@ const CAMPAIGN_MANIFEST = J('campaigns.json');
 const STORY_EXPANSIONS = J('story_expansions.json');
 const BATTLE_UPDATES = J('battle_updates.json');
 const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
+const MAIN_CAMPAIGNS = new Set(['sajo','sinjo','uicheon','chunryong']);
+const SPECIAL_OBJECTIVES = new Set(['survive','seize','escape','subdue','all','any']);
+const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan']);
+const specialCounts = Object.fromEntries([...MAIN_CAMPAIGNS].map(id=>[id,0]));
 for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
   if(!camp){ errs.push(`story expansion unknown campaign ${campId}`); continue; }
@@ -136,6 +141,7 @@ for (const CAMP of CAMPAIGN_FILES) {
       });
       if (n.win.boss && !n.enemies.some(e => e.cid === n.win.boss)) errs.push(`${tag} boss ${n.win.boss} not on map`);
       const objective=n.objective||n.win;
+      if(MAIN_CAMPAIGNS.has(CID)&&SPECIAL_OBJECTIVES.has(objective.type)) specialCounts[CID]++;
       const validateObjective=(o,path='objective')=>{
         if (!['rout','boss','survive','seize','escape','subdue','all','any'].includes(o.type)) errs.push(`${tag} ${path} unknown type ${o.type}`);
         if ((o.type==='all'||o.type==='any')) {
@@ -155,8 +161,11 @@ for (const CAMP of CAMPAIGN_FILES) {
         if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`);
         if(p.target&&!n.enemies.some(e=>e.cid===p.target&&e.boss)) errs.push(`${tag} bossPhase${i} target ${p.target} is not a deployed boss`);
         if(i>0&&p.at>n.bossPhases[i-1].at) errs.push(`${tag} bossPhase${i} thresholds must descend`);
+        if(Math.max(0,...Object.values(p.stats||{}))>.35) errs.push(`${tag} bossPhase${i} stat boost exceeds 35%`);
+        if((p.guardRatio||0)>.32) errs.push(`${tag} bossPhase${i} guardRatio exceeds 32%`);
       });
       if (n.weather && !['clear','snow','rain','fog','night'].includes(n.weather)) errs.push(`${tag} unknown weather ${n.weather}`);
+      if (n.sceneTheme && !SCENE_THEMES.has(n.sceneTheme)) errs.push(`${tag} unknown sceneTheme ${n.sceneTheme}`);
       if (n.cut && (!Array.isArray(n.cut.lines) || !n.cut.lines.length)) errs.push(`${tag} cut.lines invalid`);
       if (n.cut && n.cut.bg && !['siege','duel','throne','snow','peak'].includes(n.cut.bg)) errs.push(`${tag} cut.bg unknown ${n.cut.bg}`);
       if (n.deploy && n.deploy.forced) n.deploy.forced.forEach(c => { if (!CHARS[c]) errs.push(`${tag} forced unknown ${c}`); });
@@ -168,6 +177,22 @@ for (const CAMP of CAMPAIGN_FILES) {
   for(const id of CAMP.order) if(!seen.has(id)) errs.push(`${CID}: 시작점에서 도달 불가 ${id}`);
   CAMP.party.forEach(c => { if (!CHARS[c]) errs.push(`${CID} party unknown ${c}`); });
 }
+
+/* ── 반실사 초상 자산 검증: 매니페스트·캐릭터·두 해상도 파일을 함께 확인 ── */
+for(const [cid,meta] of Object.entries(PORTRAITS.characters||{})){
+  if(!CHARS[cid]) errs.push(`portrait unknown character ${cid}`);
+  if(!Array.isArray(meta.variants)||!meta.variants.includes('calm')) errs.push(`portrait ${cid}: calm variant missing`);
+  for(const [size,maxBytes] of [['hero',220*1024],['thumb',30*1024]]){
+    const url=new URL(`../public/portraits/${size}/${cid}.webp`,import.meta.url);
+    if(!fs.existsSync(url)){ errs.push(`portrait ${cid}: ${size} file missing`); continue; }
+    const bytes=fs.statSync(url).size;
+    if(bytes>maxBytes) errs.push(`portrait ${cid}: ${size} ${bytes} bytes exceeds ${maxBytes}`);
+  }
+}
+
+const specialTotal=Object.values(specialCounts).reduce((sum,n)=>sum+n,0);
+for(const [cid,count] of Object.entries(specialCounts)) if(count<3) errs.push(`${cid}: special battles ${count} < 3`);
+if(specialTotal<12) errs.push(`main campaigns: special battles ${specialTotal} < 12`);
 {
   for (const cid in CHARS) {
     const pr = CHARS[cid].promo;
@@ -198,5 +223,6 @@ const SUPPORTS = J('supports.json');
 }
 
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
+console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${Object.keys(PORTRAITS.characters||{}).length}명 검사`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
 console.log('DATA VALIDATION OK');

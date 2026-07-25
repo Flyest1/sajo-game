@@ -138,6 +138,13 @@ body:has(#battle.full){align-items:flex-start;}
 #battle-depth .ink-ridge{fill:#202821;stroke:#111712;stroke-width:2;}
 #battle-depth .mid-ridge{fill:#384438;opacity:.72;}
 #battle-depth .roofline{fill:#362823;stroke:#17110f;stroke-width:1.5;}
+#battle-depth .theme-landmark{fill:rgba(37,29,24,.58);stroke:#1b1512;stroke-width:2;}
+#battle-depth .theme-landmark path{vector-effect:non-scaling-stroke;}
+#battle-depth .peach-grove{fill:#bd6f78;stroke:#4f2b31;stroke-width:4}.theme-taohua .scene-orb{fill:#f1b5b7}.theme-taohua .mid-ridge{fill:#56634b!important}.theme-taohua .shoreline{fill:none;stroke:#597f88;stroke-width:7;opacity:.65}
+#battle-depth .city-wall{fill:#514841;stroke:#241f1b}.theme-xiangyang .beacon-smoke{fill:none;stroke:#4d403a;stroke-width:8;opacity:.6}.theme-xiangyang .scene-orb{fill:#d98b5f}
+#battle-depth .bright-peak{fill:#697079;stroke:#292d32}.theme-guangming .sacred-flame{fill:#b54226;stroke:#e19a4b;stroke-width:2}.theme-guangming .mid-ridge{fill:#5c626b!important}
+#battle-depth .pagoda{fill:#4b3329;stroke:#201714}.theme-shaolin .scene-orb{fill:#d68b52}.theme-shaolin .ink-branches{stroke:#4a2e21}
+#battle-depth .sword-peak{fill:#53595c;stroke:#24292c}.theme-huashan .cloud-line{fill:none;stroke:#bbc0bd;stroke-width:10;opacity:.62}.theme-huashan .mid-ridge{fill:#646b6c!important}
 #battle-depth .ink-branches,#battle-depth .ink-reeds{fill:none;stroke:#171611;stroke-width:5;stroke-linecap:round;}
 #battle-depth .ink-reeds{stroke-width:2.2;opacity:.82;}
 #battle-depth .ink-wash{fill:#17140f;opacity:.42;}
@@ -314,6 +321,7 @@ body:has(#battle.full){align-items:flex-start;}
 .skill-pick span{display:flex;flex-direction:column;gap:2px}.skill-pick small{color:var(--dim);line-height:1.4;}
 .reputation-strip{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px auto 14px;color:var(--dim);}
 .reputation-strip>span{padding:5px 10px;border-left:2px solid var(--gold);background:rgba(201,168,106,.08);}.reputation-strip b{color:var(--gold2);}
+.reputation-perks{max-width:760px;margin:-5px auto 14px;padding:8px 12px;text-align:center;color:#e7d5aa;background:linear-gradient(90deg,transparent,rgba(181,133,55,.14),transparent);font-size:12px;letter-spacing:.04em;}
 .rewind-list{display:grid;gap:7px;min-width:min(480px,80vw);}.rewind-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:9px 10px;border-bottom:1px solid rgba(201,168,106,.2);}.rewind-row small{display:block;color:var(--dim);margin-top:2px;}
 .seed-input{width:min(340px,75vw);display:block;margin:14px auto;padding:10px 12px;background:#17140f;border:1px solid var(--gold);color:var(--gold2);font:700 16px monospace;letter-spacing:.08em;text-align:center;}
 .roam-screen{max-width:1050px}.roam-party{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 22px}.roam-party span{padding:5px 9px;background:rgba(201,168,106,.1);border:1px solid rgba(201,168,106,.25);color:var(--gold2);font-size:12px}.roam-path{display:flex;align-items:center;justify-content:center;overflow-x:auto;padding:24px 8px;margin:0 auto;max-width:100%}.roam-node{flex:0 0 64px;display:grid;place-items:center;gap:5px;color:var(--dim);font-size:11px}.roam-node i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid #665b49;background:#211d17;font-style:normal}.roam-node.cur{color:var(--gold2)}.roam-node.cur i{border:2px solid var(--gold2);box-shadow:0 0 16px rgba(217,179,108,.35);transform:scale(1.15)}.roam-node.done i{background:#5b4722;color:#f6dea4}.roam-line{width:18px;height:1px;background:#665b49;flex:0 0 18px;}

@@ -2,6 +2,7 @@
   "campaigns": {
     "sajo": {
       "s6": {
+        "sceneTheme": "jiangnan",
         "objective": {
           "type": "subdue",
           "target": "ogg",
@@ -12,10 +13,17 @@
           { "target": "ogg", "at": 0.68, "name": "백타유신보", "stats": { "spd": 0.16, "skl": 0.1 }, "guardRatio": 0.18, "tactic": "hunter" },
           { "target": "ogg", "at": 0.32, "name": "영사반격", "stats": { "str": 0.2, "skl": 0.12 }, "guardRatio": 0.22, "tactic": "execute" }
         ]
+      },
+      "s7": {
+        "sceneTheme": "taohua"
+      },
+      "s14": {
+        "sceneTheme": "huashan"
       }
     },
     "sinjo": {
       "s10": {
+        "sceneTheme": "xiangyang",
         "objective": {
           "type": "all",
           "text": "곽도를 격파하고 성루의 곽양을 구출",
@@ -28,10 +36,14 @@
           { "target": "gwd", "at": 0.7, "name": "광풍신법", "stats": { "spd": 0.18, "skl": 0.08 }, "guardRatio": 0.18, "tactic": "hunter" },
           { "target": "gwd", "at": 0.34, "name": "금륜호법", "stats": { "str": 0.18, "def": 0.12 }, "guardRatio": 0.26, "tactic": "leader" }
         ]
+      },
+      "s11": {
+        "sceneTheme": "xiangyang"
       }
     },
     "uicheon": {
       "s6b": {
+        "sceneTheme": "guangming",
         "objective": {
           "type": "survive",
           "turns": 7,
@@ -42,10 +54,14 @@
           { "target": "myeoljeol", "at": 0.66, "name": "아미검진", "stats": { "int": 0.14, "res": 0.12 }, "guardRatio": 0.22, "tactic": "leader" },
           { "target": "myeoljeol", "at": 0.3, "name": "의천검의", "stats": { "int": 0.22, "skl": 0.14 }, "guardRatio": 0.25, "tactic": "execute" }
         ]
+      },
+      "s6a": {
+        "sceneTheme": "guangming"
       }
     },
     "chunryong": {
       "t6": {
+        "sceneTheme": "shaolin",
         "objective": {
           "type": "subdue",
           "target": "gmj",
@@ -56,6 +72,9 @@
           { "target": "gmj", "at": 0.7, "name": "화염도기", "stats": { "int": 0.16, "skl": 0.1 }, "guardRatio": 0.2, "tactic": "leader" },
           { "target": "gmj", "at": 0.33, "name": "소무상공", "stats": { "int": 0.22, "res": 0.14 }, "guardRatio": 0.26, "tactic": "execute" }
         ]
+      },
+      "t5": {
+        "sceneTheme": "shaolin"
       }
     }
   }

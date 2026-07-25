@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "style": "semi-realistic-wuxia-oil",
+  "characters": {
+    "gj": { "age": "late-20s", "era": "southern-song", "tone": "honest-resolute", "variants": ["calm"] },
+    "hy": { "age": "early-20s", "era": "southern-song", "tone": "clever-playful", "variants": ["calm"] },
+    "yg": { "age": "around-30", "era": "southern-song", "tone": "solitary-intense", "variants": ["calm"] },
+    "syn": { "age": "mid-20s", "era": "southern-song", "tone": "serene-disciplined", "variants": ["calm"] },
+    "jmk": { "age": "mid-20s", "era": "late-yuan", "tone": "compassionate-resolute", "variants": ["calm"] },
+    "jomin": { "age": "early-20s", "era": "late-yuan", "tone": "confident-strategic", "variants": ["calm"] },
+    "sb": { "age": "mid-30s", "era": "northern-song", "tone": "commanding-tragic", "variants": ["calm"] },
+    "dy": { "age": "early-20s", "era": "northern-song", "tone": "gentle-scholarly", "variants": ["calm"] }
+  }
+}

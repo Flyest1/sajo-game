@@ -1,4 +1,5 @@
 import { TS, TILE, CHARS } from './data.js';
+import PORTRAITS from './data/portraits.json';
 
 /* ============================================================
    SVG 그래픽: 초상화 생성기 · 맵 타일 · 유닛 토큰
@@ -178,6 +179,18 @@ function portraitInner(source, expression='calm'){
   return s;
 }
 
+const PREMIUM_PORTRAITS=PORTRAITS.characters||{};
+export function premiumPortraitURL(cid,size='hero'){
+  return PREMIUM_PORTRAITS[cid]?`${import.meta.env.BASE_URL}portraits/${size}/${cid}.webp`:null;
+}
+function premiumExpressionOverlay(expression){
+  if(expression==='hurt') return '<rect width="100" height="100" fill="#40110d" opacity=".2"/><path d="M62 26l9 20M28 55l11 7" stroke="#a53f35" stroke-width="1.4" opacity=".8"/>';
+  if(expression==='angry') return '<rect width="100" height="100" fill="url(#premium-rage)" opacity=".3"/>';
+  if(expression==='awaken') return '<circle cx="50" cy="48" r="44" fill="none" stroke="#f0cf70" stroke-width="2" opacity=".55"/><rect width="100" height="100" fill="#e8bd55" opacity=".08"/>';
+  if(expression==='smile') return '<rect width="100" height="100" fill="#e3b86c" opacity=".05"/>';
+  return '';
+}
+
 /* 초상화 defs 등록 (1회) */
 function buildPortraitDefs(){
   let defs=gfxDefs();
@@ -189,6 +202,10 @@ function buildPortraitDefs(){
   document.body.appendChild(holder.firstChild);
 }
 function ptSVG(cid, cls, expression='calm'){ // 원형 초상화 svg 태그
+  const premium=premiumPortraitURL(cid,'hero');
+  if(premium){
+    return `<svg viewBox="0 0 100 100" class="portrait-premium ${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="premium-rage"><stop offset=".4" stop-color="#6f1710" stop-opacity="0"/><stop offset="1" stop-color="#6f1710"/></radialGradient></defs><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${portraitInner(CHARS[cid].pt,expression)}</g><image href="${premium}" width="100" height="100" preserveAspectRatio="xMidYMid slice"/>${premiumExpressionOverlay(expression)}</svg>`;
+  }
   const face=expression&&expression!=='calm'?portraitInner(CHARS[cid].pt,expression):`<use href="#pt-${cid}"/>`;
   return `<svg viewBox="0 0 100 100" class="${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid meet"><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${face}</g></svg>`;
 }
@@ -307,7 +324,15 @@ function ridgePath(w,h,seed,base,amp,steps){
   }
   return d+` L${w} 0 L0 0 Z`;
 }
-function battleSceneHTML(w,h,weather='clear',time='day',seed=1){
+function sceneThemeDecor(theme,w,h){
+  if(theme==='taohua') return `<g class="theme-landmark peach-grove"><path d="M${w*.08},${h*.8} Q${w*.12},${h*.35} ${w*.2},${h*.18} M${w*.15},${h*.48} Q${w*.08},${h*.36} ${w*.04},${h*.28} M${w*.16},${h*.42} Q${w*.25},${h*.28} ${w*.31},${h*.22}"/><circle cx="${w*.07}" cy="${h*.29}" r="5"/><circle cx="${w*.3}" cy="${h*.23}" r="6"/><path d="M0,${h*.84} Q${w*.28},${h*.76} ${w*.5},${h*.86}" class="shoreline"/></g>`;
+  if(theme==='xiangyang') return `<g class="theme-landmark city-wall"><path d="M0,${h*.7} V${h*.5} H${w*.1} V${h*.43} H${w*.18} V${h*.5} H${w*.32} V${h*.44} H${w*.4} V${h*.7}Z"/><path d="M${w*.08},${h*.43} v-${h*.13} l${w*.025},-${h*.04} l${w*.025},${h*.04} v${h*.13}"/><path class="beacon-smoke" d="M${w*.105},${h*.25} q${w*.04},-${h*.08} 0,-${h*.15} q-${w*.03},-${h*.06} ${w*.02},-${h*.1}"/></g>`;
+  if(theme==='guangming') return `<g class="theme-landmark bright-peak"><path d="M${w*.58},${h*.58} L${w*.72},${h*.12} L${w*.86},${h*.58}Z M${w*.67},${h*.28} L${w*.72},${h*.12} L${w*.77},${h*.29}Z"/><path class="sacred-flame" d="M${w*.14},${h*.65} q-${w*.04},-${h*.13} ${w*.02},-${h*.22} q${w*.01},${h*.1} ${w*.06},${h*.16} q-${w*.02},${h*.05} -${w*.08},${h*.06}Z"/></g>`;
+  if(theme==='shaolin') return `<g class="theme-landmark pagoda"><path d="M${w*.72},${h*.68} h${w*.15} l-${w*.02},-${h*.08} h-${w*.11}z M${w*.745},${h*.58} h${w*.1} l-${w*.02},-${h*.08} h-${w*.06}z M${w*.77},${h*.48} h${w*.055} l-${w*.012},-${h*.08} h-${w*.03}z"/><path d="M${w*.79},${h*.4} v-${h*.17}"/></g>`;
+  if(theme==='huashan') return `<g class="theme-landmark sword-peak"><path d="M${w*.05},${h*.73} L${w*.28},${h*.08} L${w*.43},${h*.73}Z M${w*.18},${h*.38} L${w*.28},${h*.08} L${w*.34},${h*.39}Z"/><path class="cloud-line" d="M${w*.05},${h*.5} Q${w*.24},${h*.42} ${w*.42},${h*.52} T${w*.72},${h*.48}"/></g>`;
+  return '';
+}
+function battleSceneHTML(w,h,weather='clear',time='day',seed=1,theme='jianghu'){
   const far=ridgePath(w,h,seed,h*.23,h*.16,8);
   const mid=ridgePath(w,h,seed+3,h*.15,h*.08,12);
   let reeds='', branches='';
@@ -320,9 +345,10 @@ function battleSceneHTML(w,h,weather='clear',time='day',seed=1){
     branches+=`<path d="M${x},${y} q${-side*reach*.55},${18+i*4} ${-side*reach},${40+i*7} m${side*reach*.42},${-24} q${-side*18},-22 ${-side*34},-30"/>`;
   }
   const roofY=h*.12;
-  return `<div id="battle-depth" class="time-${time} weather-${weather}" aria-hidden="true">
+  const landmark=sceneThemeDecor(theme,w,h);
+  return `<div id="battle-depth" class="time-${time} weather-${weather} theme-${theme}" data-theme="${theme}" aria-hidden="true">
     <div class="depth-layer depth-far"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge far-ridge" d="${far}"/><circle class="scene-orb" cx="${w*.78}" cy="${h*.11}" r="${Math.max(18,Math.min(w,h)*.07)}"/></svg></div>
-    <div class="depth-layer depth-mid"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge mid-ridge" d="${mid}"/><g class="roofline"><path d="M${w*.05},${roofY} l${w*.08},-${h*.05} l${w*.08},${h*.05} h${w*.04} v${h*.08} h-${w*.2}z"/><path d="M${w*.76},${roofY+h*.035} l${w*.07},-${h*.045} l${w*.08},${h*.045} h${w*.035} v${h*.07} h-${w*.185}z"/></g></svg></div>
+    <div class="depth-layer depth-mid"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge mid-ridge" d="${mid}"/><g class="roofline"><path d="M${w*.05},${roofY} l${w*.08},-${h*.05} l${w*.08},${h*.05} h${w*.04} v${h*.08} h-${w*.2}z"/><path d="M${w*.76},${roofY+h*.035} l${w*.07},-${h*.045} l${w*.08},${h*.045} h${w*.035} v${h*.07} h-${w*.185}z"/></g>${landmark}</svg></div>
     <div class="depth-layer depth-near"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><g class="ink-branches">${branches}</g><g class="ink-reeds">${reeds}</g><path class="ink-wash" d="M0,${h*.92} Q${w*.24},${h*.86} ${w*.48},${h*.94} T${w},${h*.9} L${w},${h} L0,${h}Z"/></svg></div>
     <div class="paper-grain"></div>
   </div>`;
@@ -353,7 +379,9 @@ function unitSVG(u, sel){
   s+=`<circle cx="${px}" cy="${py-2}" r="${r}" fill="none" stroke="${ringG}" stroke-width="3.4"/>`;
   s+=`<clipPath id="clip-${u.uid}"><circle cx="${px}" cy="${py-2}" r="${r-2}"/></clipPath>`;
   const sc=(r-2)*2/100, ox=px-(r-2), oy=py-2-(r-2);
+  const premium=premiumPortraitURL(u.cid,'thumb');
   s+=`<g clip-path="url(#clip-${u.uid})"><g transform="translate(${ox},${oy}) scale(${sc})"><rect width="100" height="100" fill="#4a4032"/><use href="#pt-${u.cid}"/></g></g>`;
+  if(premium) s+=`<image href="${premium}" x="${px-r+2}" y="${py-r}" width="${(r-2)*2}" height="${(r-2)*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-${u.uid})"/>`;
   s+=`<path d="M${px-r+2},${py-2-r*0.55} A${r-2},${r-2} 0 0 1 ${px+r-2},${py-2-r*0.55}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2" clip-path="url(#clip-${u.uid})"/>`;
   if(u.boss) s+=`<path d="M${px-7},${py-r-7} L${px-4},${py-r-2} L${px},${py-r-8} L${px+4},${py-r-2} L${px+7},${py-r-7} L${px+6},${py-r-1} L${px-6},${py-r-1} Z" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;
   else if(u.leader) s+=`<circle cx="${px}" cy="${py-r-3.5}" r="3" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;

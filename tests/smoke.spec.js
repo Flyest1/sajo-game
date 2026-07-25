@@ -54,6 +54,47 @@ test('campaign registry applies special objectives and runtime context', async (
   expect(state.chunryong.type).toBe('subdue');
 });
 
+test('main campaigns expose regional themes and at least three special battles each', async ({ page }) => {
+  const report=await page.evaluate(() => {
+    const ids=['sajo','sinjo','uicheon','chunryong'];
+    const special=new Set(['survive','seize','escape','subdue','all','any']);
+    return Object.fromEntries(ids.map(id=>{
+      const stages=Object.values(window.__dbg.CAMPAIGNS[id].stages).filter(stage=>stage.kind==='battle');
+      return [id,{special:stages.filter(stage=>special.has((stage.objective||stage.win||{}).type)).length,themes:stages.map(stage=>stage.sceneTheme).filter(Boolean)}];
+    }));
+  });
+  for(const item of Object.values(report)) expect(item.special).toBeGreaterThanOrEqual(3);
+  expect(report.sajo.themes).toEqual(expect.arrayContaining(['taohua','huashan']));
+  expect(report.sinjo.themes).toContain('xiangyang');
+  expect(report.uicheon.themes).toContain('guangming');
+  expect(report.chunryong.themes).toContain('shaolin');
+});
+
+test('premium portraits and reputation consequences use the new systems', async ({ page }, testInfo) => {
+  const result=await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend',`<div id="portrait-probe">${window.__dbg.portraitMarkup('gj','awaken')}</div>`);
+    return {
+      hero:window.__dbg.premiumPortraitURL('gj','hero'),
+      fallback:window.__dbg.premiumPortraitURL('oyb','hero'),
+      rep:window.__dbg.reputationProbe({hyeop:3,jeong:2,se:4},{개방:2}),
+      objective:window.__dbg.objectiveProbe({type:'seize',tiles:[[2,3]]},{turn:1,pendingReinf:false,units:[{team:'P',alive:true,x:2,y:3}]}),
+    };
+  });
+  expect(result.hero).toMatch(/portraits\/hero\/gj\.webp$/);
+  expect(result.fallback).toBeNull();
+  expect(result.rep.price).toBe(88);
+  expect(result.rep.loot).toBe(1.2);
+  expect(result.rep.bond).toBe(2);
+  expect(result.rep.combat).toMatchObject({repDef:1,repAtk:1,repHit:4});
+  expect(result.objective).toEqual({won:true,progress:'1/1 지점'});
+  await expect(page.locator('#portrait-probe image')).toHaveAttribute('href',/portraits\/hero\/gj\.webp$/);
+  await expect(page.locator('#portrait-probe svg')).toHaveAttribute('data-expression','awaken');
+  if(process.env.R16_VISUAL){
+    await page.locator('#portrait-probe').evaluate(el=>Object.assign(el.style,{position:'fixed',zIndex:'9999',width:'min(420px,90vw)',left:'50%',top:'50%',transform:'translate(-50%,-50%)',background:'#171411',padding:'18px',border:'1px solid #b99657',boxShadow:'0 20px 70px #000'}));
+    await page.screenshot({path:`test-results/r16-${testInfo.project.name}-portrait.png`,fullPage:true});
+  }
+});
+
 test('manual update prompt is readable and dismissible', async ({ page }) => {
   await page.evaluate(() => window.__pwa.showUpdateNotice({kind:'update'}));
   const notice=page.locator('#update-notice');

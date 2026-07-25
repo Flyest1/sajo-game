@@ -36,9 +36,20 @@ export default defineConfig({
       workbox: {
         // 빌드 산출물 전체를 프리캐시 → 오프라인 플레이 지원
         globPatterns: ['**/*.{js,css,html,png,svg,json,woff2}'],
+        globIgnores: ['portraits/**/*'],
         navigateFallback: '/sajo-game/index.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({url}) => url.pathname.includes('/portraits/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wuxia-portraits-v1',
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 90 },
+            },
+          },
+        ],
       },
     }),
   ],

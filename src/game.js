@@ -1,10 +1,18 @@
 import { TS, TILE, SKILLS, CHARS, CHAPTERS, ENDING, ENEMY_IDS, TYPE_NAME, triangle } from './data.js';
-import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG, battleSceneHTML } from './gfx.js';
+import { buildPortraitDefs, ptSVG, tileSVG, unitSVG, titleArtSVG, battleSceneHTML, premiumPortraitURL } from './gfx.js';
 import { SFX, BGM, toggleSnd, sndOn } from './sfx.js';
 import ITEMS from './data/items.json';
 import SUPPORTS from './data/supports.json';
 import { createCampaignRegistry, CAMPAIGN_META, CAMPAIGN_GROUPS } from './campaigns.js';
 import { resolveRuntimeContext } from './runtime.js';
+import {
+  objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
+  objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
+} from './battle-objectives.js';
+import { bossPhaseDefs as resolveBossPhaseDefs, applyBossPhaseStats } from './boss-patterns.js';
+import {
+  bondRankWithReputation, reputationCombatEffects, shopPriceFor, lootMultiplier, reputationPerks,
+} from './reputation.js';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -22,7 +30,8 @@ for(const p of SUPPORTS.pairs) SUPPORT_MAP[pairKey(p.a,p.b)] = p;
 const RANK_NAME = ['—','C','B','A'];
 function bondRank(cidA,cidB){
   if(!V2||!V2.supports) return 0;
-  return V2.supports[pairKey(cidA,cidB)]||0;
+  const base=V2.supports[pairKey(cidA,cidB)]||0;
+  return bondRankWithReputation(base,V2.reputation);
 }
 /* 유닛 u 기준, 인접 아군 중 최고 인연 랭크(0~3) */
 function adjBond(u){
@@ -323,7 +332,7 @@ function calcStrike(a,d,skillId){
   const mst=(sk&&a.team==='P')?masteryTier(skillId):0;
   const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
   const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
-  let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) - mit - dT.def);
+  let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) + (a.repAtk||0) - mit - dT.def - (d.repDef||0));
   const guarded=d.guardMax>0&&d.guard>0;
   if(guarded) dmg=Math.max(1,Math.round(dmg*.65));
   else if(d.broken) dmg=Math.round(dmg*1.35);
@@ -331,7 +340,7 @@ function calcStrike(a,d,skillId){
   if(comboStep) dmg=Math.round(dmg*(1+comboStep*.08));
   const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)):0;
   const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) - d.stats.spd*2 - dT.avoid + wHit));
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) + (a.repHit||0) - d.stats.spd*2 - dT.avoid + wHit));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
   return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep};
@@ -568,34 +577,14 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
 }
 
 function bossPhaseDefs(u){
-  if(!u||!u.boss) return [];
-  const defs=curCh().bossPhases;
-  if(Array.isArray(defs)){
-    const matched=defs.filter(p=>!p.target||p.target===u.cid);
-    if(matched.length) return matched;
-  }
-  if(u.type==='외') return [
-    {at:.68,name:'강공 전환',stats:{str:.14,skl:.08},guardRatio:.18,tactic:'leader'},
-    {at:.32,name:'사력 필살',stats:{str:.2,spd:.1},guardRatio:.22,tactic:'execute'},
-  ];
-  if(u.type==='경') return [
-    {at:.7,name:'유영신법',stats:{spd:.16,skl:.1},guardRatio:.17,tactic:'hunter'},
-    {at:.35,name:'잔영 추격',stats:{spd:.2,str:.1},guardRatio:.21,tactic:'execute'},
-  ];
-  return [
-    {at:.66,name:'내력 개방',stats:{int:.15,res:.1},guardRatio:.2,tactic:'leader'},
-    {at:.3,name:'진기 폭발',stats:{int:.22,skl:.1},guardRatio:.24,tactic:'execute'},
-  ];
+  return resolveBossPhaseDefs(u,curCh().bossPhases);
 }
 async function applyBossPhase(u){
   if(!u||!u.alive||!u.boss) return;
   const defs=bossPhaseDefs(u);
   while(u.phaseIndex<defs.length && u.hp/u.maxhp<=defs[u.phaseIndex].at){
-    const p=defs[u.phaseIndex++], changes=p.stats||Object.fromEntries(['str','int','spd','skl'].map(k=>[k,p.boost||.1]));
-    for(const [k,boost] of Object.entries(changes)) if(k in u.stats) u.stats[k]=Math.max(1,Math.round(u.stats[k]*(1+boost)));
-    u.tactic=p.tactic||u.tactic||'leader';
-    u.ki=u.maxki;
-    if(p.guard!==false){ u.guardMax=Math.max(u.guardMax,Math.round(u.maxhp*(p.guardRatio||.2))); u.guard=u.guardMax; u.broken=false; }
+    const p=defs[u.phaseIndex++];
+    applyBossPhaseStats(u,p);
     await showBossReveal(u,p.name||'절기 변환');
     fx(u.x,u.y,p.name||'절기 변환','phase'); shakeMap(true);
     log(`<b>${u.name} — ${p.name||'절기 변환'}!</b> 초식과 기세가 달라졌다.`,true);
@@ -664,44 +653,11 @@ async function healAction(a,t,skillId){
 
 /* ── 승패 판정: 모든 캠페인이 공유하는 목표 규칙 ── */
 function activeObjective(){ const ch=curCh(); return (ch&&ch.objective)||ch.win||{type:'rout'}; }
-function objectiveLeaves(o=activeObjective()){
-  if((o.type==='all'||o.type==='any')&&Array.isArray(o.objectives)) return o.objectives.flatMap(objectiveLeaves);
-  return [o];
-}
-function objectiveTiles(o){ return (o.tiles||o.zones||[]).map(t=>Array.isArray(t)?{x:t[0],y:t[1]}:t); }
-function objectiveProgress(o=activeObjective()){
-  if((o.type==='all'||o.type==='any')&&Array.isArray(o.objectives)){
-    const done=o.objectives.filter(x=>objectiveWon(x)).length;
-    return `${done}/${o.objectives.length} 조건 · ${o.objectives.map(x=>`${objectiveWon(x)?'✓':'○'} ${x.text||x.type}`).join(' / ')}`;
-  }
-  if(o.type==='survive') return `${Math.max(0,o.turns-B.turn+1)}턴`;
-  if(o.type==='seize'){
-    const ts=objectiveTiles(o), held=ts.filter(t=>players().some(p=>p.x===t.x&&p.y===t.y)).length;
-    return `${held}/${ts.length} 지점`;
-  }
-  if(o.type==='escape'){
-    const ts=objectiveTiles(o), escaped=players().filter(p=>ts.some(t=>p.x===t.x&&p.y===t.y)).length;
-    return `${escaped}/${o.min||1}명`;
-  }
-  if(o.type==='subdue'){
-    const t=B.units.find(u=>u.cid===o.target&&u.alive);
-    return t?(t.subdued?'제압 완료':`대상 HP ${t.hp}/${t.maxhp}`):'대상 이탈';
-  }
-  return '';
-}
-function objectiveWon(o=activeObjective(),pendingReinf=false){
-  if(o.type==='all') return (o.objectives||[]).every(x=>objectiveWon(x,pendingReinf));
-  if(o.type==='any') return (o.objectives||[]).some(x=>objectiveWon(x,pendingReinf));
-  if(o.type==='boss') return !B.units.some(u=>u.team==='E'&&u.cid===o.boss&&u.alive);
-  if(o.type==='survive') return B.turn>o.turns || (o.boss&&!B.units.some(u=>u.team==='E'&&u.cid===o.boss&&u.alive));
-  if(o.type==='seize') return objectiveTiles(o).every(t=>players().some(p=>p.x===t.x&&p.y===t.y));
-  if(o.type==='escape'){
-    const ts=objectiveTiles(o);
-    return players().filter(p=>ts.some(t=>p.x===t.x&&p.y===t.y)&&(o.cids?o.cids.includes(p.cid):true)).length>=(o.min||1);
-  }
-  if(o.type==='subdue') return B.units.some(u=>u.cid===o.target&&u.subdued);
-  return foes().length===0&&!pendingReinf;
-}
+function objectiveContext(pendingReinf=false){ return {units:B.units,turn:B.turn,pendingReinf}; }
+function objectiveLeaves(o=activeObjective()){ return resolveObjectiveLeaves(o); }
+function objectiveTiles(o){ return resolveObjectiveTiles(o); }
+function objectiveProgress(o=activeObjective()){ return resolveObjectiveProgress(o,objectiveContext()); }
+function objectiveWon(o=activeObjective(),pendingReinf=false){ return resolveObjectiveWon(o,objectiveContext(pendingReinf)); }
 function checkEnd(){
   if(B.over) return true;
   const ch=curCh();
@@ -1069,6 +1025,12 @@ async function enemyPhase(){
 }
 
 /* ── 전투 시작 ── */
+function applyReputationCombatEffects(){
+  if(!V2||!B) return [];
+  const effects=reputationCombatEffects(V2.reputation,V2.factions);
+  players().forEach(u=>{ u.repDef=effects.repDef; u.repAtk=effects.repAtk; u.repHit=effects.repHit; });
+  return effects.labels;
+}
 function startBattle(){
   const ch=curCh();
   const ctx=runtimeContext();
@@ -1099,10 +1061,12 @@ function startBattle(){
   B.loot={gold:0,items:[]};
   if(V2&&V2.curBattle){ V2.deploy=G.deploy.slice(); v2Save(); }
   for(const def of ch.enemies) B.units.push(mkEnemyUnit(def));
+  B.reputationEffects=applyReputationCombatEffects();
   refreshEnemyIntents();
   startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${activeObjective().text||ch.win.text}`,true);
+  if(B.reputationEffects.length) log(`<b>강호의 반향</b> — ${B.reputationEffects.join(' · ')}`,true);
   beginBattlePresentation();
 }
 async function beginBattlePresentation(){
@@ -1258,7 +1222,7 @@ function renderScreenBattle(){
       <div id="mapscroll"><div id="mapsizer">
         <div id="mapwrap" style="width:${mw}px;height:${mh}px">
           <svg id="mapsvg" width="${mw}" height="${mh}"></svg>
-          ${battleSceneHTML(mw,mh,B.weather,currentBattleTime(),B.sceneSeed)}
+          ${battleSceneHTML(mw,mh,B.weather,currentBattleTime(),B.sceneSeed,curCh().sceneTheme||'jianghu')}
           <div id="timewash" class="time-${currentBattleTime()}"></div>
           <div id="weather"></div>
           <div id="fx"></div>
@@ -1756,7 +1720,7 @@ function showVictory(){
       if(ju&&ju.alive) V2.flags[n.judge.set]=1;
     }
     const loot=(B&&B.loot)||{gold:0,items:[]};
-    const gm=curDiff().gold;
+    const gm=curDiff().gold*lootMultiplier(V2.reputation);
     V2.gold += Math.round(((n.goldReward||0) + (loot.gold||0))*gm);
     for(const id of (loot.items||[])) V2.inv[id]=(V2.inv[id]||0)+1;
     for(const id of (n.rewardItems||[])) V2.inv[id]=(V2.inv[id]||0)+1;
@@ -2482,7 +2446,8 @@ function v2BattleDef(n){
   return { no:battles+1, joins:[], title:n.title, map:n.map, spawns:n.spawns, enemies:n.enemies,
     reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', pre:[], post:[],
     treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null,
-    learn:n.learn||null, objective:n.objective||null, bossPhases:n.bossPhases||null };
+    learn:n.learn||null, objective:n.objective||null, bossPhases:n.bossPhases||null,
+    sceneTheme:n.sceneTheme||null };
 }
 function v2Enter(){
   if(!V2) return;
@@ -2723,13 +2688,14 @@ function v2Promote(cid){
 }
 function campShopHTML(){
   const list=campShopList();
-  const buy=list.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left"><b>${it.name}</b><div style="font-size:11px;color:var(--dim)">${it.desc}</div></td><td>${it.price}냥</td><td><button class="btn small" ${V2.gold>=it.price?'':'disabled'} onclick="v2Buy('${id}')">구입</button></td></tr>`;}).join('');
+  const buy=list.map(id=>{const it=ITEMS[id],price=shopPrice(it);return `<tr><td style="text-align:left"><b>${it.name}</b><div style="font-size:11px;color:var(--dim)">${it.desc}</div></td><td>${price}냥${price<it.price?` <del style="color:var(--dim);font-size:10px">${it.price}</del>`:''}</td><td><button class="btn small" ${V2.gold>=price?'':'disabled'} onclick="v2Buy('${id}')">구입</button></td></tr>`;}).join('');
   const inv=Object.keys(V2.inv);
   const sell=inv.length?inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left">${it.name} ×${V2.inv[id]}</td><td>${Math.floor(it.price/2)}냥</td><td><button class="btn small" onclick="v2Sell('${id}')">매각</button></td></tr>`;}).join(''):`<tr><td colspan="3" style="color:var(--dim)">매각할 물건이 없습니다</td></tr>`;
   return `<div class="camp-cols"><div><h3>구입</h3><table class="camptable">${buy}</table></div>
   <div><h3>매각 <span style="font-size:11px;color:var(--dim)">(정가의 절반)</span></h3><table class="camptable">${sell}</table></div></div>`;
 }
-function v2Buy(id){ const it=ITEMS[id]; if(!it||V2.gold<it.price) return; V2.gold-=it.price; V2.inv[id]=(V2.inv[id]||0)+1; SFX.play('gold'); v2Save(); renderCamp(); }
+function shopPrice(it){ return shopPriceFor(it.price,V2.reputation); }
+function v2Buy(id){ const it=ITEMS[id],price=it?shopPrice(it):0; if(!it||V2.gold<price) return; V2.gold-=price; V2.inv[id]=(V2.inv[id]||0)+1; SFX.play('gold'); v2Save(); renderCamp(); }
 function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); SFX.play('gold'); v2Save(); renderCamp(); }
 function campBagHTML(){
   return `<table class="camptable">${invRowsHTML()}</table>`;
@@ -2790,9 +2756,11 @@ function showRouteMap(){
       <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}${sourceTxt}</span></div>`;
   }).join('');
   const rep=V2.reputation||{hyeop:0,jeong:0,se:0};
+  const perks=reputationPerks(rep);
   app().innerHTML=`<div id="routemap">
     <h2>${C.name}</h2>
     <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${V2.history&&V2.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${V2.history.length}</button>`:''}</div>
+    ${perks.length?`<div class="reputation-perks">강호의 반향 · ${perks.join(' · ')}</div>`:''}
     <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span><span>행적 ${Object.keys(V2.flags).length}건</span></div>
     <div class="route-list">${rows}</div>
     <div style="text-align:center;margin-top:14px">
@@ -3032,6 +3000,13 @@ export const DEBUG = {
   calc(a,d,skill){ return calcStrike(a,d,skill); },
   adjBond(u){ return adjBond(u); },
   runtimeContext(){ return runtimeContext(); },
+  portraitMarkup(cid='gj',expression='calm'){ return ptSVG(cid,'',expression); },
+  premiumPortraitURL(cid='gj',size='hero'){ return premiumPortraitURL(cid,size); },
+  objectiveProbe(objective,context){ return {won:resolveObjectiveWon(objective,context),progress:resolveObjectiveProgress(objective,context)}; },
+  reputationProbe(reputation,factions={}){ return {
+    combat:reputationCombatEffects(reputation,factions), price:shopPriceFor(100,reputation),
+    loot:lootMultiplier(reputation), bond:bondRankWithReputation(1,reputation), perks:reputationPerks(reputation),
+  }; },
   previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
   CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS,
 };

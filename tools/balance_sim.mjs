@@ -5,7 +5,7 @@
    ============================================================ */
 import fs from 'fs';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
-const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json');
+const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
 
 const DIFFS = {
   story: { enemy: 0.85 }, std: { enemy: 1.0 }, hero: { enemy: 1.15 },
@@ -88,3 +88,23 @@ for (const diff of ['story', 'std', 'hero']) {
 console.log('## 이상치 플래그');
 if (!flags.length) console.log('  (없음) — 대표 매치업이 건전한 곡선 안에 있습니다.');
 else flags.forEach(f => console.log('  - ' + f));
+
+console.log('\n## 커스텀 보스 단계 압력');
+let phaseCount=0;
+const phaseFlags=[];
+for(const [campId,stages] of Object.entries(BATTLE_UPDATES.campaigns||{})){
+  for(const [stageId,patch] of Object.entries(stages)){
+    for(const phase of (patch.bossPhases||[])){
+      phaseCount++;
+      const peak=Math.max(0,...Object.values(phase.stats||{}));
+      const pressure=`능력 최대 +${Math.round(peak*100)}% · 강기 ${Math.round((phase.guardRatio||0)*100)}%`;
+      console.log(`  ${campId}/${stageId} ${phase.name}: ${pressure}`);
+      if(peak>.35) phaseFlags.push(`[보스 폭증] ${campId}/${stageId} ${phase.name} 능력 +${Math.round(peak*100)}%`);
+      if((phase.guardRatio||0)>.32) phaseFlags.push(`[강기 과다] ${campId}/${stageId} ${phase.name} ${Math.round(phase.guardRatio*100)}%`);
+    }
+  }
+}
+if(!phaseCount) console.log('  커스텀 단계 없음 — 기본 2단계 패턴을 사용합니다.');
+console.log(`  총 ${phaseCount}단계 · 안전 상한 능력 +35% / 강기 32%`);
+if(phaseFlags.length) phaseFlags.forEach(flag=>console.log('  - '+flag));
+else console.log('  단계 압력 이상치 없음');
