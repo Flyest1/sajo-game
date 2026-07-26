@@ -307,8 +307,32 @@
      "x": 9,
      "y": 1,
      "boss": true,
-     "boost": 1.2,
+     "guard": 8,
      "wait": 2
+    }
+   ],
+   "bossPhases": [
+    {
+     "target": "oyb",
+     "at": 0.55,
+     "name": "합마응세",
+     "stats": {
+      "int": 0.08,
+      "skl": 0.06
+     },
+     "guard": false,
+     "tactic": "leader"
+    },
+    {
+     "target": "oyb",
+     "at": 0.24,
+     "name": "서독의 집념",
+     "stats": {
+      "int": 0.1,
+      "spd": 0.06
+     },
+     "guard": false,
+     "tactic": "execute"
     }
    ],
    "win": {

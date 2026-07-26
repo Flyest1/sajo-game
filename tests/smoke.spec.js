@@ -93,10 +93,34 @@ test('premium portraits and reputation consequences use the new systems', async 
   expect(result.objective).toEqual({won:true,progress:'1/1 지점'});
   await expect(page.locator('#portrait-probe image')).toHaveAttribute('href',/portraits\/expressions\/gj-awaken\.webp$/);
   await expect(page.locator('#portrait-probe svg')).toHaveAttribute('data-expression','awaken');
+  await expect(page.locator('#portrait-probe .portrait-vector-fallback')).toHaveCSS('display','none');
+  await expect(page.locator('#portrait-probe svg > path, #portrait-probe svg > circle:not(:first-of-type)')).toHaveCount(0);
   if(process.env.R16_VISUAL){
     await page.locator('#portrait-probe').evaluate(el=>Object.assign(el.style,{position:'fixed',zIndex:'9999',width:'min(420px,90vw)',left:'50%',top:'50%',transform:'translate(-50%,-50%)',background:'#171411',padding:'18px',border:'1px solid #b99657',boxShadow:'0 20px 70px #000'}));
     await page.screenshot({path:`test-results/r16-${testInfo.project.name}-portrait.png`,fullPage:true});
   }
+});
+
+test('mastery, promotion, and scenario feasibility expose their real effects', async ({ page }) => {
+  const result=await page.evaluate(() => ({
+    mastery:[0,8,20,40,70].map(uses=>window.__dbg.masteryProbe('seoncheon',uses)),
+    healing:window.__dbg.masteryProbe('jeonjin',70),
+    promotion:window.__dbg.promotionProbe('wjy'),
+    hwalsa:window.__dbg.CAMPAIGNS.hwalsa.stages.h3,
+    tower:window.__dbg.CAMPAIGNS.uicheon.stages.s7,
+  }));
+  expect(result.mastery.map(m=>[m.tier,m.power,m.hit,m.costDown])).toEqual([
+    [0,0,0,0],[1,4,2,0],[2,8,4,1],[3,12,6,1],[4,16,8,2],
+  ]);
+  expect(result.healing).toMatchObject({tier:4,heal:4,costDown:2});
+  expect(result.promotion.text).toContain('중신통(中神通)');
+  expect(result.promotion.text).toContain('일양지 습득');
+  expect(result.hwalsa.enemies.find(e=>e.cid==='oyb')).toMatchObject({guard:8,wait:2});
+  expect(result.hwalsa.bossPhases.every(p=>p.guard===false)).toBe(true);
+  expect(result.tower.joins).toContain('mgyo');
+  expect(result.tower.deploy.cap).toBe(4);
+  expect(result.tower.deploy.forced).toHaveLength(4);
+  expect(result.tower.objective.tiles).toHaveLength(4);
 });
 
 test('manual update prompt is readable and dismissible', async ({ page }) => {

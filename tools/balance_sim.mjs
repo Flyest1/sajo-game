@@ -6,6 +6,7 @@
 import fs from 'fs';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
+const HWALSA = J('stages_hwalsa.json');
 
 const DIFFS = {
   story: { enemy: 0.85 }, std: { enemy: 1.0 }, hero: { enemy: 1.15 },
@@ -108,3 +109,31 @@ if(!phaseCount) console.log('  커스텀 단계 없음 — 기본 2단계 패턴
 console.log(`  총 ${phaseCount}단계 · 안전 상한 능력 +35% / 강기 32%`);
 if(phaseFlags.length) phaseFlags.forEach(flag=>console.log('  - '+flag));
 else console.log('  단계 압력 이상치 없음');
+
+/* 2인 고정 외전은 일반 대표전보다 수적 열세가 커서 별도로 하한을 검사한다. */
+console.log('\n## 활사인묘 비사 3화 — 2인 보스전');
+const h3=HWALSA.stages.h3;
+const oybDef=h3.enemies.find(enemy=>enemy.cid==='oyb');
+const h3Flags=[];
+for(const diff of ['story','std','hero']){
+  const boss=mkUnit('oyb',0,1,true);
+  if(oybDef.boost) for(const key in boss.stats) boss.stats[key]=Math.round(boss.stats[key]*oybDef.boost);
+  const dm=DIFFS[diff].enemy;
+  if(dm!==1) for(const key of ['hp','str','int','def','res']) boss.stats[key]=Math.max(1,Math.round(boss.stats[key]*dm));
+  boss.maxhp=boss.stats.hp; boss.hp=boss.maxhp;
+  const allies=['wjy','ijy'].map(cid=>mkUnit(cid,2,1,false)); /* 1·2화 최소 성장만 반영한 보수적 기준 */
+  const skillPressure=allies.map(ally=>{
+    const sid=CHARS[ally.cid].skills[0], strike=calc(ally,boss,SKILLS[sid]);
+    return {name:ally.name,hit:strike.hit,guarded:Math.max(1,Math.round(strike.dmg*.65)),guardChip:2};
+  });
+  const expectedGuardPerTurn=skillPressure.reduce((sum,item)=>sum+item.guardChip*item.hit/100,0);
+  const breakTurns=(oybDef.guard||Math.max(8,Math.round(boss.maxhp*.28)))/expectedGuardPerTurn;
+  const incoming=allies.map(ally=>calc(boss,ally,null).dmg);
+  console.log(`  ${diff}: 호신 ${oybDef.guard} · 예상 파훼 ${breakTurns.toFixed(1)}턴 · `+
+    `${skillPressure.map(item=>`${item.name} 무공 ${item.guarded}피해/${item.hit}%`).join(' · ')} · 구양봉 평타 최대 ${Math.max(...incoming)}`);
+  if(breakTurns>3) h3Flags.push(`[파훼 지연] ${diff} ${breakTurns.toFixed(1)}턴`);
+  if(incoming.some((damage,index)=>damage>=allies[index].maxhp*.35)) h3Flags.push(`[피해 과다] ${diff} 구양봉 → ${allies[incoming.indexOf(damage)].name}`);
+}
+if(h3.bossPhases.some(phase=>phase.guard!==false)) h3Flags.push('[강기 재생] HP 단계에서 호신강기가 다시 생성됨');
+if(h3Flags.length) h3Flags.forEach(flag=>console.log('  - '+flag));
+else console.log('  2인 저성장 기준 파훼·피해 안전선 통과');

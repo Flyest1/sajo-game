@@ -190,12 +190,19 @@ export function premiumPortraitURL(cid,size='hero',expression='calm'){
   return `${import.meta.env.BASE_URL}portraits/${size}/${cid}.webp`;
 }
 function premiumExpressionOverlay(expression){
-  if(expression==='hurt') return '<rect width="100" height="100" fill="#40110d" opacity=".2"/><path d="M62 26l9 20M28 55l11 7" stroke="#a53f35" stroke-width="1.4" opacity=".8"/>';
+  /* 반실사 원화 위에는 색조만 얹는다. 선형 표식은 구 SVG 얼굴처럼 겹쳐 보인다. */
+  if(expression==='hurt') return '<rect width="100" height="100" fill="#40110d" opacity=".2"/>';
   if(expression==='angry') return '<rect width="100" height="100" fill="url(#premium-rage)" opacity=".3"/>';
-  if(expression==='awaken') return '<circle cx="50" cy="48" r="44" fill="none" stroke="#f0cf70" stroke-width="2" opacity=".55"/><rect width="100" height="100" fill="#e8bd55" opacity=".08"/>';
+  if(expression==='awaken') return '<rect width="100" height="100" fill="#e8bd55" opacity=".08"/>';
   if(expression==='smile') return '<rect width="100" height="100" fill="#e3b86c" opacity=".05"/>';
   return '';
 }
+
+/* 새 원화가 로드되지 못한 경우에만 구 SVG를 보이는 단일 대체 경로. */
+function portraitFallback(cid, expression='calm', attrs=''){
+  return `<g class="portrait-vector-fallback" style="display:none" ${attrs}>${portraitInner(CHARS[cid].pt,expression)}</g>`;
+}
+const revealPortraitFallback = `onerror="this.style.display='none';if(this.previousElementSibling)this.previousElementSibling.style.display='block'"`;
 
 /* 초상화 defs 등록 (1회) */
 function buildPortraitDefs(){
@@ -210,7 +217,7 @@ function buildPortraitDefs(){
 function ptSVG(cid, cls, expression='calm'){ // 원형 초상화 svg 태그
   const premium=premiumPortraitURL(cid,'hero',expression);
   if(premium){
-    return `<svg viewBox="0 0 100 100" class="portrait-premium ${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="premium-rage"><stop offset=".4" stop-color="#6f1710" stop-opacity="0"/><stop offset="1" stop-color="#6f1710"/></radialGradient></defs><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${portraitInner(CHARS[cid].pt,expression)}</g><image href="${premium}" width="100" height="100" preserveAspectRatio="xMidYMid slice"/>${premiumExpressionOverlay(expression)}</svg>`;
+    return `<svg viewBox="0 0 100 100" class="portrait-premium ${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="premium-rage"><stop offset=".4" stop-color="#6f1710" stop-opacity="0"/><stop offset="1" stop-color="#6f1710"/></radialGradient></defs><circle cx="50" cy="50" r="50" fill="#463c2e"/>${portraitFallback(cid,expression)}<image href="${premium}" width="100" height="100" preserveAspectRatio="xMidYMid slice" ${revealPortraitFallback}/>${premiumExpressionOverlay(expression)}</svg>`;
   }
   const face=expression&&expression!=='calm'?portraitInner(CHARS[cid].pt,expression):`<use href="#pt-${cid}"/>`;
   return `<svg viewBox="0 0 100 100" class="${cls||''}" data-expression="${expression}" preserveAspectRatio="xMidYMid meet"><circle cx="50" cy="50" r="50" fill="#463c2e"/><g>${face}</g></svg>`;
@@ -386,8 +393,11 @@ function unitSVG(u, sel){
   s+=`<clipPath id="clip-${u.uid}"><circle cx="${px}" cy="${py-2}" r="${r-2}"/></clipPath>`;
   const sc=(r-2)*2/100, ox=px-(r-2), oy=py-2-(r-2);
   const premium=premiumPortraitURL(u.cid,'thumb');
-  s+=`<g clip-path="url(#clip-${u.uid})"><g transform="translate(${ox},${oy}) scale(${sc})"><rect width="100" height="100" fill="#4a4032"/><use href="#pt-${u.cid}"/></g></g>`;
-  if(premium) s+=`<image href="${premium}" x="${px-r+2}" y="${py-r}" width="${(r-2)*2}" height="${(r-2)*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-${u.uid})"/>`;
+  if(premium){
+    s+=`<g clip-path="url(#clip-${u.uid})"><rect x="${px-r+2}" y="${py-r}" width="${(r-2)*2}" height="${(r-2)*2}" fill="#4a4032"/>${portraitFallback(u.cid,'calm',`transform="translate(${ox},${oy}) scale(${sc})"`)}<image href="${premium}" x="${px-r+2}" y="${py-r}" width="${(r-2)*2}" height="${(r-2)*2}" preserveAspectRatio="xMidYMid slice" ${revealPortraitFallback}/></g>`;
+  }else{
+    s+=`<g clip-path="url(#clip-${u.uid})"><g transform="translate(${ox},${oy}) scale(${sc})"><rect width="100" height="100" fill="#4a4032"/><use href="#pt-${u.cid}"/></g></g>`;
+  }
   s+=`<path d="M${px-r+2},${py-2-r*0.55} A${r-2},${r-2} 0 0 1 ${px+r-2},${py-2-r*0.55}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2" clip-path="url(#clip-${u.uid})"/>`;
   if(u.boss) s+=`<path d="M${px-7},${py-r-7} L${px-4},${py-r-2} L${px},${py-r-8} L${px+4},${py-r-2} L${px+7},${py-r-7} L${px+6},${py-r-1} L${px-6},${py-r-1} Z" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;
   else if(u.leader) s+=`<circle cx="${px}" cy="${py-r-3.5}" r="3" fill="#ffd94a" stroke="#8a6a10" stroke-width=".8"/>`;

@@ -92,16 +92,28 @@ const aSleep = ms => sleep(ms/effSpeed());
 /* ── 무공 숙련도 (전 모드 공유, 스킬별 사용 횟수 누적) ── */
 const MASTERY_STEPS = [0, 8, 20, 40, 70]; // 숙련 단계(0~4) 진입 누적 사용 횟수
 let SKILL_USE = profileValue(V3STORE,'mastery',{});
-function masteryTier(sid){
-  const n=SKILL_USE[sid]||0;
+function masteryTierForUses(n){
   let t=0; for(let i=MASTERY_STEPS.length-1;i>=0;i--){ if(n>=MASTERY_STEPS[i]){ t=i; break; } }
   return t;
 }
+function masteryTier(sid){ return masteryTierForUses(SKILL_USE[sid]||0); }
 function masteryLabel(sid){ const t=masteryTier(sid); return t?('숙련 '+['','★','★★','★★★','極'][t]):''; }
 /* 숙련 보정: 위력 배수 +0.04/단계, 명중 +2/단계, 기 소모 -1/2단계 */
 function masteryMultBonus(sid){ return masteryTier(sid)*0.04; }
 function masteryHitBonus(sid){ return masteryTier(sid)*2; }
 function masteryCost(sid){ const sk=SKILLS[sid]; return Math.max(1, (sk.cost||0) - Math.floor(masteryTier(sid)/2)); }
+function masteryInfo(sid, uses=SKILL_USE[sid]||0){
+  const sk=SKILLS[sid], tier=masteryTierForUses(uses);
+  const cost=Math.max(1,(sk.cost||0)-Math.floor(tier/2));
+  return {tier,uses,power:sk.heal?0:tier*4,hit:sk.heal?0:tier*2,heal:sk.heal?tier:0,cost,costDown:Math.max(0,(sk.cost||0)-cost)};
+}
+function masteryEffectText(sid){
+  const m=masteryInfo(sid), parts=[];
+  if(m.power) parts.push(`위력 +${m.power}%p`,`명중 +${m.hit}`);
+  if(m.heal) parts.push(`회복 +${m.heal}`);
+  if(m.costDown) parts.push(`기 소모 -${m.costDown}`);
+  return parts.length?parts.join(' · '):'현재 보정 없음';
+}
 function bumpMastery(sid){
   const before=masteryTier(sid);
   SKILL_USE[sid]=(SKILL_USE[sid]||0)+1;
@@ -845,12 +857,13 @@ function openMenu(){
     const sk=SKILLS[sid];
     const cost=masteryCost(sid), ml=masteryLabel(sid);
     const mlTxt=ml?` <span style="color:#e8c96a;font-size:11px">${ml}</span>`:'';
+    const mstTitle=`${sk.desc} · ${masteryEffectText(sid)} · ${masteryProgress(sid)}`;
     if(u.ki<cost) return;
     if(sk.heal){
       const hurt=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp);
-      if(hurt.length) html+=`<button class="btn" onclick="menuAct('heal',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
+      if(hurt.length) html+=`<button class="btn" title="${mstTitle}" onclick="menuAct('heal',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
     }else if(enemiesNear.length){
-      html+=`<button class="btn" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
+      html+=`<button class="btn" title="${mstTitle}" onclick="menuAct('skill',${i})">${sk.name} <span style="color:#6ab0ce;font-size:12px">기${cost}</span>${mlTxt}</button>`;
     }
   });
   if(V2&&v2Usables().length){
@@ -1405,7 +1418,7 @@ function ucardHTML(u){
   ${(u.eqAtk||u.eqHit||u.eqCrit)?`<div class="uc-sub" style="color:#8fce6a;margin-top:2px">병기 보정: ${[u.eqAtk?`공격 +${u.eqAtk}`:'',u.eqHit?`명중 +${u.eqHit}`:'',u.eqCrit?`필살 +${u.eqCrit}`:''].filter(Boolean).join(' · ')}</div>`:''}
   ${bossPatternHTML(u)}
   ${u.team==='E'?`<div class="intent-line"><b>다음 의도</b><span>${intentText(u)}</span></div>`:''}
-  ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;const mp=u.team==='P'?masteryProgress(sid):'';return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})${mp?` <span style="color:#c9a86a">(${mp})</span>`:''}</div>`;}).join('')}
+  ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;const mp=u.team==='P'?masteryProgress(sid):'';const me=u.team==='P'?masteryEffectText(sid):'';return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})${mp?`<br><span style="color:#c9a86a">${mp} · 실제 효과: ${me}</span>`:''}</div>`;}).join('')}
   <div class="uc-sub" style="margin-top:6px">${terrLine()}</div>`;
 }
 function infoHTML(ch){
@@ -2652,7 +2665,7 @@ function campUnitHTML(){
     else if(promo){
       const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;
       pcell=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button>
-        <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}</div>`;
+        <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}<br>${promotionEffectText(promo)}</div>`;
     }
     return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${V2.promoted[cid]||c.cls}</div></td>
       <td>${r.lvl}</td>
@@ -2661,6 +2674,12 @@ function campUnitHTML(){
       <td><button class="btn small" onclick="openSkillLoadout('${cid}')">편성</button><div style="font-size:11px;color:var(--dim)">${((V2.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(V2.extraSkills[cid]||[]).length))}/3</div></td>
       <td>${pcell}</td></tr>`;
   }).join('')+`</table>`;
+}
+function promotionEffectText(promo){
+  const names={hp:'HP',str:'힘',int:'내공',def:'방어',res:'정신',spd:'속도',skl:'기술',mov:'이동',ki:'기'};
+  const stats=Object.entries(promo.bonus||{}).map(([k,v])=>`${names[k]||k} +${v}`);
+  if(promo.skill&&SKILLS[promo.skill]) stats.push(`${SKILLS[promo.skill].name} 습득`);
+  return `${promo.cls} · ${stats.join(' · ')}`;
 }
 function v2Equip(cid, slot, id){
   SFX.play('equip');
@@ -2803,7 +2822,7 @@ function openSkillLoadout(cid){
   const c=CHARS[cid], all=[...new Set([...c.skills,...(V2.extraSkills[cid]||[])])];
   const selected=(V2.skillLoadouts[cid]&&V2.skillLoadouts[cid].filter(s=>all.includes(s)))||all.slice(0,3);
   V2.skillLoadouts[cid]=selected;
-  const rows=all.map(sid=>{const sk=SKILLS[sid], on=selected.includes(sid);return `<label class="skill-pick ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="toggleSkillLoadout('${cid}','${sid}',this.checked)"><span><b>${sk.name}</b><small>${sk.desc} · 기 ${masteryCost(sid)}</small></span></label>`;}).join('');
+  const rows=all.map(sid=>{const sk=SKILLS[sid], on=selected.includes(sid);return `<label class="skill-pick ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="toggleSkillLoadout('${cid}','${sid}',this.checked)"><span><b>${sk.name}</b><small>${sk.desc} · 기 ${masteryCost(sid)}<br>${masteryProgress(sid)} · 실제 효과: ${masteryEffectText(sid)}</small></span></label>`;}).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="skill-modal"><div class="modal"><h3>무공 편성 — ${c.name}</h3><p class="modal-note">출전 무공은 최대 3개입니다. 서로 다른 초식을 잇으면 연계 피해가 상승합니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeSkillLoadout()">완료</button></div></div></div>`);
 }
 function toggleSkillLoadout(cid,sid,on){
@@ -3007,6 +3026,8 @@ export const DEBUG = {
     combat:reputationCombatEffects(reputation,factions), price:shopPriceFor(100,reputation),
     loot:lootMultiplier(reputation), bond:bondRankWithReputation(1,reputation), perks:reputationPerks(reputation),
   }; },
+  masteryProbe(sid='seoncheon',uses=0){ return masteryInfo(sid,uses); },
+  promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
   CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS,
 };
