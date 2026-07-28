@@ -4,6 +4,10 @@
  "desc": "강남에 전해진 월녀검법의 전승 — 한소영과 강남의 벗들 (창작 · 3전투 · 사조영웅전 완주 시 해금)",
  "start": "w1",
  "gold": 450,
+ "startLvl": 3,
+ "startInv": {
+  "geumchang": 3
+ },
  "requireAll": [
   "sajo"
  ],
@@ -198,7 +202,8 @@
      "x": 8,
      "y": 1,
      "boss": true,
-     "wait": 1
+     "guard": 8,
+     "wait": 2
     }
    ],
    "win": {
@@ -334,8 +339,9 @@
      "x": 9,
      "y": 0,
      "boss": true,
-     "boost": 1.15,
-     "wait": 1
+     "boost": 0.85,
+     "guard": 8,
+     "wait": 2
     }
    ],
    "win": {

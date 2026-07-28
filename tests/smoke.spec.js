@@ -6,6 +6,11 @@ test.beforeEach(async ({ page }) => {
 
 test('v3 title has one canonical campaign entry', async ({ page }) => {
   await expect(page.getByText('江湖의 별 · v3 통합판')).toBeVisible();
+  const titleOffset=await page.locator('.title-menu').evaluate(el=>{
+    const box=el.getBoundingClientRect();
+    return Math.abs((box.left+box.width/2)-window.innerWidth/2);
+  });
+  expect(titleOffset).toBeLessThanOrEqual(2);
   await expect(page.getByRole('button', { name: /강호연대기/ })).toBeVisible();
   await expect(page.getByText(/신규 캠페인|베타/)).toHaveCount(0);
   await page.getByRole('button', { name: /강호연대기/ }).click();
@@ -21,7 +26,27 @@ test('canonical bridge scenes are visible on the campaign route', async ({ page 
   await sajoCard.getByRole('button', { name: '시작하기' }).click();
   await expect(page.getByText('대막의 약속 — 두 개의 고향')).toBeVisible();
   await expect(page.getByText('이평의 마지막 가르침')).toBeVisible();
-  await expect(page.getByText('이야기 · 정사 보강', { exact:true })).toHaveCount(8);
+  await expect(page.getByText('이야기 · 정사 보강', { exact:true })).toHaveCount(13);
+});
+
+test('U6 enriches all four main campaigns with the requested ensembles', async ({ page }) => {
+  const report=await page.evaluate(() => {
+    const ids=['sajo','sinjo','uicheon','chunryong'];
+    const stages=Object.fromEntries(ids.map(id=>[id,Object.values(window.__dbg.CAMPAIGNS[id].stages)]));
+    return {
+      counts:Object.fromEntries(ids.map(id=>[id,stages[id].filter(stage=>stage.id?.startsWith('u6_')).length])),
+      corpus:Object.values(stages).flat().flatMap(stage=>stage.pre||[]).map(line=>line.t).join('\n'),
+      wolnyeo:window.__dbg.CAMPAIGNS.wolnyeo,
+      heroine:window.__dbg.CHARS.hsy.base,
+    };
+  });
+  expect(report.counts).toEqual({sajo:5,sinjo:4,uicheon:4,chunryong:8});
+  for(const name of ['전진칠자','곡령풍','구천장','달이파','광명좌사 양소','육대파','사대악인','단정순','유탄지']) expect(report.corpus).toContain(name);
+  expect(report.wolnyeo.startLvl).toBe(3);
+  expect(report.wolnyeo.startInv.geumchang).toBe(3);
+  expect(report.wolnyeo.stages.w2.enemies.find(enemy=>enemy.boss)).toMatchObject({guard:8,wait:2});
+  expect(report.wolnyeo.stages.w3.enemies.find(enemy=>enemy.boss)).toMatchObject({boost:.85,guard:8,wait:2});
+  expect(report.heroine.slice(0,7)).toEqual([30,10,6,8,7,11,10]);
 });
 
 test('Tianlong default ending is canon while survival endings stay IF-only', async ({ page }) => {

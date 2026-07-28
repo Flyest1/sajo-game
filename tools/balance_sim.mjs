@@ -6,7 +6,7 @@
 import fs from 'fs';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
-const HWALSA = J('stages_hwalsa.json');
+const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
 
 const DIFFS = {
   story: { enemy: 0.85 }, std: { enemy: 1.0 }, hero: { enemy: 1.15 },
@@ -137,3 +137,25 @@ for(const diff of ['story','std','hero']){
 if(h3.bossPhases.some(phase=>phase.guard!==false)) h3Flags.push('[강기 재생] HP 단계에서 호신강기가 다시 생성됨');
 if(h3Flags.length) h3Flags.forEach(flag=>console.log('  - '+flag));
 else console.log('  2인 저성장 기준 파훼·피해 안전선 통과');
+
+console.log('\n## 월녀검 전설 — 주인공 체감 곡선');
+const wolnyeoFlags=[];
+for(const diff of ['story','std','hero']){
+  const heroine=mkUnit('hsy',WOLNYEO.startLvl||1,1,false);
+  for(const stageId of ['w1','w2','w3']){
+    const stage=WOLNYEO.stages[stageId], def=stage.enemies.find(enemy=>enemy.boss);
+    const boss=mkUnit(def.cid,0,1,true);
+    if(def.boost) for(const key in boss.stats) boss.stats[key]=Math.round(boss.stats[key]*def.boost);
+    const dm=DIFFS[diff].enemy;
+    if(dm!==1) for(const key of ['hp','str','int','def','res']) boss.stats[key]=Math.max(1,Math.round(boss.stats[key]*dm));
+    boss.maxhp=boss.stats.hp; boss.hp=boss.maxhp;
+    const heroineSkill=calc(heroine,boss,SKILLS.wolnyeo);
+    const bossSid=CHARS[def.cid].skills[0], bossStrike=calc(boss,heroine,bossSid?SKILLS[bossSid]:null);
+    const guarded=Math.max(1,Math.round(heroineSkill.dmg*.65));
+    console.log(`  ${diff} ${stageId}/${boss.name}: 월녀검 ${guarded}→${heroineSkill.dmg}피해 · 명중 ${heroineSkill.hit}% · 적 최대기술 ${bossStrike.dmg}/${heroine.maxhp}HP`);
+    if(heroineSkill.dmg<3) wolnyeoFlags.push(`[주인공 무피해] ${diff} ${stageId} ${heroineSkill.dmg}`);
+    if(bossStrike.dmg>=heroine.maxhp*.7) wolnyeoFlags.push(`[보스 폭딜] ${diff} ${stageId} ${bossStrike.dmg}/${heroine.maxhp}`);
+  }
+}
+if(wolnyeoFlags.length) wolnyeoFlags.forEach(flag=>console.log('  - '+flag));
+else console.log('  전 난이도에서 주인공 유효 피해·생존 안전선 통과');

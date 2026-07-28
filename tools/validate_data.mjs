@@ -77,6 +77,18 @@ for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
     if(pos>=0) camp.order.splice(pos+1,0,...ids);
   }
 }
+const U6_STORY_MIN={sajo:5,sinjo:4,uicheon:4,chunryong:8};
+for(const [campId,min] of Object.entries(U6_STORY_MIN)){
+  const nodes=Object.values(STORY_EXPANSIONS.campaigns[campId]?.after||{}).flat().filter(node=>node.id?.startsWith('u6_'));
+  if(nodes.length<min) errs.push(`${campId}: U6 story scenes ${nodes.length} < ${min}`);
+}
+{
+  const w2=WOLNYEO.stages.w2.enemies.find(enemy=>enemy.boss), w3=WOLNYEO.stages.w3.enemies.find(enemy=>enemy.boss);
+  if((WOLNYEO.startLvl||1)<3) errs.push('wolnyeo: startLvl must be at least 3');
+  if(!w2||w2.guard>8||w2.wait<2) errs.push('wolnyeo/w2: boss relief settings regressed');
+  if(!w3||w3.boost>.85||w3.guard>8||w3.wait<2) errs.push('wolnyeo/w3: boss relief settings regressed');
+  if(CHARS.hsy.base[0]<30||CHARS.hsy.base[1]<10||CHARS.hsy.base[3]<8) errs.push('wolnyeo: heroine core stats regressed');
+}
 for (const [campId,updates] of Object.entries(BATTLE_UPDATES.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
   if(!camp){ errs.push(`battle update unknown campaign ${campId}`); continue; }

@@ -370,7 +370,9 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
   #amenu .btn{padding:10px 14px;font-size:15px;width:170px;}
   .title-main{font-size:29px;}
   .title-sub{font-size:13px;}
-  .title-menu .btn{width:min(320px,86vw);margin:5px;}
+  .title-menu{width:min(720px,94vw);margin-left:auto;margin-right:auto;}
+  .title-menu>div{width:100%;justify-content:center;}
+  .title-menu .btn{width:100%;margin:0;}
   .title-note{font-size:11px;padding:0 8px;}
   #dlg-screen{height:74vh;min-height:430px;}
   .dlg-pt{width:150px;height:150px;bottom:138px;}
