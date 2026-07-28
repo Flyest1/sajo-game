@@ -7,8 +7,15 @@
     "dj", "jhp", "mcp", "msa", "gs", "hth", "yjs", "yjo", "plh", "stc", "ygang", "sab", "ogg", "oyb", "imsu", "hnp", "sap", "grb", "gwd", "mgb", "mgs", "hbo", "njg", "sgon", "ydg",
     "myb", "gmj", "jcc", "ssj", "myg", "gdb", "gds", "yyh", "wjy", "ijy", "djh", "gwi", "hgd", "gsc", "ycs", "dds", "mok", "yeonggo", "dtd", "wanyan", "gbyeong", "gci", "cjb",
     "eobu", "chobu", "nongbu", "seosaeng", "gyang", "gsj", "jgj", "geomhon", "jjy", "sason", "geumhwa", "psa", "mgyo", "myeoljeol", "jchsan", "unss", "azu", "way", "swon", "mybak", "mumyeong",
-    "gblr", "baekse", "gunung", "chwihyeon", "mlg", "jmg", "danyeon", "ichusu", "shb", "scs", "drb", "wonjang"
+    "gblr", "baekse", "gunung", "chwihyeon", "mlg", "jmg", "danyeon", "ichusu", "shb", "scs", "drb", "wonjang",
+    "qjc", "dcd", "ycx", "wcy", "hdt", "sbi", "lsf", "fmf", "gcj", "nyg", "pjr", "zjg", "lcd", "dlp", "yso", "fyo", "ecj", "wis", "yyn", "ans", "wjh", "djs", "aja", "ytj", "tst", "zling", "mwc"
   ],
+  "aliases": {
+    "qjc":"wjy", "dcd":"mo", "ycx":"seosaeng", "wcy":"dds", "hdt":"chobu", "sbi":"hsy",
+    "lsf":"djh", "fmf":"nhi", "gcj":"gci", "nyg":"gblr", "pjr":"baekse", "zjg":"scs", "lcd":"drb", "dlp":"gmj",
+    "yso":"jchsan", "fyo":"swon", "ecj":"hcg", "wis":"gwd", "yyn":"geumhwa", "ans":"hgd", "wjh":"plh",
+    "djs":"dy", "aja":"jjy", "ytj":"wonjang", "tst":"ichusu", "zling":"azu", "mwc":"mok"
+  },
   "characters": {
     "gj": { "age": "late-20s", "era": "southern-song", "tone": "honest-resolute", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },
     "hy": { "age": "early-20s", "era": "southern-song", "tone": "clever-playful", "variants": ["calm", "angry", "hurt", "awaken", "smile"] },

@@ -183,11 +183,12 @@ const PREMIUM_PORTRAITS=new Set(PORTRAITS.ids||Object.keys(PORTRAITS.characters|
 const EXPRESSION_PORTRAITS=PORTRAITS.characters||{};
 export function premiumPortraitURL(cid,size='hero',expression='calm'){
   if(!PREMIUM_PORTRAITS.has(cid)) return null;
+  const source=(PORTRAITS.aliases&&PORTRAITS.aliases[cid])||cid;
   const variants=EXPRESSION_PORTRAITS[cid]&&EXPRESSION_PORTRAITS[cid].variants;
   if(size==='hero'&&expression!=='calm'&&variants&&variants.includes(expression)){
-    return `${import.meta.env.BASE_URL}portraits/expressions/${cid}-${expression}.webp`;
+    return `${import.meta.env.BASE_URL}portraits/expressions/${source}-${expression}.webp`;
   }
-  return `${import.meta.env.BASE_URL}portraits/${size}/${cid}.webp`;
+  return `${import.meta.env.BASE_URL}portraits/${size}/${source}.webp`;
 }
 function premiumExpressionOverlay(expression){
   /* 반실사 원화 위에는 색조만 얹는다. 선형 표식은 구 SVG 얼굴처럼 겹쳐 보인다. */

@@ -2467,7 +2467,11 @@ function v2Enter(){
   v2Save();
   const n=curNode();
   if(!n){ toTitle(); return; }
-  (n.joins||[]).forEach(cid=>initRosterCharV2(cid));
+  (n.joins||[]).forEach(cid=>{
+    initRosterCharV2(cid);
+    const target=Math.max(1,n.joinLevel||1), r=V2.roster[cid];
+    while(r.lvl<target) rosterLevelUp(r);
+  });
   (n.leave||[]).forEach(cid=>{
     const i=V2.party.indexOf(cid); if(i>=0) V2.party.splice(i,1);
     if(V2.deploy){ const j=V2.deploy.indexOf(cid); if(j>=0) V2.deploy.splice(j,1); }

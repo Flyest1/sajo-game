@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "note": "U6 원작 군상극을 실제 전투로 확장한 본편 삽입 스테이지",
+  "layouts": {
+    "hall": {
+      "map": ["##################","#....rr....rr....#","#.hh.rr....rr.hh.#","#....rr....rr....#","#................#","#..f..........f..#","#................#","#....rr....rr....#","#.hh.rr....rr.hh.#","#....rr....rr....#","#......rrrr......#","##################"],
+      "spawns": [[7,10],[8,10],[6,9],[9,9],[5,10],[10,10],[7,9],[8,9]]
+    },
+    "field": {
+      "map": ["mm..............mm","m....f......f....m","...f..........f...","..................","......hh..hh......","..f............f..","..................",".....f......f.....","..................","...f..........f...","m................m","mm..............mm"],
+      "spawns": [[3,9],[4,9],[2,8],[5,8],[3,10],[4,10],[6,9],[1,9]]
+    },
+    "mountain": {
+      "map": ["mmmm..........mmmm","mmm....m..m....mmm","mm..m........m..mm","m......hh........m","....m......m......","..m............m..","......m..m........","...m..........m...","m......hh........m","mm............m.mm","mmm............mmm","mmmm..........mmmm"],
+      "spawns": [[7,10],[8,10],[6,9],[9,9],[5,10],[10,10],[7,9],[8,9]]
+    },
+    "town": {
+      "map": ["hh..rr......rr..hh","....rr..hh..rr....","....rr......rr....","rrrrrrrr..rrrrrrrr","......rr..rr......","..hh..rr..rr..hh..","......rr..rr......","rrrrrrrr..rrrrrrrr","....rr......rr....","....rr..hh..rr....","hh..rr......rr..hh",".................."],
+      "spawns": [[1,9],[2,9],[1,8],[3,10],[4,9],[2,10],[3,8],[4,10]]
+    }
+  },
+  "campaigns": {
+    "sajo": {"after": {
+      "s5": [{
+        "id":"u6b_sj_big_dipper","kind":"battle","source":"canon","layout":"mountain","title":"본편 추가전 一  천강북두진","goldReward":320,
+        "enemies":[{"cid":"mo","x":8,"y":3,"boss":true,"guard":8,"wait":2},{"cid":"qjc","x":7,"y":2},{"cid":"dcd","x":10,"y":3},{"cid":"ycx","x":11,"y":5},{"cid":"wcy","x":9,"y":6},{"cid":"hdt","x":6,"y":6},{"cid":"sbi","x":5,"y":4}],
+        "win":{"type":"boss","boss":"mo","text":"전진칠자의 북두진 돌파"},"deploy":{"cap":6},"sceneTheme":"huashan",
+        "pre":[{"s":"mo","side":"R","t":"곽 소협, 일곱 별의 자리가 서로를 지키는 천강북두진을 직접 겪어 보시오."},{"s":"qjc","side":"R","t":"한 사람만 좇으면 나머지 여섯의 검이 빈틈을 메울 것이오. 진의 흐름을 읽으시오!"},{"s":"gj","side":"L","t":"정면의 강약보다 서로 이어지는 자리를 끊어야 한다는 뜻이군요. 가르침을 받겠습니다!"}],
+        "post":[{"s":"mo","side":"R","t":"훌륭하오. 전진칠자의 힘은 개인이 아니라 서로의 빈틈을 맡는 데 있소."},{"s":"hy","side":"L","t":"일곱 분의 성정이 제각각이어도 진 안에서는 한 몸처럼 움직였어요. 좋은 공부였네요."}]
+      }],
+      "u6_sj_peach_disciples": [{
+        "id":"u6b_sj_returning_disciples","kind":"battle","source":"canon","layout":"field","title":"본편 추가전 二  도화도의 흩어진 문인","goldReward":360,"joins":["lsf","fmf"],"joinLevel":4,
+        "enemies":[{"cid":"msa","x":11,"y":3},{"cid":"msa","x":13,"y":4},{"cid":"gs","x":14,"y":2},{"cid":"sab","x":12,"y":7},{"cid":"dtd","x":15,"y":5,"boss":true,"guard":7,"wait":2}],
+        "win":{"type":"rout","text":"귀운장을 습격한 추격대 격퇴"},"objective":{"type":"all","text":"육승풍·풍묵풍을 지키고 추격대 격퇴","objectives":[{"type":"rout","text":"추격대 전원 격퇴"},{"type":"survive","turns":1,"protect":["lsf","fmf"],"text":"도화도 문인 생존"}]},"deploy":{"cap":7,"forced":["lsf","fmf"]},"sceneTheme":"jiangnan",
+        "pre":[{"s":"lsf","side":"L","t":"귀운장의 수로를 빌려 금국의 추격대를 묶겠습니다. 다리가 성치 않아도 진법은 펼칠 수 있소."},{"s":"fmf","side":"L","t":"사부님께 돌아갈 낯은 없지만 동문이 위험한데 모른 척할 수는 없지."},{"s":"mcp","side":"R","t":"우리를 쫓아낸 도화도가 이제 와 문인을 찾는다고? 먼저 이 포위를 벗어나 보아라!"}],
+        "post":[{"s":"yaksa","side":"L","t":"내 분노로 제자들의 다리를 꺾은 죄는 사라지지 않는다. 오늘부터 그 빚을 내가 짊어지겠다."},{"s":"lsf","side":"L","t":"그 한마디를 듣기까지 너무 오래 걸렸습니다, 사부님."}]
+      }],
+      "u6_sj_beggar_elders": [{
+        "id":"u6b_sj_beggar_assembly","kind":"battle","source":"canon","layout":"town","title":"본편 추가전 三  군산 개방대회","goldReward":380,"joins":["nyg"],"joinLevel":6,
+        "enemies":[{"cid":"gblr","x":11,"y":2},{"cid":"gblr","x":13,"y":3},{"cid":"gblr","x":12,"y":6},{"cid":"gblr","x":15,"y":8},{"cid":"pjr","x":15,"y":4,"boss":true,"guard":9,"wait":1}],
+        "reinforce":[{"turn":3,"msg":"양강의 거짓 명령에 속은 개방 제자들이 합류한다!","units":[{"cid":"gblr","x":16,"y":6},{"cid":"gblr","x":16,"y":9}]}],
+        "win":{"type":"boss","boss":"pjr","text":"팽 장로를 제압해 섭혼술 해제"},"deploy":{"cap":7,"forced":["hy","nyg"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"nyg","side":"L","t":"황 방주를 믿는 제자들이 길을 열겠소. 팽 장로의 섭혼술부터 끊어 주시오!"},{"s":"pjr","side":"R","t":"누가 방주인지는 타구봉이 아니라 오늘 살아남은 자가 정한다!"},{"s":"hy","side":"L","t":"개방의 규율을 훔친 사람에게 타구봉법의 뜻을 보여드리죠."}],
+        "post":[{"s":"hcg","side":"L","t":"옷의 깨끗함과 더러움이 의리를 정하지 않는다. 백성을 먼저 보는 자가 개방의 제자다."},{"s":"nyg","side":"L","t":"새 방주의 명을 받듭니다. 흩어진 제자들을 다시 모으겠습니다."}]
+      }],
+      "u6_sj_qiu_twins": [{
+        "id":"u6b_sj_black_swamp","kind":"battle","source":"canon","layout":"mountain","title":"본편 추가전 四  흑늪의 묵은 원한","goldReward":440,"joins":["djh","yeonggo"],"joinLevel":7,
+        "enemies":[{"cid":"cjb","x":5,"y":3},{"cid":"cjb","x":11,"y":3},{"cid":"cjb","x":4,"y":6},{"cid":"cjb","x":12,"y":6},{"cid":"gcj","x":8,"y":5,"wait":1},{"cid":"gci","x":8,"y":2,"boss":true,"guard":10,"wait":2}],
+        "win":{"type":"subdue","target":"gci","threshold":0.2,"text":"구천인을 HP 20% 이하로 제압"},"deploy":{"cap":7,"forced":["zbt","djh","yeonggo"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"gcj","side":"R","t":"철장수상표가 둘이라 놀랐느냐! 어느 쪽이 진짜인지 맞혀 보아라!"},{"s":"yeonggo","side":"L","t":"허세는 눈빛을 숨기지 못한다. 내 아이를 해친 철장은 구천인, 네놈이다."},{"s":"zbt","side":"L","t":"이번에는 도망치지 않겠어. 영고와 일등 형 앞에서 이 매듭을 끊는다!"}],
+        "post":[{"s":"gci","side":"R","t":"홍칠공의 꾸짖음도, 이 원망도 피하지 않겠다. 일등대사여, 나를 데려가시오."},{"s":"djh","side":"L","t":"자은이라는 새 이름은 죄를 지우는 면죄부가 아니라 갚아 나갈 첫걸음이오."}]
+      }]
+    }},
+    "sinjo": {"after": {
+      "u6_sn_quanzhen_decline": [{
+        "id":"u6b_sn_chongyang_palace","kind":"battle","source":"canon","layout":"hall","title":"본편 추가전 一  중양궁의 그늘","goldReward":350,
+        "enemies":[{"cid":"ydg","x":4,"y":2},{"cid":"ydg","x":13,"y":2},{"cid":"ydg","x":5,"y":5},{"cid":"ydg","x":12,"y":5},{"cid":"lcd","x":6,"y":3},{"cid":"zjg","x":11,"y":3,"boss":true,"guard":9,"wait":2}],
+        "win":{"type":"boss","boss":"zjg","text":"조지경을 제압하고 중양궁 탈출"},"objective":{"type":"all","text":"조지경 제압 및 산문 확보","objectives":[{"type":"boss","boss":"zjg","text":"조지경 제압"},{"type":"seize","tiles":[[8,1]],"text":"중양궁 산문 확보"}]},"deploy":{"cap":5,"forced":["yg"]},"sceneTheme":"huashan",
+        "pre":[{"s":"zjg","side":"R","t":"문규를 어긴 아이에게 전진의 검을 가르쳐 주마. 모두 포위하라!"},{"s":"lcd","side":"R","t":"사형, 저놈을 잡아 몽골군에 넘기면 우리 지위도 단단해질 겁니다."},{"s":"yg","side":"L","t":"왕중양 진인이 세운 문파가 약한 아이 하나를 짓밟는 곳이라면, 내가 그 문을 열고 나가겠다."}],
+        "post":[{"s":"qjc","side":"L","t":"문파의 이름만 지키고 사람을 놓쳤구나. 후대의 잘못도 우리 전진칠자의 책임이다."},{"s":"yg","side":"L","t":"전진에서 배운 호흡은 잊지 않겠습니다. 하지만 제 길은 제가 고르겠습니다."}]
+      }],
+      "u6_sn_wheel_disciples": [{
+        "id":"u6b_sn_wheel_camp","kind":"battle","source":"canon","layout":"field","title":"본편 추가전 二  금륜 문하의 삼색","goldReward":420,
+        "enemies":[{"cid":"mgb","x":11,"y":2},{"cid":"mgs","x":14,"y":3},{"cid":"gwd","x":12,"y":6},{"cid":"dlp","x":10,"y":4},{"cid":"grb","x":15,"y":5,"boss":true,"guard":12,"wait":3}],
+        "win":{"type":"survive","turns":7,"boss":"grb","text":"7턴 버티거나 금륜법왕 격퇴"},"deploy":{"cap":7,"forced":["yg","syn"]},"sceneTheme":"xiangyang",
+        "pre":[{"s":"dlp","side":"R","t":"스승님, 제가 앞에서 저들의 장법을 받아 내겠습니다!"},{"s":"gwd","side":"R","t":"둔한 사형은 방패나 하시오. 빈틈은 내가 취하지."},{"s":"grb","side":"R","t":"한 문하에서도 충직함과 재주는 다르다. 신조협, 네가 그 차이를 견뎌 보아라."}],
+        "post":[{"s":"yg","side":"L","t":"달이파의 힘, 곽도의 잔꾀, 법왕의 내공이 서로 맞물리니 쉽지 않았소."},{"s":"grb","side":"R","t":"다음에는 용상반야공의 진정한 경지를 보여 주마."}]
+      }],
+      "u6_sn_heshiwo": [{
+        "id":"u6b_sn_false_beggar","kind":"battle","source":"canon","layout":"town","title":"본편 추가전 三  하사아의 가면","goldReward":430,
+        "enemies":[{"cid":"gblr","x":11,"y":2},{"cid":"gblr","x":13,"y":3},{"cid":"gblr","x":12,"y":6},{"cid":"mgb","x":15,"y":7},{"cid":"gwd","x":15,"y":4,"boss":true,"guard":10,"wait":2}],
+        "win":{"type":"boss","boss":"gwd","text":"하사아로 숨은 곽도 격파"},"deploy":{"cap":7,"forced":["yg","zbt"]},"sceneTheme":"xiangyang",
+        "pre":[{"s":"gwd","side":"R","t":"나는 개방의 하사아다! 신조협이 장로를 핍박한다! 모두 저자를 쳐라!"},{"s":"zbt","side":"L","t":"얼굴은 속여도 금륜 문하의 발놀림은 못 숨기지. 네놈 곽도 맞잖아!"},{"s":"yg","side":"L","t":"노유각을 해치고 의복까지 훔쳤군. 오늘 그 가면을 벗기겠다."}],
+        "post":[{"s":"dlp","side":"L","t":"곽도! 스승을 배반하고 개방까지 더럽히다니, 더는 동문이라 부르지 않겠다."},{"s":"gwd","side":"R","t":"살아남는 자가 옳은 것이다… 아직 끝나지 않았다!"}]
+      }]
+    }},
+    "uicheon": {"after": {
+      "u6_yt_childhood_road": [{
+        "id":"u6b_yt_cold_poison","kind":"battle","source":"canon","layout":"mountain","title":"본편 추가전 一  한독을 품은 아이","goldReward":300,"joins":["jsam"],"joinLevel":2,
+        "enemies":[{"cid":"ydg","x":5,"y":3},{"cid":"ydg","x":11,"y":3},{"cid":"mgs","x":4,"y":6},{"cid":"hbo","x":7,"y":2,"boss":true,"guard":8,"wait":2},{"cid":"njg","x":10,"y":2,"boss":true,"guard":8,"wait":2}],
+        "win":{"type":"survive","turns":6,"boss":"hbo","text":"6턴 생존하거나 학필옹 격퇴"},"deploy":{"cap":4,"forced":["jmk"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"hbo","side":"R","t":"사손의 행방을 말하면 현명신장의 한기를 거두어 주마."},{"s":"jmk","side":"L","t":"의부님을 팔아 목숨을 구하지 않겠습니다. 이 한독도 제가 견디겠습니다!"},{"s":"jsam","side":"L","t":"무기야, 살아남는 것도 용기다. 호흡을 지키며 여섯 번의 공세를 버텨라."}],
+        "post":[{"s":"jmk","side":"L","t":"한기가 뼛속에 남았지만 환자를 돌보며 독과 병을 배우겠습니다."},{"s":"jsam","side":"L","t":"고통을 아는 마음이 훗날 사람을 살리는 힘이 될 것이다."}]
+      }],
+      "u6_yt_ming_roster": [{
+        "id":"u6b_yt_bright_peak_oath","kind":"battle","source":"canon","layout":"hall","title":"본편 추가전 二  광명정 오행기","goldReward":440,"joins":["yso","fyo","ecj","wis"],"joinLevel":6,
+        "enemies":[{"cid":"ydg","x":4,"y":2},{"cid":"ydg","x":13,"y":2},{"cid":"ydg","x":5,"y":5},{"cid":"ydg","x":12,"y":5},{"cid":"myeoljeol","x":8,"y":1,"boss":true,"guard":9,"wait":2}],
+        "reinforce":[{"turn":3,"msg":"육대문파 후속대가 광명정 회랑으로 진입한다!","units":[{"cid":"ydg","x":2,"y":4},{"cid":"ydg","x":15,"y":4}]}],
+        "win":{"type":"survive","turns":7,"boss":"myeoljeol","text":"명교 수뇌부와 7턴 방어"},"deploy":{"cap":8,"forced":["jmk","yso","fyo","ecj","wis"]},"sceneTheme":"guangming",
+        "pre":[{"s":"yso","side":"L","t":"광명좌사 양소, 교주의 좌익을 맡겠습니다."},{"s":"fyo","side":"L","t":"우사 범요는 적진의 허실을 끊지."},{"s":"ecj","side":"L","t":"백미응왕 은천정의 늙은 발톱이 아직 무디지 않았다!"},{"s":"wis","side":"L","t":"청익복왕 위일소는 오행기의 빈틈을 메우겠다."},{"s":"jmk","side":"L","t":"명교의 모든 형제여, 서로의 자리를 다투지 말고 광명정을 함께 지킵시다!"}],
+        "post":[{"s":"myeoljeol","side":"R","t":"마교라 불린 자들이 서로를 위해 목숨을 거는구나… 오늘은 물러나겠다."},{"s":"jmk","side":"L","t":"이제 명교는 한 사람의 무공이 아니라 모두의 질서로 움직일 것입니다."}]
+      }],
+      "u6_yt_six_sects": [{
+        "id":"u6b_yt_six_sect_rescue","kind":"battle","source":"canon","layout":"town","title":"본편 추가전 三  육대문파 구출전","goldReward":460,
+        "enemies":[{"cid":"gwi","x":11,"y":2},{"cid":"gwi","x":13,"y":3},{"cid":"mgs","x":12,"y":6},{"cid":"hbo","x":15,"y":4,"boss":true,"guard":9,"wait":2},{"cid":"njg","x":15,"y":8,"wait":1}],
+        "win":{"type":"all","text":"현명이로를 제압하고 감옥 문 개방","objectives":[{"type":"boss","boss":"hbo","text":"학필옹 격파"},{"type":"seize","tiles":[[16,1],[16,10]],"text":"남·북 감옥 문 확보"}]},"deploy":{"cap":8,"forced":["jmk","jjy","jsam"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"jmk","side":"L","t":"소림·무당·아미·곤륜·공동·화산의 장문인들이 각기 다른 감옥에 갇혔습니다. 두 문을 함께 열어야 합니다."},{"s":"jjy","side":"L","t":"아미 제자들은 북쪽 감옥을 맡겠습니다. 무당은 남쪽 길을 열어 주세요."},{"s":"hbo","side":"R","t":"원수끼리 손을 잡는다 해도 만안사의 문은 열리지 않는다!"}],
+        "post":[{"s":"jsam","side":"L","t":"문파의 이름보다 백성을 지키는 뜻이 먼저다. 오늘 육대문파가 그것을 배웠구나."},{"s":"jmk","side":"L","t":"다음에는 서로를 멸하기 위해서가 아니라 천하를 돕기 위해 모입시다."}]
+      }]
+    }},
+    "chunryong": {"after": {
+      "u6_tl_beggar_coup": [{
+        "id":"u6b_tl_beggar_coup","kind":"battle","source":"canon","layout":"town","title":"소봉편 추가전 一  개방의 갈라진 타구봉","goldReward":360,
+        "enemies":[{"cid":"gblr","x":11,"y":2},{"cid":"gblr","x":13,"y":3},{"cid":"gblr","x":12,"y":6},{"cid":"pjr","x":15,"y":7},{"cid":"baekse","x":15,"y":4,"boss":true,"guard":9,"wait":2}],
+        "win":{"type":"boss","boss":"baekse","text":"백세경을 제압해 반란의 증거 확보"},"deploy":{"cap":5,"forced":["sb","azu"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"baekse","side":"R","t":"거란인의 피를 품은 자에게 개방을 맡길 수 없다. 장로들이여, 타구봉을 거두어라!"},{"s":"sb","side":"L","t":"내 출생은 심판받겠다. 하지만 강민과 전관청이 만든 거짓으로 형제들을 해치게 둘 수는 없다."},{"s":"azu","side":"L","t":"봉 형님, 장로들의 서신을 찾았어요. 백 부방주를 제압하면 진실을 밝힐 수 있어요."}],
+        "post":[{"s":"sb","side":"L","t":"방주 자리는 내려놓는다. 그러나 개방 형제에게 칼을 겨눈 음모는 여기서 끊겠다."},{"s":"azu","side":"L","t":"이제 신분이 아니라 형님이 걸어온 길을 보고 판단할 사람들이 생길 거예요."}]
+      }],
+      "u6_tl_azhu_azi": [{
+        "id":"u6b_tl_iron_mask","kind":"battle","source":"canon","layout":"field","title":"소봉편 추가전 二  빙잠의 철두인","goldReward":420,"joins":["aja"],"joinLevel":4,
+        "enemies":[{"cid":"gblr","x":11,"y":3},{"cid":"ssj","x":13,"y":4},{"cid":"ssj","x":12,"y":7},{"cid":"ytj","x":15,"y":5,"boss":true,"guard":11,"wait":2}],
+        "win":{"type":"subdue","target":"ytj","threshold":0.18,"text":"유탄지를 HP 18% 이하로 제압"},"deploy":{"cap":5,"forced":["sb","aja"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"aja","side":"L","t":"형부, 저 철가면은 취현장의 유탄지예요. 나를 따라 성수파 독공까지 익혔죠."},{"s":"ytj","side":"R","t":"아자! 나를 버리지 마라. 소봉을 쓰러뜨리면 네가 다시 나를 보아 주겠지!"},{"s":"sb","side":"L","t":"복수와 집착에 몸을 내주지 마라. 아주와의 약속 때문에라도 너희 둘을 죽게 두지 않겠다."}],
+        "post":[{"s":"aja","side":"L","t":"언니는 사람을 살리려 자신을 내놓았는데, 나는 사람을 장난감으로 삼았구나."},{"s":"ytj","side":"R","t":"내가 원한 것은 복수였는지 네 눈길이었는지… 이제 나도 모르겠다."}]
+      }],
+      "u6_tl_duan_zhengchun": [{
+        "id":"u6b_tl_four_villains","kind":"battle","source":"canon","layout":"mountain","title":"단예편 추가전 一  만겁곡 사대악인","goldReward":380,"joins":["djs","mwc","zling"],"joinLevel":3,
+        "enemies":[{"cid":"yyn","x":5,"y":3},{"cid":"ans","x":11,"y":3},{"cid":"wjh","x":12,"y":6},{"cid":"jmg","x":6,"y":6},{"cid":"danyeon","x":8,"y":2,"boss":true,"guard":11,"wait":2}],
+        "win":{"type":"boss","boss":"danyeon","text":"악관만영 단연경 격퇴"},"deploy":{"cap":6,"forced":["dy","djs","mwc","zling"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"danyeon","side":"R","t":"대리의 황통을 훔친 단씨에게 오늘 빚을 받겠다."},{"s":"yyn","side":"R","t":"아이를 잃은 어미의 손이 얼마나 잔혹해지는지 보여 주마."},{"s":"ans","side":"R","t":"말은 그만! 악노삼의 악어가위가 먼저다!"},{"s":"wjh","side":"R","t":"싸움은 형님들이 하시오. 나는 저 미인들을 맡지."},{"s":"djs","side":"L","t":"내가 남긴 인연과 원한은 내가 앞에서 막겠다. 예야, 뒤를 부탁한다."}],
+        "post":[{"s":"dy","side":"L","t":"단연경의 원한도, 아버님의 방황이 남긴 상처도 대리 왕가가 외면해서는 안 됩니다."},{"s":"djs","side":"L","t":"그래. 왕의 체면보다 상처 입은 사람들에게 먼저 사죄해야 한다."}]
+      }],
+      "u6_tl_duanyu_bonds": [{
+        "id":"u6b_tl_mantuo_women","kind":"battle","source":"canon","layout":"town","title":"단예편 추가전 二  만다산장의 선택","goldReward":400,"joins":["way"],"joinLevel":4,
+        "enemies":[{"cid":"myg","x":11,"y":2},{"cid":"myg","x":13,"y":3},{"cid":"mlg","x":12,"y":6},{"cid":"jmg","x":15,"y":8},{"cid":"gmj","x":15,"y":4,"boss":true,"guard":8,"wait":2}],
+        "win":{"type":"all","text":"왕어언을 지키고 추격대 격퇴","objectives":[{"type":"rout","text":"추격대 전원 격퇴"},{"type":"survive","turns":1,"protect":["way","mwc","zling"],"text":"세 사람 생존"}]},"deploy":{"cap":6,"forced":["dy","way","mwc","zling"]},"sceneTheme":"jiangnan",
+        "pre":[{"s":"mwc","side":"L","t":"단예, 이번에는 나를 구하러 온 척하며 왕 낭자만 보지 마시오."},{"s":"zling","side":"L","t":"언니, 다투는 건 나간 뒤에 해요. 독초밭 길은 제가 찾을게요!"},{"s":"way","side":"L","t":"저들의 진은 왼쪽 세 걸음마다 빈틈이 생겨요. 단 공자, 제 말대로 움직이세요."},{"s":"dy","side":"L","t":"세 분 모두의 선택을 존중하겠소. 우선 이 장원을 함께 빠져나갑시다!"}],
+        "post":[{"s":"way","side":"L","t":"무공을 아는 것과 내 삶을 선택하는 일은 다르군요. 이제 사촌 오라버니의 뜻만 따르지 않겠어요."},{"s":"mwc","side":"L","t":"좋소. 우리를 누군가의 전리품처럼 말하는 자부터 베어 버립시다."}]
+      }],
+      "u6_tl_xiaoyao_lineage": [{
+        "id":"u6b_tl_xiaoyao_trial","kind":"battle","source":"canon","layout":"mountain","title":"허죽편 추가전 一  소요삼로의 시험","goldReward":420,"joins":["dy"],"joinLevel":4,
+        "enemies":[{"cid":"ssj","x":5,"y":3},{"cid":"ssj","x":11,"y":3},{"cid":"ichusu","x":6,"y":6,"guard":7},{"cid":"tst","x":10,"y":6,"boss":true,"guard":10,"wait":2}],
+        "win":{"type":"survive","turns":6,"boss":"tst","text":"소요파 두 고수의 시험을 6턴 견딤"},"deploy":{"cap":5,"forced":["hj","dy"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"tst","side":"R","t":"무애자의 내공을 받았다고 영취궁주가 되는 것은 아니다. 천산절매수를 받아 보아라!"},{"s":"ichusu","side":"R","t":"사저와 싸우면서도 사람을 해치지 않을 방법을 찾아야 할 것이다."},{"s":"hj","side":"L","t":"소승은 두 분을 이길 자신은 없습니다. 하지만 물려받은 힘으로 사람을 살리겠습니다!"}],
+        "post":[{"s":"tst","side":"R","t":"우유부단해 보여도 끝까지 사람을 버리지 않는구나. 영취궁의 아이들을 맡길 만하다."},{"s":"ichusu","side":"R","t":"소요파의 갈라진 세월이 네 손에서 다시 이어졌구나."}]
+      }],
+      "u6_tl_lingjiu": [{
+        "id":"u6b_tl_lingjiu_revolt","kind":"battle","source":"canon","layout":"hall","title":"허죽편 추가전 二  영취궁 삼십육동","goldReward":430,"joins":["tst"],"joinLevel":5,
+        "enemies":[{"cid":"shb","x":4,"y":2},{"cid":"shb","x":13,"y":2},{"cid":"gunung","x":5,"y":5},{"cid":"gunung","x":12,"y":5},{"cid":"drb","x":8,"y":1,"boss":true,"guard":10,"wait":2}],
+        "reinforce":[{"turn":3,"msg":"칠십이도 도주들이 영취궁 회랑을 포위한다!","units":[{"cid":"gunung","x":2,"y":4},{"cid":"gunung","x":15,"y":4}]}],
+        "win":{"type":"survive","turns":7,"boss":"drb","text":"7턴 방어하며 생사부의 진실 전달"},"deploy":{"cap":6,"forced":["hj","tst"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"drb","side":"R","t":"생사부로 우리를 부린 영취궁을 오늘 무너뜨린다! 새 궁주도 함께 끌어내려라!"},{"s":"hj","side":"L","t":"여러분의 고통은 옳습니다. 싸움을 멈추면 생사부를 하나씩 풀어 드리겠습니다."},{"s":null,"t":"허죽은 적을 죽이지 않고 일곱 차례 공세를 견뎌 약속을 증명해야 한다."}],
+        "post":[{"s":"hj","side":"L","t":"영취궁은 두려움으로 사람을 묶지 않겠습니다. 해약과 무공을 함께 나누겠습니다."},{"s":"drb","side":"R","t":"힘으로 복종을 요구하지 않는 궁주라… 이번 한 번은 믿어 보겠다."}]
+      }],
+      "u6_tl_xingxiu_youtanzhi": [{
+        "id":"u6b_tl_xingxiu_purge","kind":"battle","source":"canon","layout":"field","title":"허죽편 추가전 三  성수해의 독무","goldReward":470,"joins":["aja"],"joinLevel":5,
+        "enemies":[{"cid":"ssj","x":11,"y":2},{"cid":"ssj","x":13,"y":3},{"cid":"ssj","x":12,"y":7},{"cid":"ytj","x":10,"y":5,"wait":1},{"cid":"jcc","x":15,"y":5,"boss":true,"guard":12,"wait":2}],
+        "win":{"type":"boss","boss":"jcc","text":"정춘추 격파"},"deploy":{"cap":6,"forced":["hj","aja"]},"sceneTheme":"jianghu",
+        "pre":[{"s":"jcc","side":"R","t":"아첨하는 자가 높은 자리에 오르는 것이 성수파의 법이다. 독무 속에서 서로를 밟아라!"},{"s":"aja","side":"L","t":"그 법을 배워 사람을 괴롭힌 건 나예요. 하지만 오늘은 내 손으로 끊겠어요."},{"s":"ytj","side":"R","t":"아자가 가는 곳이라면 독바다라도 따른다. 누구도 막지 마라!"},{"s":"hj","side":"L","t":"유 공자도 독의 희생자입니다. 정춘추를 먼저 막고 모두를 살릴 길을 찾겠습니다."}],
+        "post":[{"s":"jcc","side":"R","t":"제자들이 나를 떠나다니… 성수노선의 법이 틀렸단 말이냐!"},{"s":"aja","side":"L","t":"두려움과 아첨으로 세운 문파는 사부가 쓰러지는 순간 끝나요."},{"s":"hj","side":"L","t":"독을 익힌 손도 해독약을 만들 수 있습니다. 이제부터 무엇을 할지 선택하십시오."}]
+      }]
+    }}
+  }
+}

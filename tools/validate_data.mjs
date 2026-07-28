@@ -53,6 +53,7 @@ const PUNGREUNG = J('stages_pungreung.json');
 const ITEMS = J('items.json');
 const CAMPAIGN_MANIFEST = J('campaigns.json');
 const STORY_EXPANSIONS = J('story_expansions.json');
+const BATTLE_EXPANSIONS = J('battle_expansions.json');
 const BATTLE_UPDATES = J('battle_updates.json');
 const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
 const MAIN_CAMPAIGNS = new Set(['sajo','sinjo','uicheon','chunryong']);
@@ -81,6 +82,28 @@ const U6_STORY_MIN={sajo:5,sinjo:4,uicheon:4,chunryong:8};
 for(const [campId,min] of Object.entries(U6_STORY_MIN)){
   const nodes=Object.values(STORY_EXPANSIONS.campaigns[campId]?.after||{}).flat().filter(node=>node.id?.startsWith('u6_'));
   if(nodes.length<min) errs.push(`${campId}: U6 story scenes ${nodes.length} < ${min}`);
+}
+for (const [campId,pack] of Object.entries(BATTLE_EXPANSIONS.campaigns||{})) {
+  const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
+  if(!camp){ errs.push(`battle expansion unknown campaign ${campId}`); continue; }
+  for(const [anchorId,defs] of Object.entries(pack.after||{})){
+    const anchor=camp.stages[anchorId];
+    if(!anchor||typeof anchor.next!=='string'){ errs.push(`${campId}: battle expansion anchor invalid ${anchorId}`); continue; }
+    const oldNext=anchor.next, ids=defs.map(d=>d.id);
+    anchor.next=ids[0]||oldNext;
+    defs.forEach((raw,i)=>{
+      const layout=BATTLE_EXPANSIONS.layouts[raw.layout];
+      if(!layout) errs.push(`${campId}/${raw.id}: unknown battle layout ${raw.layout}`);
+      camp.stages[raw.id]={...JSON.parse(JSON.stringify(layout||{})),...JSON.parse(JSON.stringify(raw)),next:ids[i+1]||oldNext};
+    });
+    const pos=camp.order.indexOf(anchorId);
+    if(pos>=0) camp.order.splice(pos+1,0,...ids);
+  }
+}
+const U6_BATTLE_MIN={sajo:4,sinjo:3,uicheon:3,chunryong:7};
+for(const [campId,min] of Object.entries(U6_BATTLE_MIN)){
+  const nodes=Object.values(BATTLE_EXPANSIONS.campaigns[campId]?.after||{}).flat();
+  if(nodes.length<min) errs.push(`${campId}: U6 battle scenes ${nodes.length} < ${min}`);
 }
 {
   const w2=WOLNYEO.stages.w2.enemies.find(enemy=>enemy.boss), w3=WOLNYEO.stages.w3.enemies.find(enemy=>enemy.boss);
@@ -121,6 +144,7 @@ for (const CAMP of CAMPAIGN_FILES) {
     if (n.options) n.options.forEach(o => targets.push(o.to));
     edges.set(id, targets.filter(Boolean));
     (n.joins || []).forEach(j => { if (!CHARS[j]) errs.push(`${tag} joins unknown ${j}`); });
+    if(n.joinLevel!==undefined&&(!Number.isInteger(n.joinLevel)||n.joinLevel<1||n.joinLevel>20)) errs.push(`${tag} joinLevel invalid ${n.joinLevel}`);
     if(n.source&&!['canon','short-story','recollection','original','noncanon'].includes(n.source)) errs.push(`${tag}: invalid source ${n.source}`);
     [...(n.pre || []), ...(n.post || [])].forEach((d, i) => { if (d.s && !CHARS[d.s]) errs.push(`${tag} dlg${i}: unknown speaker ${d.s}`); if(!d.t) errs.push(`${tag} dlg${i}: empty text`); });
     targets.forEach(t => { if (!S[t]) errs.push(`${tag}: next 대상 없음 ${t}`); });
@@ -196,8 +220,10 @@ if(new Set(portraitIds).size!==portraitIds.length) errs.push('portrait ids conta
 for(const cid of Object.keys(CHARS)) if(!portraitIds.includes(cid)) errs.push(`portrait coverage missing ${cid}`);
 for(const cid of portraitIds){
   if(!CHARS[cid]) errs.push(`portrait unknown character ${cid}`);
+  const source=(PORTRAITS.aliases&&PORTRAITS.aliases[cid])||cid;
+  if(PORTRAITS.aliases&&PORTRAITS.aliases[cid]&&!portraitIds.includes(source)) errs.push(`portrait ${cid}: alias target unknown ${source}`);
   for(const [size,maxBytes] of [['hero',220*1024],['thumb',30*1024]]){
-    const url=new URL(`../public/portraits/${size}/${cid}.webp`,import.meta.url);
+    const url=new URL(`../public/portraits/${size}/${source}.webp`,import.meta.url);
     if(!fs.existsSync(url)){ errs.push(`portrait ${cid}: ${size} file missing`); continue; }
     const bytes=fs.statSync(url).size;
     if(bytes>maxBytes) errs.push(`portrait ${cid}: ${size} ${bytes} bytes exceeds ${maxBytes}`);

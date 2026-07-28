@@ -49,6 +49,25 @@ test('U6 enriches all four main campaigns with the requested ensembles', async (
   expect(report.heroine.slice(0,7)).toEqual([30,10,6,8,7,11,10]);
 });
 
+test('U6 ensemble additions are playable battles, not dialogue-only scenes', async ({ page }) => {
+  const report=await page.evaluate(() => {
+    const ids=['sajo','sinjo','uicheon','chunryong'];
+    const stages=Object.fromEntries(ids.map(id=>[id,Object.values(window.__dbg.CAMPAIGNS[id].stages)]));
+    return {
+      counts:Object.fromEntries(ids.map(id=>[id,stages[id].filter(stage=>stage.kind==='battle'&&stage.id?.startsWith('u6b_')).length])),
+      deployed:Object.values(stages).flat().filter(stage=>stage.kind==='battle'&&stage.id?.startsWith('u6b_')).flatMap(stage=>[
+        ...(stage.enemies||[]).map(enemy=>enemy.cid), ...(stage.joins||[]), ...(stage.deploy?.forced||[]),
+      ]),
+      named:['qjc','sbi','lsf','gcj','zjg','dlp','yso','ecj','yyn','ans','wjh','djs','aja','ytj','tst'].map(cid=>window.__dbg.CHARS[cid]?.name),
+      aliasPortrait:window.__dbg.premiumPortraitURL('qjc','hero'),
+    };
+  });
+  expect(report.counts).toEqual({sajo:4,sinjo:3,uicheon:3,chunryong:7});
+  expect(report.deployed).toEqual(expect.arrayContaining(['qjc','sbi','gci','zjg','dlp','yso','yyn','ans','wjh','ytj','tst','jcc']));
+  expect(report.named).toEqual(['구처기','손불이','육승풍','구천장','조지경','달이파','양소','은천정','엽이낭','악노삼','운중학','단정순','아자','유탄지','천산동모']);
+  expect(report.aliasPortrait).toMatch(/portraits\/hero\/wjy\.webp$/);
+});
+
 test('Tianlong default ending is canon while survival endings stay IF-only', async ({ page }) => {
   const route=await page.evaluate(() => {
     const stages=window.__dbg.CAMPAIGNS.chunryong.stages;

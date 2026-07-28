@@ -12,6 +12,7 @@ import HWALSA from './data/stages_hwalsa.json';
 import PUNGREUNG from './data/stages_pungreung.json';
 import CAMPAIGN_MANIFEST from './data/campaigns.json';
 import STORY_EXPANSIONS from './data/story_expansions.json';
+import BATTLE_EXPANSIONS from './data/battle_expansions.json';
 import BATTLE_UPDATES from './data/battle_updates.json';
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -61,6 +62,26 @@ function applyBattleUpdates(registry){
   }
 }
 
+function applyBattleExpansions(registry){
+  const layouts=BATTLE_EXPANSIONS.layouts||{};
+  for(const [campId,pack] of Object.entries(BATTLE_EXPANSIONS.campaigns||{})){
+    const camp=registry[campId]; if(!camp) continue;
+    for(const [anchorId,defs] of Object.entries(pack.after||{})){
+      const anchor=camp.stages[anchorId];
+      if(!anchor||typeof anchor.next!=='string'||!Array.isArray(defs)||!defs.length) continue;
+      const oldNext=anchor.next, ids=defs.map(d=>d.id);
+      if(ids.some(id=>camp.stages[id])) continue;
+      anchor.next=ids[0];
+      defs.forEach((raw,i)=>{
+        const layout=layouts[raw.layout]||{};
+        camp.stages[raw.id]={...clone(layout),...clone(raw),next:ids[i+1]||oldNext};
+      });
+      const pos=camp.order.indexOf(anchorId);
+      if(pos>=0) camp.order.splice(pos+1,0,...ids);
+    }
+  }
+}
+
 export function createCampaignRegistry(){
   const registry={
     sajo:clone(SAJO), sinjo:clone(SINJO), uicheon:clone(UICHEON), chunryong:clone(CHUNRYONG),
@@ -69,6 +90,7 @@ export function createCampaignRegistry(){
     chronicle:makeChronicleCampaign(),
   };
   applyStoryExpansions(registry);
+  applyBattleExpansions(registry);
   applyBattleUpdates(registry);
   return registry;
 }
