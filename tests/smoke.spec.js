@@ -338,18 +338,33 @@ test('manual update prompt is readable and dismissible', async ({ page }) => {
   await expect(notice).toHaveCount(0);
 });
 
-test('seeded roam creates a ten-node route and enters deployment', async ({ page }, testInfo) => {
+test('seeded roam creates a 12-15 node route and opens actions on the first unit tap', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: /도전과 회상/ }).click();
   await page.getByRole('button', { name: /유람 시작/ }).click();
   await page.getByLabel('시드 코드').fill('R17-SMOKE');
   await page.getByRole('button', { name: '새 유람' }).click();
   await expect(page.getByText('SEED R17-SMOKE')).toBeVisible();
-  await expect(page.locator('.roam-node')).toHaveCount(10);
+  const nodeCount=await page.locator('.roam-node').count();
+  expect(nodeCount).toBeGreaterThanOrEqual(12);
+  expect(nodeCount).toBeLessThanOrEqual(15);
   await expect(page.locator('.roam-party span')).toHaveCount(4);
+  const nodeTypes=await page.evaluate(() => window.__dbg.challengeState.nodes);
+  expect(nodeTypes).toEqual(expect.arrayContaining(['shop','faction','camp','event','battle','boss']));
   await page.getByRole('button', { name: '격전으로' }).click();
   await expect(page.getByRole('heading', { name: /출전 준비/ })).toBeVisible();
   await expect(page.getByText(/승리 조건: 습격자 격파/)).toBeVisible();
   await page.getByRole('button', { name: '출 전 !' }).click();
+  const firstUid=await page.evaluate(() => window.__dbg.B.units.find(unit=>unit.team==='P').uid);
+  await page.locator(`#ug-${firstUid}`).click();
+  const actionMenu=page.getByRole('menu');
+  await expect(actionMenu).toBeVisible();
+  await expect(actionMenu).toHaveAttribute('aria-label',/행동$/);
+  await expect(actionMenu.getByRole('button',{name:'이동'})).toBeVisible();
+  await actionMenu.getByRole('button',{name:'이동'}).click();
+  await expect(actionMenu).toHaveCount(0);
+  expect(await page.evaluate(() => window.__dbg.B.mode)).toBe('move');
+  await page.evaluate(() => window.uiCancel());
+  expect(await page.evaluate(() => window.__dbg.B.sel)).toBeNull();
   await expect(page.locator('.intent-mark')).toHaveCount(5);
   await expect(page.locator('.intent-mark text')).toHaveCount(0);
   await expect(page.locator('.intent-mark title').first()).toHaveText(/공격 예고|이동 예고|대기 예고/);
@@ -380,6 +395,43 @@ test('seeded roam creates a ten-node route and enters deployment', async ({ page
   await expect(page.getByRole('heading',{name:'유람 중 패배'})).toBeVisible();
   await page.getByRole('button',{name:'재도전'}).click();
   await expect(page.getByRole('heading',{name:/출전 준비/})).toBeVisible();
+});
+
+test('R17 roam shop, faction build, and completion legends persist', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button', { name: /도전과 회상/ }).click();
+  await page.getByRole('button', { name: /유람 시작/ }).click();
+  await page.getByLabel('시드 코드').fill('R17-BUILD');
+  await page.getByRole('button', { name: '새 유람' }).click();
+
+  const shopPos=await page.evaluate(() => window.__dbg.challengeState.nodes.indexOf('shop'));
+  await page.evaluate(pos => { window.__dbg.challengeState.pos=pos; window.showRoamMap(); },shopPos);
+  await page.getByRole('button',{name:'장터로'}).click();
+  const beforeShop=await page.evaluate(() => ({coins:window.__dbg.challengeState.coins,stats:{...window.__dbg.G.roster[window.__dbg.G.party[0]].stats}}));
+  const relic=page.locator('.roam-shop-item:not([disabled])').first();
+  await relic.click();
+  const afterShop=await page.evaluate(() => ({coins:window.__dbg.challengeState.coins,relics:window.__dbg.challengeState.relics,stats:{...window.__dbg.G.roster[window.__dbg.G.party[0]].stats}}));
+  expect(afterShop.coins).toBeLessThan(beforeShop.coins);
+  expect(afterShop.relics).toHaveLength(1);
+  expect(Object.keys(afterShop.stats).some(key=>afterShop.stats[key]>beforeShop.stats[key])).toBe(true);
+
+  const factionPos=await page.evaluate(() => window.__dbg.challengeState.nodes.indexOf('faction'));
+  await page.evaluate(pos => { window.__dbg.challengeState.pos=pos; window.showRoamMap(); },factionPos);
+  await page.getByRole('button',{name:'문파 사건으로'}).click();
+  await page.getByRole('button',{name:/함께 지킨다/}).click();
+  const faction=await page.evaluate(() => window.__dbg.challengeState.factions);
+  expect(Math.max(...Object.values(faction))).toBe(2);
+
+  await page.evaluate(() => { const run=window.__dbg.challengeState;run.pos=run.nodes.length-1;window.showRoamMap(); });
+  await page.getByRole('button',{name:'고수에게'}).click();
+  await page.getByRole('button',{name:'출 전 !'}).click();
+  await page.evaluate(() => { window.__dbg.B.units.filter(unit=>unit.team==='E').forEach(unit=>{unit.alive=false;});window.__dbg.winCheck(); });
+  await expect(page.getByRole('heading',{name:'강호에 이름을 남기다'})).toBeVisible();
+  await expect(page.locator('.legend-card')).toHaveCount(4);
+  const legends=await page.evaluate(() => window.__dbg.roamProbe().legends);
+  expect(legends).toHaveLength(4);
+  expect(legends.every(item=>item.title&&item.scar&&item.seed==='R17-BUILD')).toBe(true);
 });
 
 test('legacy classic save is copied into the unified chronicle', async ({ page }) => {

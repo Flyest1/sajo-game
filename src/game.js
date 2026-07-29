@@ -8,6 +8,7 @@ import { createSessionRuntime } from './runtime.js';
 import { initModalAccessibility, handleModalKeydown } from './ui-accessibility.js';
 import { makeCampaignCheckpoint, appendCheckpoint, checkpointById } from './checkpoints.js';
 import { loadMotion, killMotionTriggers } from './motion.js';
+import { ROAM_RELICS, ROAM_NODE_META, buildRoamNodes, relicOffers, applyRelic, legendFor } from './roam.js';
 import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
@@ -248,6 +249,7 @@ async function animateChronicleScreen(){
 }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const deepClone = o => JSON.parse(JSON.stringify(o));
+const escHtml = value => String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const dist = (a,b) => Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 
 function statObj(base){
@@ -707,8 +709,9 @@ function clearSel(){
 }
 function selectUnit(u){
   SFX.play('select');
-  B.sel=u; B.orig={x:u.x,y:u.y}; B.mode='move'; B.mr=moveRange(u); B.inspect=null;
+  B.sel=u; B.orig={x:u.x,y:u.y}; B.mode='menu'; B.mr=moveRange(u); B.inspect=null;
   renderBattle();
+  openMenu();
 }
 function inspectEnemy(u){
   if(B.inspect===u){ B.inspect=null; B.mr=null; }
@@ -810,8 +813,12 @@ function toggleThreats(){
 }
 
 function onTile(x,y){
-  if(!B||B.busy||B.over||B.phase!=='P') return;
+  if(!B||B.over||B.phase!=='P') return;
   const u=unitAt(x,y);
+  if(B.busy){
+    if(B.queueInput&&u&&u.team==='P'&&!u.acted) B.queuedUnit=u.uid;
+    return;
+  }
   B.tileSel={x,y};
   if(u) UCARD_HIDE=false; /* 유닛 클릭 → 팝업 카드 다시 표시 */
   if(B.mode==='idle'){
@@ -858,9 +865,10 @@ function finishUnit(u){
 /* ── 액션 메뉴 ── */
 function openMenu(){
   const u=B.sel; hideMenu();
+  if(!u||!u.alive||u.acted||B.phase!=='P') return;
   const campaign=SESSION.campaign();
   const enemiesNear=foes().filter(e=>u.range.includes(dist(u,e)));
-  let html='';
+  let html=`<button class="btn" onclick="menuAct('move')">이동</button>`;
   if(enemiesNear.length) html+=`<button class="btn" onclick="menuAct('attack')">공격</button>`;
   u.skills.forEach((sid,i)=>{
     const sk=SKILLS[sid];
@@ -884,10 +892,10 @@ function openMenu(){
   html+=`<button class="btn" onclick="menuAct('wait')">대기</button>`;
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
-  m.id='amenu'; m.innerHTML=html;
+  m.id='amenu'; m.setAttribute('role','menu'); m.setAttribute('aria-label',`${u.name} 행동`); m.innerHTML=html;
   const sizer=document.getElementById('mapsizer')||document.getElementById('mapwrap');
   const sc=mapScale();
-  const menuW=165, menuH=60+u.skills.length*38+80;
+  const menuW=165, menuH=12+m.querySelectorAll('button').length*38;
   let mx=((u.x+1)*TS+6)*sc, my=(u.y*TS-10)*sc;
   if(mx>B.w*TS*sc-menuW) mx=Math.max(2,u.x*TS*sc-menuW);
   my=Math.max(4,Math.min(my,Math.max(4,B.h*TS*sc-menuH)));
@@ -899,6 +907,7 @@ function menuAct(act,idx){
   SFX.play('ui');
   const u=B.sel;
   if(act==='cancel'){ clearSel(); return; }
+  if(act==='move'){ hideMenu(); B.mode='move'; B.mr=moveRange(u); renderBattle(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
   hideMenu();
   if(act==='tool'){ openToolMenu(u); return; }
@@ -958,6 +967,7 @@ function confirmAttack(){
 /* ── 턴 진행 ── */
 async function startPlayerPhase(first){
   if(B.over) return;
+  B.queueInput=true;
   if(!first) B.turn++;
   const ch=curCh();
   /* 방어전: 규정 턴을 버티면 승리 */
@@ -987,7 +997,10 @@ async function startPlayerPhase(first){
   await banner(`아군 페이즈 — ${B.turn}턴`);
   if(!B) return; /* 배너 대기 중 타이틀 이탈 가드 */
   B.busy=false;
-  renderSide();
+  B.queueInput=false;
+  const queued=B.units.find(u=>u.uid===B.queuedUnit&&u.alive&&u.team==='P'&&!u.acted);
+  B.queuedUnit=null;
+  if(queued) selectUnit(queued); else renderSide();
 }
 function endPlayerPhase(){
   if(!B||B.over||B.phase!=='P'||B.busy) return;
@@ -1068,7 +1081,7 @@ function startBattle(){
     map, w:W, h:map.length,
     units:[], turn:1, phase:'P', mode:'idle',
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
-    busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null,
+    busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null, queuedUnit:null, queueInput:true,
     intents:{}, showThreats:true, joints:{},
     diff:ctx.difficulty,
     weather:pickWeather(),
@@ -1855,6 +1868,8 @@ function showDefeat(){
   }
   if(outcome==='roam'){
     const challenge=SESSION.challenge();
+    challenge.falls=(challenge.falls||0)+1;
+    challenge.scars=[...new Set([...(challenge.scars||[]),...(B?.units||[]).filter(u=>u.team==='P'&&!u.alive).map(u=>u.cid)])];
     challenge.ch=null; saveRoam();
     app().innerHTML=`<div class="result-screen">${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">유람 중 패배</h2><p>이 노드에 들어오기 전 기록에서 다시 도전할 수 있습니다.</p><button class="btn" onclick="enterRoamNode()">재도전</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
     return;
@@ -1966,7 +1981,7 @@ function showSaveHub(){
       <td><button class="btn small" onclick="hubContinue('campaign','${id}')">이어하기</button></td></tr>`);
   }
   const roam=V3STORE.challenges.roam||{};
-  if(roam.current) rows.push(`<tr><td style="text-align:left"><b>강호유람</b><div class="hub-sub">시드 ${roam.current.seed} · ${roam.current.pos||0}/10 노드</div></td>
+  if(roam.current) rows.push(`<tr><td style="text-align:left"><b>강호유람</b><div class="hub-sub">시드 ${escHtml(roam.current.seed)} · ${roam.current.pos||0}/${roam.current.nodes?.length||10} 노드</div></td>
     <td><button class="btn small" onclick="hubContinue('roam')">이어하기</button></td></tr>`);
   if(bestWave()>0){
     rows.push(`<tr><td style="text-align:left"><b>영웅집결 무한 모드</b><div class="hub-sub">역대 최고 ${bestWave()}파</div></td>
@@ -2104,15 +2119,23 @@ function nextWave(w){
   showDeploy();
 }
 
-/* ── 강호유람: 10노드 시드형 원정 ── */
+/* ── 강호유람: 12~15노드 시드형 원정 ── */
 function seededRng(seed){ let a=strSeed(String(seed))||1; return ()=>{ a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296; }; }
 function shuffleSeeded(arr,rng){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr; }
-function roamNodes(seed){
-  const rng=seededRng(seed), middle=shuffleSeeded(['event','battle','camp','battle','event','battle','camp','battle'],rng);
-  return ['battle',...middle,'boss'];
+function roamNodes(seed){ return buildRoamNodes(seededRng(`${seed}:route`)); }
+function normalizeRoam(run){
+  run.boons=Array.isArray(run.boons)?run.boons:[];
+  run.relics=Array.isArray(run.relics)?run.relics:[];
+  run.coins=Number.isFinite(run.coins)?run.coins:6;
+  run.factions=run.factions&&typeof run.factions==='object'?run.factions:{};
+  run.scars=Array.isArray(run.scars)?run.scars:[];
+  run.falls=Number.isFinite(run.falls)?run.falls:0;
+  run.victories=Number.isFinite(run.victories)?run.victories:0;
+  return run;
 }
 function saveRoam(){
   if(!SESSION.challengeState||SESSION.challengeState.mode!=='roam') return;
+  normalizeRoam(SESSION.challengeState);
   markPlay('roam');
   const {ch,...run}=SESSION.challengeState;
   V3STORE.challenges.roam=V3STORE.challenges.roam||{};
@@ -2121,7 +2144,8 @@ function saveRoam(){
 }
 function showRoamStart(){
   const saved=V3STORE.challenges.roam&&V3STORE.challenges.roam.current;
-  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="roam-modal"><div class="modal"><h3>강호유람</h3><p class="modal-note">같은 시드 코드는 같은 동료 후보와 노드 순서를 만듭니다.</p><input id="roam-seed" class="seed-input" maxlength="20" value="${new Date().toISOString().slice(0,10).replaceAll('-','')}" aria-label="시드 코드"><div class="btnrow"><button class="btn" onclick="startRoamFromInput()">새 유람</button>${saved?'<button class="btn" onclick="resumeRoam()">이어하기</button>':''}<button class="btn danger" onclick="document.getElementById('roam-modal').remove()">취소</button></div></div></div>`);
+  const legends=(V3STORE.challenges.roam&&V3STORE.challenges.roam.legends)||[];
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="roam-modal"><div class="modal"><h3>강호유람</h3><p class="modal-note">같은 시드는 같은 4인 후보·12~15개 노드·장터 물품을 만듭니다. 기연과 보물로 이번 원정만의 전투 빌드를 완성하세요.</p><input id="roam-seed" class="seed-input" maxlength="20" value="${new Date().toISOString().slice(0,10).replaceAll('-','')}" aria-label="시드 코드"><div class="btnrow"><button class="btn" onclick="startRoamFromInput()">새 유람</button>${saved?'<button class="btn" onclick="resumeRoam()">이어하기</button>':''}${legends.length?'<button class="btn" onclick="showRoamLegends()">강호전설</button>':''}<button class="btn danger" onclick="document.getElementById('roam-modal').remove()">취소</button></div></div></div>`);
 }
 function startRoamFromInput(){ const el=document.getElementById('roam-seed'); startRoam((el&&el.value)||Date.now().toString(36)); }
 function startRoam(seed){
@@ -2130,13 +2154,14 @@ function startRoam(seed){
   const rng=seededRng(seed+':party');
   const allies=shuffleSeeded(Object.keys(CHARS).filter(id=>!ENEMY_IDS.has(id)&&!CHARS[id].npc),rng).slice(0,4);
   for(const cid of allies){ initRosterChar(cid); const r=G.roster[cid]; for(let i=1;i<8;i++) rosterLevelUp(r); }
-  SESSION.activateChallenge({mode:'roam',seed:String(seed),pos:0,nodes:roamNodes(seed),boons:[],diff:SETTINGS.diff,ch:null});
+  SESSION.activateChallenge({mode:'roam',seed:String(seed),pos:0,nodes:roamNodes(seed),boons:[],relics:[],coins:6,factions:{},scars:[],falls:0,victories:0,diff:SETTINGS.diff,ch:null});
   saveRoam(); showRoamMap();
 }
 function resumeRoam(){
   const s=V3STORE.challenges.roam&&V3STORE.challenges.roam.current; if(!s)return;
   const m=document.getElementById('roam-modal'); if(m)m.remove();
-  B=null;SESSION.activateChallenge({mode:'roam',seed:s.seed,pos:s.pos,nodes:s.nodes,boons:s.boons||[],diff:s.diff||SETTINGS.diff,ch:null});
+  const {roster,party,extra,deploy,...savedRun}=deepClone(s);
+  B=null;SESSION.activateChallenge(normalizeRoam({mode:'roam',...savedRun,diff:s.diff||SETTINGS.diff,ch:null}));
   G.roster=deepClone(s.roster);G.party=deepClone(s.party);G.extraSkills=deepClone(s.extra||{});G.deploy=deepClone(s.deploy||null);
   showRoamMap();
 }
@@ -2151,32 +2176,78 @@ function makeRoamBattle(pos,boss){
   return {no:6+pos,title:boss?'강호유람 — 천하 고수':'강호유람 — 길 위의 습격',joins:[],map:base.map,spawns:base.spawns,enemies,win:{type:'rout',text:boss?'천하 고수와 수하 격파':'습격자 격파'},lose:'원정대가 전멸하면 패배',pre:[],post:[]};
 }
 function showRoamMap(){
-  const labels={battle:'격전',event:'기연',camp:'객잔',boss:'고수'};
-  const nodes=SESSION.challengeState.nodes.map((n,i)=>`<div class="roam-node ${i<SESSION.challengeState.pos?'done':i===SESSION.challengeState.pos?'cur':'lock'}"><i>${i<SESSION.challengeState.pos?'✓':i+1}</i><b>${labels[n]}</b></div>`).join('<span class="roam-line"></span>');
-  const destination={battle:'격전으로',event:'기연으로',camp:'객잔으로',boss:'고수에게'}[SESSION.challengeState.nodes[SESSION.challengeState.pos]];
-  app().innerHTML=`<div class="result-screen roam-screen"><div class="eyebrow">SEED ${SESSION.challengeState.seed}</div><h2>강호유람</h2><div class="roam-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="roam-path">${nodes}</div><p>기연과 객잔에서 얻은 선택은 이 원정에만 남습니다.<br>${SESSION.challengeState.boons.length?'기연: '+SESSION.challengeState.boons.join(' · '):'아직 얻은 기연이 없습니다.'}</p><button class="btn" onclick="enterRoamNode()">${destination}</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
+  const run=normalizeRoam(SESSION.challengeState);
+  const nodes=run.nodes.map((n,i)=>`<div class="roam-node ${i<run.pos?'done':i===run.pos?'cur':'lock'}"><i>${i<run.pos?'✓':i+1}</i><b>${ROAM_NODE_META[n]?.label||n}</b></div>`).join('<span class="roam-line"></span>');
+  const type=run.nodes[run.pos], destination=ROAM_NODE_META[type]?.action||'계속';
+  const relicText=run.relics.length?run.relics.map(id=>ROAM_RELICS[id]?.name).filter(Boolean).join(' · '):'아직 지닌 보물이 없습니다.';
+  const factionText=Object.entries(run.factions).filter(([,v])=>v>0).map(([k,v])=>`${k} ${v}`).join(' · ')||'아직 인연을 맺은 문파가 없습니다.';
+  app().innerHTML=`<div class="result-screen roam-screen"><div class="eyebrow">SEED ${escHtml(run.seed)}</div><h2>강호유람</h2><div class="roam-summary"><b>노정 ${run.pos}/${run.nodes.length}</b><b>엽전 ${run.coins}</b><b>승전 ${run.victories}</b></div><div class="roam-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="roam-path">${nodes}</div><div class="roam-build"><p><b>기연</b>${run.boons.join(' · ')||'없음'}</p><p><b>보물</b>${relicText}</p><p><b>문파</b>${factionText}</p></div><button class="btn" onclick="enterRoamNode()">${destination}</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
 }
 function enterRoamNode(){
   const type=SESSION.challengeState.nodes[SESSION.challengeState.pos];
   if(type==='battle'||type==='boss'){SESSION.challengeState.ch=makeRoamBattle(SESSION.challengeState.pos,type==='boss');saveRoam();showDeploy();return;}
   if(type==='camp'){
-    app().innerHTML=`<div class="result-screen"><h2>客棧 객잔</h2><p>따뜻한 국물과 등불 아래, 다음 길을 준비한다.</p><button class="btn" onclick="roamChoice('train')">밤새 수련 — 전원 Lv.+1</button><button class="btn" onclick="roamChoice('rest')">운기조식 — 전원 HP·기력 +3</button></div>`;
-  }else{
+    app().innerHTML=`<div class="result-screen roam-event"><h2>客棧 객잔</h2><p>따뜻한 국물과 등불 아래, 다음 길을 준비한다.</p><button class="btn" onclick="roamChoice('train')">밤새 수련 — 전원 Lv.+1</button><button class="btn" onclick="roamChoice('rest')">운기조식 — 전원 최대 HP·기력 +3</button></div>`;
+  }else if(type==='event'){
     app().innerHTML=`<div class="result-screen"><h2>奇緣 길 위의 기연</h2><p>낡은 비급 한 장과 묵직한 호신부가 놓여 있다. 하나만 취할 수 있다.</p><button class="btn" onclick="roamChoice('power')">비급 — 힘·내공 +2</button><button class="btn" onclick="roamChoice('guard')">호신부 — 방어·정신 +2</button></div>`;
-  }
+  }else if(type==='shop') showRoamShop();
+  else if(type==='faction') showRoamFaction();
 }
 function roamChoice(kind){
   const label={train:'수련',rest:'운기조식',power:'잔결 비급',guard:'호신부'}[kind];SESSION.challengeState.boons.push(label);
   for(const cid of G.party){const r=G.roster[cid];if(kind==='train')rosterLevelUp(r);if(kind==='rest'){r.stats.hp+=3;r.stats.ki+=3;}if(kind==='power'){r.stats.str+=2;r.stats.int+=2;}if(kind==='guard'){r.stats.def+=2;r.stats.res+=2;}}
+  advanceRoamNode();
+}
+function currentRoamOffers(){
+  const run=normalizeRoam(SESSION.challengeState);
+  return relicOffers(seededRng(`${run.seed}:shop:${run.pos}`),run.relics);
+}
+function showRoamShop(){
+  const run=normalizeRoam(SESSION.challengeState), offers=currentRoamOffers();
+  const rows=offers.length?offers.map(id=>{const item=ROAM_RELICS[id];return `<button class="btn roam-shop-item" ${run.coins<item.cost?'disabled':''} onclick="roamBuyRelic('${id}')"><b>${item.name}</b><span>${item.desc}</span><em>엽전 ${item.cost}</em></button>`;}).join(''):'<p>이미 이 장터의 진귀한 물건을 모두 지녔습니다.</p>';
+  app().innerHTML=`<div class="result-screen roam-event"><h2>市 장터의 기물상</h2><p>원정대의 엽전 <b>${run.coins}</b> · 구입한 보물은 네 협객 모두에게 즉시 적용됩니다.</p><div class="roam-shop">${rows}</div><button class="btn danger" onclick="advanceRoamNode()">장터를 떠난다</button></div>`;
+}
+function roamBuyRelic(id){
+  const run=normalizeRoam(SESSION.challengeState), item=ROAM_RELICS[id];
+  if(!item||run.relics.includes(id)||!currentRoamOffers().includes(id)||run.coins<item.cost) return;
+  run.coins-=item.cost;run.relics.push(id);run.boons.push(item.name);
+  for(const cid of G.party) applyRelic(G.roster[cid].stats,id);
+  saveRoam();SFX.play('equip');showRoamShop();
+}
+function showRoamFaction(){
+  const run=normalizeRoam(SESSION.challengeState), factions=['개방','전진교','명교','소요파'];
+  const faction=factions[Math.floor(seededRng(`${run.seed}:faction:${run.pos}`)()*factions.length)];
+  run.pendingFaction=faction;
+  app().innerHTML=`<div class="result-screen roam-event"><h2>門 ${faction}의 청</h2><p>${faction} 문도들이 추격대에 포위되었다. 어느 방식으로 강호의 인연을 맺을 것인가?</p><button class="btn" onclick="roamFactionChoice('aid')">함께 지킨다 — 방어·정신 +1, 관계 +2</button><button class="btn" onclick="roamFactionChoice('duel')">무공으로 길을 연다 — 힘·내공 +1, 엽전 +2, 관계 +1</button></div>`;
+}
+function roamFactionChoice(kind){
+  const run=normalizeRoam(SESSION.challengeState), faction=run.pendingFaction||'강호';
+  run.factions[faction]=(run.factions[faction]||0)+(kind==='aid'?2:1);
+  for(const cid of G.party){const st=G.roster[cid].stats;if(kind==='aid'){st.def++;st.res++;}else{st.str++;st.int++;}}
+  if(kind==='duel') run.coins+=2;
+  run.boons.push(`${faction} ${kind==='aid'?'수호':'논검'}`);delete run.pendingFaction;
+  advanceRoamNode();
+}
+function advanceRoamNode(){
   SESSION.challengeState.pos++;saveRoam();showRoamMap();
 }
 function roamBattleWon(){
-  SESSION.challengeState.ch=null;SESSION.challengeState.pos++;
-  if(SESSION.challengeState.pos>=SESSION.challengeState.nodes.length){
-    V3STORE.challenges.roam.best=Math.max(V3STORE.challenges.roam.best||0,SESSION.challengeState.nodes.length);delete V3STORE.challenges.roam.current;V3STORE=writeV3(V3STORE);
-    app().innerHTML=`<div class="result-screen">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${SESSION.challengeState.seed}</b>의 열 갈래 길을 완주했습니다.<br>네 협객의 유람은 강호전설에 기록됩니다.</p><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
+  const run=normalizeRoam(SESSION.challengeState), wasBoss=run.nodes[run.pos]==='boss';
+  const fallen=(B?.units||[]).filter(u=>u.team==='P'&&!u.alive).map(u=>u.cid);
+  run.scars=[...new Set([...run.scars,...fallen])];run.coins+=wasBoss?6:3;run.victories++;run.ch=null;run.pos++;
+  if(run.pos>=run.nodes.length){
+    const roam=V3STORE.challenges.roam=V3STORE.challenges.roam||{};
+    const legends=G.party.map(cid=>legendFor(cid,CHARS[cid],run));
+    roam.best=Math.max(roam.best||0,run.nodes.length);roam.legends=[...legends,...(roam.legends||[])].slice(0,40);delete roam.current;V3STORE=writeV3(V3STORE);
+    app().innerHTML=`<div class="result-screen roam-finish">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${escHtml(run.seed)}</b>의 ${run.nodes.length}갈래 길을 완주했습니다.<br>네 협객의 별호와 여정이 강호전설에 기록되었습니다.</p><div class="legend-grid">${legends.map(x=>`<div class="legend-card"><b>${x.name}</b><strong>${x.title}</strong><span>${x.scar}</span></div>`).join('')}</div><button class="btn" onclick="showRoamLegends()">강호전설 보기</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
   }
-  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${SESSION.challengeState.pos}/10 노드를 통과했습니다.</p><button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
+  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${run.pos}/${run.nodes.length} 노드를 통과했습니다.<br>전리품으로 엽전 ${wasBoss?6:3}을 얻었습니다.</p><button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
+}
+function showRoamLegends(){
+  const old=document.getElementById('roam-modal');if(old)old.remove();
+  const legends=(V3STORE.challenges.roam&&V3STORE.challenges.roam.legends)||[];
+  const rows=legends.length?legends.map(x=>`<div class="legend-row"><b>${x.name}</b><span>${x.title} · ${x.scar}</span><small>SEED ${escHtml(x.seed)} · ${x.nodes}노드 · ${(x.relics||[]).map(id=>ROAM_RELICS[id]?.name).filter(Boolean).join(' · ')||'무보물'}</small></div>`).join(''):'<p>아직 기록된 강호전설이 없습니다.</p>';
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="legend-modal"><div class="modal"><h3>강호전설</h3><div class="legend-list">${rows}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('legend-modal').remove()">닫기</button></div></div></div>`);
 }
 
 /* ── 타이틀 ── */
@@ -3014,7 +3085,7 @@ function showChallengeSelect(){
         <p>전 영웅을 이끌고 강해지는 적의 파도에 맞섭니다. 3파마다 강적이 출현합니다.</p>
         <button class="btn" onclick="startEndless()">도전하기${best?` · 최고 ${best}파`:''}</button></div>
       ${campCard('chronicle','19전 압축')}
-      <div class="camp-card challenge-card"><div class="camp-meta"><span>시드 원정</span><span>비정사</span></div><h3>강호유람</h3><p>네 협객으로 10개 노드의 전투·기연·객잔을 지나 천하 고수에게 도전합니다. 시드를 공유할 수 있습니다.</p><button class="btn" onclick="showRoamStart()">${roam.current?'이어하기 / 새 유람':'유람 시작'}${roam.best?' · 완주':''}</button></div>
+      <div class="camp-card challenge-card"><div class="camp-meta"><span>시드 원정</span><span>비정사</span></div><h3>강호유람</h3><p>네 협객으로 12~15개 노드의 격전·기연·객잔·장터·문파 사건을 지나 천하 고수에게 도전합니다. 완주 기록은 별호와 흉터를 지닌 강호전설로 남습니다.</p><button class="btn" onclick="showRoamStart()">${roam.current?'이어하기 / 새 유람':'유람 시작'}${roam.best?` · 최고 ${roam.best}노드`:''}</button>${roam.legends?.length?`<button class="btn small" onclick="showRoamLegends()">강호전설 ${roam.legends.length}</button>`:''}</div>
     </div>
   </div>`;
   requestAnimationFrame(animateChronicleScreen);
@@ -3133,6 +3204,7 @@ export const DEBUG = {
   backupInspection(input){ const result=inspectBackupPayload(input); return {ok:result.ok,count:result.count,issues:result.issues}; },
   backupRestore(input){ const result=restoreBackupPayload(input,localStorage); return {ok:result.ok,count:result.count,issues:result.issues}; },
   checkpointProbe(){ return deepClone(V3STORE.checkpoints||{latest:null,history:[]}); },
+  roamProbe(){ return deepClone(V3STORE.challenges.roam||{}); },
   sessionContext(){ return {context:runtimeContext(),outcome:SESSION.outcome(),campaign:SESSION.campaign()?.camp||null,challenge:SESSION.challenge()?.mode||null}; },
   openCurrentDeploy(){ const node=curNode(); if(node?.kind==='battle') v2Deploy(node); },
   forceDefeat(){ if(B){ B.over=true; showDefeat(); } },
@@ -3145,6 +3217,7 @@ export const GLOBALS = {
   uiCancel, cycleZoom, toggleThreats, toggleDeploy, startBattle, newGame, continueGame,
   showChapterSelect, jumpChapter, startEndless, nextWave, toTitle, retryChapter, afterVictory,
   showRoamStart, startRoamFromInput, resumeRoam, showRoamMap, enterRoamNode, roamChoice,
+  showRoamShop, roamBuyRelic, showRoamFaction, roamFactionChoice, advanceRoamNode, showRoamLegends,
   showCampaignSelect, showChallengeSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
