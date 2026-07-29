@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
+  await page.waitForFunction(() => !!window.__dbg?.CAMPAIGNS);
 });
 
 test('v3 title has one canonical campaign entry', async ({ page }) => {
@@ -106,6 +107,22 @@ test('v3 save quarantines damaged sections and backup carries validation metadat
     'kimyong_save_v3.campaigns.sinjo',
     'kimyong_v2_sajo',
   ]));
+  await page.getByRole('button',{name:/설정/}).click();
+  await page.getByRole('button',{name:'검사·복구'}).click();
+  await expect(page.getByRole('heading',{name:'저장 검사·복구'})).toBeVisible();
+  await expect(page.getByText('profile',{exact:true})).toBeVisible();
+  await expect(page.getByText('campaigns.sinjo',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'닫기'}).click();
+  const restored=await page.evaluate(() => {
+    const payload=window.__dbg.backupProbe();
+    const save=JSON.parse(payload.data.kimyong_save_v3);
+    save.profile.settings.diff='story';
+    payload.data.kimyong_save_v3=JSON.stringify(save);
+    const result=window.__dbg.backupRestore(payload);
+    return {result,saved:JSON.parse(localStorage.getItem('kimyong_save_v3'))};
+  });
+  expect(restored.result.ok).toBe(true);
+  expect(restored.saved.profile.settings.diff).toBe('story');
 });
 
 test('legacy v2 migration keeps valid campaigns and quarantines damaged siblings', async ({ page }) => {
@@ -132,6 +149,45 @@ test('session runtime identifies campaign mode without battle-engine mode flags'
   expect(session.context).toMatchObject({mode:'campaign',campaignId:'sajo'});
   expect(session.campaign).toBe('sajo');
   expect(session.challenge).toBeNull();
+});
+
+test('automatic campaign checkpoint restores the pre-deploy state', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/강호연대기/}).click();
+  const card=page.locator('.camp-card').filter({hasText:'사조영웅전'});
+  await card.getByRole('button',{name:'시작하기'}).click();
+  const checkpoint=await page.evaluate(() => {
+    const state=window.__dbg.campaignState;
+    state.stageId='s2'; state.gold=321;
+    window.__dbg.openCurrentDeploy();
+    return window.__dbg.checkpointProbe().history[0];
+  });
+  expect(checkpoint).toMatchObject({kind:'deploy',campaignId:'sajo',stageId:'s2'});
+  await page.evaluate(() => { window.__dbg.campaignState.gold=999; window.showSettings(); });
+  await page.getByRole('button',{name:'검사·복구'}).click();
+  await expect(page.getByText('제1막  대막의 결투 · 출전 직전')).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'복구'}).first().click();
+  expect(await page.evaluate(() => window.__dbg.campaignState.gold)).toBe(321);
+});
+
+test('campaign rewind restores a recorded choice snapshot', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/강호연대기/}).click();
+  const card=page.locator('.camp-card').filter({hasText:'사조영웅전'});
+  await card.getByRole('button',{name:'시작하기'}).click();
+  await page.evaluate(() => {
+    const current=window.__dbg.campaignState;
+    const snapshot=JSON.parse(JSON.stringify(current));
+    delete snapshot.curBattle; snapshot.gold=111; snapshot.stageId='s1'; snapshot.history=[];
+    current.gold=999;
+    current.history=[{stageId:'s1',title:'검증 분기',label:'이전 선택',at:Date.now(),state:snapshot}];
+    window.showRewindHistory();
+  });
+  await page.getByRole('button',{name:'이 지점으로'}).click();
+  expect(await page.evaluate(() => window.__dbg.campaignState.gold)).toBe(111);
 });
 
 test('U6 enriches all four main campaigns with the requested ensembles', async ({ page }) => {
@@ -320,6 +376,10 @@ test('seeded roam creates a ten-node route and enters deployment', async ({ page
     await expect(page.locator('#battle-mobile-bar')).toBeVisible();
     await expect(page.locator('#battle-mobile-bar').getByRole('button')).toHaveCount(4);
   }
+  await page.evaluate(() => window.__dbg.forceDefeat());
+  await expect(page.getByRole('heading',{name:'유람 중 패배'})).toBeVisible();
+  await page.getByRole('button',{name:'재도전'}).click();
+  await expect(page.getByRole('heading',{name:/출전 준비/})).toBeVisible();
 });
 
 test('legacy classic save is copied into the unified chronicle', async ({ page }) => {

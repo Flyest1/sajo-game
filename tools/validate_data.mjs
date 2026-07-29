@@ -54,6 +54,7 @@ const MAIN_CAMPAIGNS = new Set(['sajo','sinjo','uicheon','chunryong']);
 const SPECIAL_OBJECTIVES = new Set(['survive','seize','escape','subdue','all','any']);
 const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan']);
 const specialCounts = Object.fromEntries([...MAIN_CAMPAIGNS].map(id=>[id,0]));
+const flowStats=[];
 for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
   if(!camp){ errs.push(`story expansion unknown campaign ${campId}`); continue; }
@@ -210,6 +211,20 @@ for (const CAMP of CAMPAIGN_FILES) {
   const seen=new Set(), queue=[CAMP.start];
   while(queue.length){ const id=queue.shift(); if(seen.has(id)||!S[id])continue; seen.add(id); for(const to of (edges.get(id)||[])) if(!seen.has(to))queue.push(to); }
   for(const id of CAMP.order) if(!seen.has(id)) errs.push(`${CID}: 시작점에서 도달 불가 ${id}`);
+  const reachableEnds=[...seen].filter(id=>S[id]?.kind==='end');
+  if(!reachableEnds.length) errs.push(`${CID}: 시작점에서 도달 가능한 종막 없음`);
+  const reverse=new Map([...seen].map(id=>[id,[]]));
+  for(const [from,targets] of edges) for(const to of targets) if(reverse.has(to)) reverse.get(to).push(from);
+  const canFinish=new Set(reachableEnds), finishQueue=[...reachableEnds];
+  while(finishQueue.length){
+    const id=finishQueue.shift();
+    for(const from of (reverse.get(id)||[])) if(!canFinish.has(from)){ canFinish.add(from); finishQueue.push(from); }
+  }
+  for(const id of seen){
+    if(S[id]?.kind!=='end'&&!(edges.get(id)||[]).length) errs.push(`${CID}/${id}: 종막이 아닌 막힌 경로`);
+    if(!canFinish.has(id)) errs.push(`${CID}/${id}: 어떤 종막으로도 이어지지 않음`);
+  }
+  flowStats.push(`${CID} ${seen.size}노드/${reachableEnds.length}종막`);
   CAMP.party.forEach(c => { if (!CHARS[c]) errs.push(`${CID} party unknown ${c}`); });
 }
 
@@ -274,5 +289,6 @@ const SUPPORTS = J('supports.json');
 
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
+console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
 console.log('DATA VALIDATION OK');

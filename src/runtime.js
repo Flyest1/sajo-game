@@ -12,17 +12,22 @@ export function resolveRuntimeContext({campaign,challenge,classic,settings}){
   };
 }
 
-/* 모드별 전역을 전투 엔진에 노출하지 않는 단일 세션 어댑터. */
-export function createSessionRuntime({classic,getCampaign,setCampaign,getChallenge,setChallenge}){
-  const campaign=()=>getCampaign()||null;
-  const challenge=()=>getChallenge()||null;
+/* 캠페인·도전 상태를 직접 소유하고 전투에는 문맥만 제공하는 단일 세션 저장소. */
+export function createSessionRuntime({classic}){
+  let campaignState=null, challengeState=null;
+  const campaign=()=>campaignState;
+  const challenge=()=>challengeState;
   return {
+    get campaignState(){ return campaignState; },
+    set campaignState(value){ campaignState=value||null; },
+    get challengeState(){ return challengeState; },
+    set challengeState(value){ challengeState=value||null; },
     campaign,
     challenge,
-    activateCampaign(state){ setChallenge(null); setCampaign(state); return state; },
-    activateChallenge(state){ setCampaign(null); setChallenge(state); return state; },
-    useClassic(){ setCampaign(null); setChallenge(null); },
-    clear(){ setCampaign(null); setChallenge(null); },
+    activateCampaign(state){ challengeState=null; campaignState=state; return state; },
+    activateChallenge(state){ campaignState=null; challengeState=state; return state; },
+    useClassic(){ campaignState=null; challengeState=null; },
+    clear(){ campaignState=null; challengeState=null; },
     isCampaign(){ return !!campaign(); },
     isChallenge(mode){ const state=challenge(); return !!state&&(!mode||state.mode===mode); },
     context(settings){ return resolveRuntimeContext({campaign:campaign(),challenge:challenge(),classic,settings}); },

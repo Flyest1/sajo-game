@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "verify:build": "node tools/verify_build.mjs",
     "preview": "vite preview",
     "validate": "node tools/validate_data.mjs",
     "balance": "node tools/balance_sim.mjs",

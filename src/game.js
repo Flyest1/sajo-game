@@ -5,6 +5,9 @@ import ITEMS from './data/items.json';
 import SUPPORTS from './data/supports.json';
 import { createCampaignRegistry, CAMPAIGN_META, CAMPAIGN_GROUPS, DISCOVERED_CAMPAIGN_IDS } from './campaigns.js';
 import { createSessionRuntime } from './runtime.js';
+import { initModalAccessibility, handleModalKeydown } from './ui-accessibility.js';
+import { makeCampaignCheckpoint, appendCheckpoint, checkpointById } from './checkpoints.js';
+import { loadMotion, killMotionTriggers } from './motion.js';
 import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
@@ -13,15 +16,12 @@ import { bossPhaseDefs as resolveBossPhaseDefs, applyBossPhaseStats } from './bo
 import {
   bondRankWithReputation, reputationCombatEffects, shopPriceFor, lootMultiplier, reputationPerks,
 } from './reputation.js';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   migrateLegacy, profileValue, setProfileValue, getCampaignSave, setCampaignSave,
   setLastSession, setEndlessBest, writeV3, createBackupPayload, inspectBackupPayload, restoreBackupPayload, validateV3,
 } from './save.js';
 
 let V3STORE = migrateLegacy();
-gsap.registerPlugin(ScrollTrigger);
 
 /* ── 인연(지원) 시스템 ── */
 function pairKey(a,b){ return a<b ? a+'_'+b : b+'_'+a; }
@@ -53,13 +53,7 @@ function adjBond(u){
 
 const G = { chapterIdx:0, roster:{}, party:[], snapshot:null, extraSkills:{}, deploy:null };
 let B = null;       // 현재 전투 상태
-let ENDLESS = null; // 영웅집결 무한 모드 상태 {wave, ch}
-let V2 = null;      // 진행 중 캠페인 상태(세션 어댑터가 전투 규칙으로 변환)
-const SESSION=createSessionRuntime({
-  classic:G,
-  getCampaign:()=>V2,setCampaign:value=>{ V2=value; },
-  getChallenge:()=>ENDLESS,setChallenge:value=>{ ENDLESS=value; },
-});
+const SESSION=createSessionRuntime({classic:G});
 let uidSeq = 0;
 
 function runtimeContext(){
@@ -228,15 +222,17 @@ function bgmTheme(){
 function startBGM(mood){ BGM.start(mood, bgmTheme()); }
 
 const app = () => document.getElementById('app');
-function animateTitleScreen(){
+async function animateTitleScreen(){
   if(SETTINGS.reducedFx) return;
+  const {gsap}=await loadMotion(); if(!document.getElementById('title-screen')) return;
   gsap.fromTo('#title-art',{scale:.94,opacity:0},{scale:1,opacity:1,duration:1.05,ease:'power3.out'});
   gsap.fromTo('.title-main,.title-sub',{y:18,opacity:0},{y:0,opacity:1,duration:.72,stagger:.09,ease:'power2.out'});
   gsap.fromTo('.title-menu>div',{y:14,opacity:0},{y:0,opacity:1,duration:.55,stagger:.055,delay:.22,ease:'power2.out'});
 }
-function animateChronicleScreen(){
+async function animateChronicleScreen(){
   if(SETTINGS.reducedFx) return;
-  ScrollTrigger.getAll().forEach(t=>{ if(t.vars&&t.vars.id&&String(t.vars.id).startsWith('chronicle-')) t.kill(); });
+  const {gsap}=await loadMotion(); if(!document.querySelector('.chronicle-screen')) return;
+  await killMotionTriggers('chronicle-');
   const copy=document.querySelector('.chronicle-head p');
   if(copy&&!copy.dataset.split){
     copy.dataset.split='1';
@@ -448,6 +444,7 @@ function inkTrail(a,d,tone='basic',critical=false){
 async function showMartialCutin(a,sk,partner=null,headline=null){
   if(SETTINGS.reducedFx||!B||!sk) return;
   const host=document.getElementById('battlebody'); if(!host) return;
+  const {gsap}=await loadMotion(); if(!B) return;
   const el=document.createElement('div');
   const tone=a.type==='외'?'force':(a.type==='경'?'swift':'inner');
   el.className=`martial-cutin tone-${tone}${partner?' joint':''}`;
@@ -465,6 +462,7 @@ async function showMartialCutin(a,sk,partner=null,headline=null){
 async function showBossReveal(u,title){
   if(SETTINGS.reducedFx||!u) return;
   const host=document.getElementById('battlebody'); if(!host) return;
+  const {gsap}=await loadMotion(); if(!B) return;
   const el=document.createElement('div');
   el.className='boss-reveal';
   el.innerHTML=`<div class="boss-brush"></div><div class="boss-portrait">${ptSVG(u.cid,'','angry')}</div><div class="boss-copy"><small>强敵出現</small><strong>${u.name}</strong><span>${title||u.cls}</span></div><div class="boss-stamp">敵</div>`;
@@ -1059,6 +1057,7 @@ function applyReputationCombatEffects(){
 function startBattle(){
   const ch=curCh();
   const ctx=runtimeContext();
+  saveCampaignCheckpoint('battle',`${ch.title} · 전투 직전`);
   const W=ch.map[0].length;
   const map=ch.map.map(r=>{
     let s=r;
@@ -1981,6 +1980,28 @@ function showSaveHub(){
     </div></div>`;
   document.body.insertAdjacentHTML('beforeend',html);
 }
+function showSaveHealth(){
+  document.getElementById('set-modal')?.remove();
+  const issues=V3STORE.quarantine?.issues||[];
+  const checkpoints=V3STORE.checkpoints?.history||[];
+  const issueRows=issues.map(issue=>`<div class="health-row"><div><b>${issue.path}</b><small>${issue.reason}</small></div><span class="health-badge warn">격리</span></div>`).join('');
+  const checkpointRows=checkpoints.map(item=>`<div class="health-row"><div><b>${item.label}</b><small>${new Date(item.at).toLocaleString('ko-KR')} · ${item.kind}</small></div><button class="btn small" onclick="restoreCampaignCheckpoint('${item.id}')">복구</button></div>`).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="health-modal"><div class="modal save-health"><h3>저장 검사·복구</h3>
+    <p class="modal-note">손상 구획은 게임에서 분리되어 있으며 백업 내보내기에 그대로 보존됩니다. 체크포인트 복구는 해당 캠페인의 현재 진행을 선택 시점으로 되돌립니다.</p>
+    <h4>손상 격리 ${issues.length}건</h4><div class="health-list">${issueRows||'<p class="health-empty">격리된 손상 기록이 없습니다.</p>'}</div>
+    <h4>자동 체크포인트 ${checkpoints.length}개</h4><div class="health-list">${checkpointRows||'<p class="health-empty">아직 생성된 체크포인트가 없습니다.</p>'}</div>
+    <div class="btnrow"><button class="btn small" onclick="exportSave()">백업 내보내기</button><button class="btn" onclick="document.getElementById('health-modal').remove()">닫기</button></div>
+  </div></div>`);
+}
+function restoreCampaignCheckpoint(id){
+  const checkpoint=checkpointById(V3STORE,id); if(!checkpoint) return;
+  if(!confirm(`${checkpoint.label} 상태로 돌아갈까요?\n현재 ${CAMPAIGNS[checkpoint.campaignId]?.name||checkpoint.campaignId} 진행은 덮어씁니다.`)) return;
+  V3STORE=setCampaignSave(V3STORE,checkpoint.campaignId,checkpoint.state);
+  localStorage.setItem(v2Key(checkpoint.campaignId),JSON.stringify(checkpoint.state));
+  markPlay('campaign',checkpoint.campaignId);
+  document.getElementById('health-modal')?.remove();
+  startCampaignV2(checkpoint.campaignId,true);
+}
 function loadGame(){
   return V3STORE.legacy.classicV1||null;
 }
@@ -2091,9 +2112,9 @@ function roamNodes(seed){
   return ['battle',...middle,'boss'];
 }
 function saveRoam(){
-  if(!ENDLESS||ENDLESS.mode!=='roam') return;
+  if(!SESSION.challengeState||SESSION.challengeState.mode!=='roam') return;
   markPlay('roam');
-  const {ch,...run}=ENDLESS;
+  const {ch,...run}=SESSION.challengeState;
   V3STORE.challenges.roam=V3STORE.challenges.roam||{};
   V3STORE.challenges.roam.current=deepClone({...run,roster:G.roster,party:G.party,extra:G.extraSkills,deploy:G.deploy});
   V3STORE=writeV3(V3STORE);
@@ -2120,7 +2141,7 @@ function resumeRoam(){
   showRoamMap();
 }
 function makeRoamBattle(pos,boss){
-  const rng=seededRng(`${ENDLESS.seed}:battle:${pos}`), base=CHAPTERS[ARENAS[pos%ARENAS.length]], W=base.map[0].length;
+  const rng=seededRng(`${SESSION.challengeState.seed}:battle:${pos}`), base=CHAPTERS[ARENAS[pos%ARENAS.length]], W=base.map[0].length;
   const minions=['dj','msa','gs','sab','sap','mgb','mgs','ydg','gdb','gds','ssj','myg'];
   const elites=['jhp','hth','yjo','plh','stc','yjs','gwd','hnp'], bosses=['mcp','ygang','ogg','oyb','imsu','grb','hbo','njg','sgon','myb','gmj','jcc','yyh'];
   let cells=[];for(let y=0;y<base.map.length;y++)for(let x=Math.floor(W/2);x<W;x++)if(TILE[base.map[y][x]].cost<99&&base.spawns.every(s=>Math.abs(s[0]-x)+Math.abs(s[1]-y)>=3))cells.push([x,y]);
@@ -2131,13 +2152,13 @@ function makeRoamBattle(pos,boss){
 }
 function showRoamMap(){
   const labels={battle:'격전',event:'기연',camp:'객잔',boss:'고수'};
-  const nodes=ENDLESS.nodes.map((n,i)=>`<div class="roam-node ${i<ENDLESS.pos?'done':i===ENDLESS.pos?'cur':'lock'}"><i>${i<ENDLESS.pos?'✓':i+1}</i><b>${labels[n]}</b></div>`).join('<span class="roam-line"></span>');
-  const destination={battle:'격전으로',event:'기연으로',camp:'객잔으로',boss:'고수에게'}[ENDLESS.nodes[ENDLESS.pos]];
-  app().innerHTML=`<div class="result-screen roam-screen"><div class="eyebrow">SEED ${ENDLESS.seed}</div><h2>강호유람</h2><div class="roam-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="roam-path">${nodes}</div><p>기연과 객잔에서 얻은 선택은 이 원정에만 남습니다.<br>${ENDLESS.boons.length?'기연: '+ENDLESS.boons.join(' · '):'아직 얻은 기연이 없습니다.'}</p><button class="btn" onclick="enterRoamNode()">${destination}</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
+  const nodes=SESSION.challengeState.nodes.map((n,i)=>`<div class="roam-node ${i<SESSION.challengeState.pos?'done':i===SESSION.challengeState.pos?'cur':'lock'}"><i>${i<SESSION.challengeState.pos?'✓':i+1}</i><b>${labels[n]}</b></div>`).join('<span class="roam-line"></span>');
+  const destination={battle:'격전으로',event:'기연으로',camp:'객잔으로',boss:'고수에게'}[SESSION.challengeState.nodes[SESSION.challengeState.pos]];
+  app().innerHTML=`<div class="result-screen roam-screen"><div class="eyebrow">SEED ${SESSION.challengeState.seed}</div><h2>강호유람</h2><div class="roam-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="roam-path">${nodes}</div><p>기연과 객잔에서 얻은 선택은 이 원정에만 남습니다.<br>${SESSION.challengeState.boons.length?'기연: '+SESSION.challengeState.boons.join(' · '):'아직 얻은 기연이 없습니다.'}</p><button class="btn" onclick="enterRoamNode()">${destination}</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
 }
 function enterRoamNode(){
-  const type=ENDLESS.nodes[ENDLESS.pos];
-  if(type==='battle'||type==='boss'){ENDLESS.ch=makeRoamBattle(ENDLESS.pos,type==='boss');saveRoam();showDeploy();return;}
+  const type=SESSION.challengeState.nodes[SESSION.challengeState.pos];
+  if(type==='battle'||type==='boss'){SESSION.challengeState.ch=makeRoamBattle(SESSION.challengeState.pos,type==='boss');saveRoam();showDeploy();return;}
   if(type==='camp'){
     app().innerHTML=`<div class="result-screen"><h2>客棧 객잔</h2><p>따뜻한 국물과 등불 아래, 다음 길을 준비한다.</p><button class="btn" onclick="roamChoice('train')">밤새 수련 — 전원 Lv.+1</button><button class="btn" onclick="roamChoice('rest')">운기조식 — 전원 HP·기력 +3</button></div>`;
   }else{
@@ -2145,17 +2166,17 @@ function enterRoamNode(){
   }
 }
 function roamChoice(kind){
-  const label={train:'수련',rest:'운기조식',power:'잔결 비급',guard:'호신부'}[kind];ENDLESS.boons.push(label);
+  const label={train:'수련',rest:'운기조식',power:'잔결 비급',guard:'호신부'}[kind];SESSION.challengeState.boons.push(label);
   for(const cid of G.party){const r=G.roster[cid];if(kind==='train')rosterLevelUp(r);if(kind==='rest'){r.stats.hp+=3;r.stats.ki+=3;}if(kind==='power'){r.stats.str+=2;r.stats.int+=2;}if(kind==='guard'){r.stats.def+=2;r.stats.res+=2;}}
-  ENDLESS.pos++;saveRoam();showRoamMap();
+  SESSION.challengeState.pos++;saveRoam();showRoamMap();
 }
 function roamBattleWon(){
-  ENDLESS.ch=null;ENDLESS.pos++;
-  if(ENDLESS.pos>=ENDLESS.nodes.length){
-    V3STORE.challenges.roam.best=Math.max(V3STORE.challenges.roam.best||0,ENDLESS.nodes.length);delete V3STORE.challenges.roam.current;V3STORE=writeV3(V3STORE);
-    app().innerHTML=`<div class="result-screen">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${ENDLESS.seed}</b>의 열 갈래 길을 완주했습니다.<br>네 협객의 유람은 강호전설에 기록됩니다.</p><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
+  SESSION.challengeState.ch=null;SESSION.challengeState.pos++;
+  if(SESSION.challengeState.pos>=SESSION.challengeState.nodes.length){
+    V3STORE.challenges.roam.best=Math.max(V3STORE.challenges.roam.best||0,SESSION.challengeState.nodes.length);delete V3STORE.challenges.roam.current;V3STORE=writeV3(V3STORE);
+    app().innerHTML=`<div class="result-screen">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${SESSION.challengeState.seed}</b>의 열 갈래 길을 완주했습니다.<br>네 협객의 유람은 강호전설에 기록됩니다.</p><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
   }
-  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${ENDLESS.pos}/10 노드를 통과했습니다.</p><button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
+  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${SESSION.challengeState.pos}/10 노드를 통과했습니다.</p><button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
 }
 
 /* ── 타이틀 ── */
@@ -2197,6 +2218,9 @@ function showSettings(){
         <button class="btn small" onclick="exportSave()">내보내기</button>
         <button class="btn small" onclick="triggerImport()">가져오기</button>
         <span style="color:var(--dim);font-size:11.5px">전 기록을 파일로 저장·복원 (기기 이동)</span></div></div>
+    <div class="set-sec"><div class="set-h">저장 상태</div>
+      <div class="set-line"><button class="btn small" onclick="showSaveHealth()">검사·복구</button>
+        <span style="color:var(--dim);font-size:11.5px">격리 ${V3STORE.quarantine?.issues?.length||0}건 · 체크포인트 ${V3STORE.checkpoints?.history?.length||0}개</span></div></div>
     <div class="set-sec"><div class="set-h">조작 안내</div>
       <div style="color:var(--dim);font-size:12px;line-height:1.7">방향키/WASD 커서 · Enter/Space 선택·확정 · Esc 취소 · Tab 다음 유닛 · E 턴 종료 · I 정보 · Z 배율<br>게임패드: 방향패드 이동 · A 확정 · B 취소 · Start 턴 종료 · Y 다음 유닛</div></div>
     <div class="version-line">현재 버전 ${window.__pwa?.version||'local'} · 새 버전은 화면 아래 알림에서 적용</div>
@@ -2213,7 +2237,7 @@ function toggleFastEnemy(){ SETTINGS.fastEnemy=!SETTINGS.fastEnemy; saveSettings
   const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings(); }
 function toggleReducedFx(){
   SETTINGS.reducedFx=!SETTINGS.reducedFx; saveSettings(); SFX.play('ui');
-  if(SETTINGS.reducedFx) ScrollTrigger.getAll().forEach(t=>t.kill());
+  if(SETTINGS.reducedFx) void killMotionTriggers();
   if(B){ renderBattleAtmosphere(); renderWeather(); }
   const m=document.getElementById('set-modal'); if(m) m.remove(); showSettings();
 }
@@ -2324,52 +2348,8 @@ function keyNextUnit(){
   const u=ps[(idx+1)%ps.length];
   clearSel(); B.tileSel={x:u.x,y:u.y}; focusUnit(u); selectUnit(u);
 }
-const MODAL_FOCUS=new WeakMap();
-function enhanceModal(backdrop){
-  if(!backdrop||MODAL_FOCUS.has(backdrop)) return;
-  MODAL_FOCUS.set(backdrop,document.activeElement);
-  backdrop.setAttribute('role','dialog');
-  backdrop.setAttribute('aria-modal','true');
-  const panel=backdrop.querySelector('.modal');
-  if(panel&&!panel.hasAttribute('tabindex')) panel.tabIndex=-1;
-  requestAnimationFrame(()=>{
-    const target=backdrop.querySelector('input:not([disabled]),button:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])');
-    (target||panel||backdrop).focus?.();
-  });
-}
-function initUIAccessibility(){
-  const observer=new MutationObserver(records=>{
-    for(const record of records) for(const node of record.addedNodes){
-      if(!(node instanceof Element)) continue;
-      if(node.matches('.modal-back')) enhanceModal(node);
-      node.querySelectorAll?.('.modal-back').forEach(enhanceModal);
-    }
-    for(const record of records) for(const node of record.removedNodes){
-      if(!(node instanceof Element)||!node.matches('.modal-back')) continue;
-      const previous=MODAL_FOCUS.get(node);
-      if(previous?.isConnected) requestAnimationFrame(()=>previous.focus());
-    }
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-}
-function trapModalFocus(e,modal){
-  const focusable=[...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')];
-  if(!focusable.length){ e.preventDefault(); modal.querySelector('.modal')?.focus(); return; }
-  const first=focusable[0],last=focusable[focusable.length-1];
-  if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
-  else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
-}
 document.addEventListener('keydown',e=>{
-  const modals=document.querySelectorAll('.modal-back');
-  const modal=modals.length?modals[modals.length-1]:null;
-  if(modal){
-    if(e.key==='Escape'){
-      if(modal.id==='fc-modal') cancelForecast(); else modal.remove();
-      e.preventDefault();
-    }
-    else if(e.key==='Tab') trapModalFocus(e,modal);
-    return;
-  }
+  if(handleModalKeydown(e,{cancelForecast})) return;
   if(!B) return; /* 메뉴 화면에서는 브라우저의 기본 Tab/Enter/Space 조작을 보존 */
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||'');
   if(typing) return;
@@ -2461,8 +2441,8 @@ const DEFAULT_SHOP = ['mokgeom','cheolgeom','gangcheol','yuyeopdo','panhwanpil',
 
 const v2Key = id => 'kimyong_v2_' + id;
 function partyLeader(){
-  if(V2&&CAMPAIGNS[V2.camp]&&CAMPAIGNS[V2.camp].leader){
-    const ld=CAMPAIGNS[V2.camp].leader;
+  if(SESSION.campaignState&&CAMPAIGNS[SESSION.campaignState.camp]&&CAMPAIGNS[SESSION.campaignState.camp].leader){
+    const ld=CAMPAIGNS[SESSION.campaignState.camp].leader;
     return G.party.includes(ld)?ld:null;
   }
   return G.party.find(cid=>CHARS[cid].leader)||null;
@@ -2493,74 +2473,79 @@ function importClassicAsChronicle(){
   }
 }
 function v2Save(){
-  markPlay('campaign', V2&&V2.camp);
-  if(!V2) return;
+  markPlay('campaign', SESSION.campaignState&&SESSION.campaignState.camp);
+  if(!SESSION.campaignState) return;
   try{
-    const {curBattle, ...st}=V2;
-    V3STORE=setCampaignSave(V3STORE,V2.camp,st);
-    localStorage.setItem(v2Key(V2.camp), JSON.stringify(st));
+    const {curBattle, ...st}=SESSION.campaignState;
+    V3STORE=setCampaignSave(V3STORE,SESSION.campaignState.camp,st);
+    localStorage.setItem(v2Key(SESSION.campaignState.camp), JSON.stringify(st));
   }catch(e){}
+}
+function saveCampaignCheckpoint(kind,label){
+  const campaign=SESSION.campaign(); if(!campaign) return;
+  appendCheckpoint(V3STORE,makeCampaignCheckpoint({kind,label,campaign}));
+  V3STORE=writeV3(V3STORE);
 }
 function v2LoadSave(campId){
   return getCampaignSave(V3STORE,campId);
 }
 function v2Bind(){
-  G.roster=V2.roster; G.party=V2.party; G.extraSkills=V2.extraSkills; G.deploy=V2.deploy;
+  G.roster=SESSION.campaignState.roster; G.party=SESSION.campaignState.party; G.extraSkills=SESSION.campaignState.extraSkills; G.deploy=SESSION.campaignState.deploy;
 }
 function initRosterCharV2(cid){
-  if(V2.roster[cid]){
-    if(!V2.party.includes(cid)) V2.party.push(cid); /* 이탈했던 동료 복귀 */
+  if(SESSION.campaignState.roster[cid]){
+    if(!SESSION.campaignState.party.includes(cid)) SESSION.campaignState.party.push(cid); /* 이탈했던 동료 복귀 */
     return;
   }
-  V2.roster[cid]={cid, lvl:1, exp:0, stats:statObj(CHARS[cid].base)};
-  V2.party.push(cid);
+  SESSION.campaignState.roster[cid]={cid, lvl:1, exp:0, stats:statObj(CHARS[cid].base)};
+  SESSION.campaignState.party.push(cid);
 }
 function startCampaignV2(campId, useSave, ngBonus){
   B=null;
   const C=CAMPAIGNS[campId];
   const loaded=useSave&&v2LoadSave(campId);
   SESSION.activateCampaign(loaded||v2New(campId));
-  V2.attempted=V2.attempted||{};
-  V2.supports=V2.supports||{}; V2.supportLock=V2.supportLock||{}; /* 구 세이브 호환 */
-  V2.skillLoadouts=V2.skillLoadouts||{}; V2.history=V2.history||[];
-  V2.reputation=V2.reputation||{hyeop:0,jeong:0,se:0}; V2.factions=V2.factions||{};
+  SESSION.campaignState.attempted=SESSION.campaignState.attempted||{};
+  SESSION.campaignState.supports=SESSION.campaignState.supports||{}; SESSION.campaignState.supportLock=SESSION.campaignState.supportLock||{}; /* 구 세이브 호환 */
+  SESSION.campaignState.skillLoadouts=SESSION.campaignState.skillLoadouts||{}; SESSION.campaignState.history=SESSION.campaignState.history||[];
+  SESSION.campaignState.reputation=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0}; SESSION.campaignState.factions=SESSION.campaignState.factions||{};
   if(!loaded&&C.inherit){ /* 전권 세이브에서 플래그·보너스 계승 */
     const src=v2LoadSave(C.inherit.from);
     if(src){
-      for(const f of (C.inherit.flags||[])) if(src.flags&&src.flags[f]) V2.flags[f]=src.flags[f];
+      for(const f of (C.inherit.flags||[])) if(src.flags&&src.flags[f]) SESSION.campaignState.flags[f]=src.flags[f];
       if(src.cleared&&src.cleared.includes('end')){
-        V2.gold+=(C.inherit.clearBonusGold||0);
-        V2.flags.prevClear=1;
+        SESSION.campaignState.gold+=(C.inherit.clearBonusGold||0);
+        SESSION.campaignState.flags.prevClear=1;
       }
     }
   }
-  if(!V2.party.length){ for(const cid of C.party) initRosterCharV2(cid); }
+  if(!SESSION.campaignState.party.length){ for(const cid of C.party) initRosterCharV2(cid); }
   if(!loaded){
-    if(C.startLvl){ for(const cid of V2.party){ const r=V2.roster[cid]; while(r.lvl<C.startLvl) rosterLevelUp(r); } }
-    if(C.startInv) for(const k in C.startInv) V2.inv[k]=(V2.inv[k]||0)+C.startInv[k];
-    if(C.startSkills) for(const k in C.startSkills) V2.extraSkills[k]=[...(C.startSkills[k]||[])];
+    if(C.startLvl){ for(const cid of SESSION.campaignState.party){ const r=SESSION.campaignState.roster[cid]; while(r.lvl<C.startLvl) rosterLevelUp(r); } }
+    if(C.startInv) for(const k in C.startInv) SESSION.campaignState.inv[k]=(SESSION.campaignState.inv[k]||0)+C.startInv[k];
+    if(C.startSkills) for(const k in C.startSkills) SESSION.campaignState.extraSkills[k]=[...(C.startSkills[k]||[])];
     /* 회차(New Game+) 계승 보너스 */
     if(ngBonus){
-      V2.ngPlus=true; unlockAchv('ng_plus');
-      if(ngBonus==='gold') V2.gold += 2000;
-      else if(ngBonus==='item'){ V2.inv.bogeom=(V2.inv.bogeom||0)+1; V2.inv.daehwandan=(V2.inv.daehwandan||0)+3; V2.inv.yeonwoogap=(V2.inv.yeonwoogap||0)+1; }
-      else if(ngBonus==='bond'){ for(const p of SUPPORTS.pairs){ if(V2.party.includes(p.a)&&V2.party.includes(p.b)) V2.supports[pairKey(p.a,p.b)]=2; } }
+      SESSION.campaignState.ngPlus=true; unlockAchv('ng_plus');
+      if(ngBonus==='gold') SESSION.campaignState.gold += 2000;
+      else if(ngBonus==='item'){ SESSION.campaignState.inv.bogeom=(SESSION.campaignState.inv.bogeom||0)+1; SESSION.campaignState.inv.daehwandan=(SESSION.campaignState.inv.daehwandan||0)+3; SESSION.campaignState.inv.yeonwoogap=(SESSION.campaignState.inv.yeonwoogap||0)+1; }
+      else if(ngBonus==='bond'){ for(const p of SUPPORTS.pairs){ if(SESSION.campaignState.party.includes(p.a)&&SESSION.campaignState.party.includes(p.b)) SESSION.campaignState.supports[pairKey(p.a,p.b)]=2; } }
     }
   }
   v2Bind();
   v2Save(); /* 시작 즉시 저장 → 통합 이어하기 허브에 노출 */
   showRouteMap();
 }
-function curNode(){ return V2?CAMPAIGNS[V2.camp].stages[V2.stageId]:null; }
+function curNode(){ return SESSION.campaignState?CAMPAIGNS[SESSION.campaignState.camp].stages[SESSION.campaignState.stageId]:null; }
 function v2Lines(lines){
   return (lines||[]).filter(l=>{
-    if(l.ifNot&&V2.flags[l.ifNot]) return false;
-    if(('if' in l)&&l.if!==null&&l.if!==undefined&&!V2.flags[l.if]) return false;
+    if(l.ifNot&&SESSION.campaignState.flags[l.ifNot]) return false;
+    if(('if' in l)&&l.if!==null&&l.if!==undefined&&!SESSION.campaignState.flags[l.if]) return false;
     return true;
   });
 }
 function v2BattleDef(n){
-  const battles=V2.cleared.filter(id=>{const st=CAMPAIGNS[V2.camp].stages[id];return st&&st.kind==='battle';}).length;
+  const battles=SESSION.campaignState.cleared.filter(id=>{const st=CAMPAIGNS[SESSION.campaignState.camp].stages[id];return st&&st.kind==='battle';}).length;
   return { no:battles+1, joins:[], title:n.title, map:n.map, spawns:n.spawns, enemies:n.enemies,
     reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', pre:[], post:[],
     treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null,
@@ -2568,35 +2553,35 @@ function v2BattleDef(n){
     sceneTheme:n.sceneTheme||null };
 }
 function v2Enter(){
-  if(!V2) return;
+  if(!SESSION.campaignState) return;
   v2Save();
   const n=curNode();
   if(!n){ toTitle(); return; }
   (n.joins||[]).forEach(cid=>{
     initRosterCharV2(cid);
-    const target=Math.max(1,n.joinLevel||1), r=V2.roster[cid];
+    const target=Math.max(1,n.joinLevel||1), r=SESSION.campaignState.roster[cid];
     while(r.lvl<target) rosterLevelUp(r);
   });
   (n.leave||[]).forEach(cid=>{
-    const i=V2.party.indexOf(cid); if(i>=0) V2.party.splice(i,1);
-    if(V2.deploy){ const j=V2.deploy.indexOf(cid); if(j>=0) V2.deploy.splice(j,1); }
+    const i=SESSION.campaignState.party.indexOf(cid); if(i>=0) SESSION.campaignState.party.splice(i,1);
+    if(SESSION.campaignState.deploy){ const j=SESSION.campaignState.deploy.indexOf(cid); if(j>=0) SESSION.campaignState.deploy.splice(j,1); }
   });
   /* 첫 진입 시 컷신 → 대사 순으로 (재도전 시 생략) */
-  const firstTime = !V2.attempted[V2.stageId] && !V2.cleared.includes(V2.stageId);
+  const firstTime = !SESSION.campaignState.attempted[SESSION.campaignState.stageId] && !SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId);
   const withCut = (after)=>{ if(firstTime && n.cut) showCutscene(n.cut, after); else after(); };
   if(n.kind==='talk'){
     const go=()=>v2Advance(n);
-    if(V2.attempted[V2.stageId]) go();
-    else { V2.attempted[V2.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), go, n.title)); }
+    if(SESSION.campaignState.attempted[SESSION.campaignState.stageId]) go();
+    else { SESSION.campaignState.attempted[SESSION.campaignState.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), go, n.title)); }
     return;
   }
   if(n.kind==='battle'){
     const dep=()=>v2Deploy(n);
-    if(V2.attempted[V2.stageId]) dep();
-    else { V2.attempted[V2.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), dep, n.title)); }
+    if(SESSION.campaignState.attempted[SESSION.campaignState.stageId]) dep();
+    else { SESSION.campaignState.attempted[SESSION.campaignState.stageId]=1; withCut(()=>showDialogue(v2Lines(n.pre), dep, n.title)); }
   }else if(n.kind==='camp'){
     const go=()=>showCamp(n,'route');
-    if(n.pre&&!V2.cleared.includes(V2.stageId)&&!V2.attempted[V2.stageId]){ V2.attempted[V2.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
+    if(n.pre&&!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)&&!SESSION.campaignState.attempted[SESSION.campaignState.stageId]){ SESSION.campaignState.attempted[SESSION.campaignState.stageId]=1; showDialogue(v2Lines(n.pre), go, n.title); }
     else go();
   }else if(n.kind==='choice'){
     showChoiceNode(n);
@@ -2605,8 +2590,9 @@ function v2Enter(){
   }
 }
 function v2Deploy(n){
-  V2.curBattle=v2BattleDef(n);
-  G.deploy=V2.deploy;
+  saveCampaignCheckpoint('deploy',`${n.title} · 출전 직전`);
+  SESSION.campaignState.curBattle=v2BattleDef(n);
+  G.deploy=SESSION.campaignState.deploy;
   showDeploy();
 }
 function v2AfterBattle(){
@@ -2617,46 +2603,47 @@ function v2AfterBattle(){
 }
 function v2Advance(n){
   let nx=n?n.next:null;
-  if(n&&n.set) Object.assign(V2.flags,n.set); /* 노드 완료 시 플래그 */
+  if(n&&n.set) Object.assign(SESSION.campaignState.flags,n.set); /* 노드 완료 시 플래그 */
   if(nx&&typeof nx==='object'&&nx.cond){ /* 플래그 조건/비교 분기 */
     let to=nx.else;
     for(const c of nx.cond){
-      if(c.and){ if(c.and.every(f=>V2.flags[f])){ to=c.to; break; } }
-      else if(c.gte){ if((V2.flags[c.gte[0]]||0)>=(V2.flags[c.gte[1]]||0)){ to=c.to; break; } }
-      else if(c.if&&V2.flags[c.if]){ to=c.to; break; }
+      if(c.and){ if(c.and.every(f=>SESSION.campaignState.flags[f])){ to=c.to; break; } }
+      else if(c.gte){ if((SESSION.campaignState.flags[c.gte[0]]||0)>=(SESSION.campaignState.flags[c.gte[1]]||0)){ to=c.to; break; } }
+      else if(c.if&&SESSION.campaignState.flags[c.if]){ to=c.to; break; }
     }
     nx=to;
   }
   if(!nx){ toTitle(); return; }
-  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
-  V2.stageId=nx; v2Save(); v2Enter();
+  if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
+  SESSION.campaignState.stageId=nx; v2Save(); v2Enter();
 }
 function showChoiceNode(n){
+  saveCampaignCheckpoint('choice',`${n.title} · 선택 직전`);
   app().innerHTML=`<div class="result-screen" style="padding:44px 0">
     ${journeyTrail('aftermath')}
     <h2 style="font-size:26px">${n.title}</h2>
     <p>${n.prompt}</p>
-    ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&V2.flags[x.o.hideIf])).map(x=>`<div style="margin:12px 0">
+    ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&SESSION.campaignState.flags[x.o.hideIf])).map(x=>`<div style="margin:12px 0">
       <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${x.i})">${x.o.label}</button>
       <div style="color:var(--dim);font-size:12.5px;margin-top:4px">${x.o.desc||''}</div></div>`).join('')}
   </div>`;
 }
 function pickChoice(i){
   const n=curNode(), o=n.options[i];
-  const {history,curBattle,...snapshot}=V2;
-  V2.history=V2.history||[];
-  V2.history.push({stageId:V2.stageId,title:n.title,label:o.label,at:Date.now(),state:deepClone(snapshot)});
-  if(o.set) Object.assign(V2.flags,o.set);
-  if(o.add) for(const k in o.add) V2.flags[k]=(V2.flags[k]||0)+o.add[k];
-  if(o.rep) for(const k in o.rep) V2.reputation[k]=(V2.reputation[k]||0)+o.rep[k];
-  if(o.faction) for(const k in o.faction) V2.factions[k]=(V2.factions[k]||0)+o.faction[k];
-  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
-  V2.stageId=o.to; v2Save(); v2Enter();
+  const {history,curBattle,...snapshot}=SESSION.campaignState;
+  SESSION.campaignState.history=SESSION.campaignState.history||[];
+  SESSION.campaignState.history.push({stageId:SESSION.campaignState.stageId,title:n.title,label:o.label,at:Date.now(),state:deepClone(snapshot)});
+  if(o.set) Object.assign(SESSION.campaignState.flags,o.set);
+  if(o.add) for(const k in o.add) SESSION.campaignState.flags[k]=(SESSION.campaignState.flags[k]||0)+o.add[k];
+  if(o.rep) for(const k in o.rep) SESSION.campaignState.reputation[k]=(SESSION.campaignState.reputation[k]||0)+o.rep[k];
+  if(o.faction) for(const k in o.faction) SESSION.campaignState.factions[k]=(SESSION.campaignState.factions[k]||0)+o.faction[k];
+  if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
+  SESSION.campaignState.stageId=o.to; v2Save(); v2Enter();
 }
 function showV2End(n){
-  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+  if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
   v2Save();
-  recordCampaignClear(V2.camp, V2.stageId);
+  recordCampaignClear(SESSION.campaignState.camp, SESSION.campaignState.stageId);
   SFX.play('victory'); startBGM('calm');
   app().innerHTML=`<div class="result-screen">
     ${sealSVG('終','#d9b36c')}<h2>終 幕</h2>
@@ -2680,14 +2667,14 @@ function v2Pickup(u){
 
 /* ── 도구 (전투 중 소모품) ── */
 function v2Usables(){
-  if(!V2) return [];
-  return Object.keys(V2.inv).filter(id=>V2.inv[id]>0&&ITEMS[id]&&ITEMS[id].kind==='use');
+  if(!SESSION.campaignState) return [];
+  return Object.keys(SESSION.campaignState.inv).filter(id=>SESSION.campaignState.inv[id]>0&&ITEMS[id]&&ITEMS[id].kind==='use');
 }
 function openToolMenu(u){
   const list=v2Usables();
   const html=`<div class="modal-back" id="tool-modal">
     <div class="modal"><h3>도구 사용 — ${u.name}</h3>
-    ${list.map(id=>{const it=ITEMS[id];return `<div style="margin:6px 0"><button class="btn small" style="width:100%;text-align:left" onclick="v2UseTool('${id}')">${it.name} ×${V2.inv[id]} <span style="color:var(--dim);font-size:12px">— ${it.desc}</span></button></div>`;}).join('')}
+    ${list.map(id=>{const it=ITEMS[id];return `<div style="margin:6px 0"><button class="btn small" style="width:100%;text-align:left" onclick="v2UseTool('${id}')">${it.name} ×${SESSION.campaignState.inv[id]} <span style="color:var(--dim);font-size:12px">— ${it.desc}</span></button></div>`;}).join('')}
     <div class="btnrow"><button class="btn" onclick="closeToolMenu()">취소</button></div>
     </div></div>`;
   document.body.insertAdjacentHTML('beforeend',html);
@@ -2696,8 +2683,8 @@ function closeToolMenu(){ const m=document.getElementById('tool-modal'); if(m) m
 function v2UseTool(id){
   const m=document.getElementById('tool-modal'); if(m) m.remove();
   const u=B.sel, it=ITEMS[id];
-  if(!u||!it||(V2.inv[id]||0)<=0){ backToMenu(); return; }
-  V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+  if(!u||!it||(SESSION.campaignState.inv[id]||0)<=0){ backToMenu(); return; }
+  SESSION.campaignState.inv[id]--; if(SESSION.campaignState.inv[id]<=0) delete SESSION.campaignState.inv[id];
   if(it.cure&&u.poison){ u.poison=0; log(`${u.name} — 해독되었다`); }
   if(it.heal){ const amt=Math.min(u.maxhp-u.hp, it.heal); u.hp+=amt; fx(u.x,u.y,'+'+amt,'heal'); SFX.play('heal'); log(`${u.name} — ${it.name} 사용 (HP ${amt} 회복)`); }
   if(it.ki){ const amt=Math.min(u.maxki-u.ki, it.ki); u.ki+=amt; fx(u.x,u.y,'기+'+amt,'label'); SFX.play('skill'); log(`${u.name} — ${it.name} 사용 (기 ${amt} 회복)`); }
@@ -2724,7 +2711,7 @@ function campShopList(){
   for(const id of [...themed, ...DEFAULT_SHOP]){ if(!seen.has(id)&&ITEMS[id]){ seen.add(id); out.push(id); } }
   return out;
 }
-function ownedCount(id){ return V2.inv[id]||0; }
+function ownedCount(id){ return SESSION.campaignState.inv[id]||0; }
 function renderCamp(){
   const n=CAMP_CTX.node;
   let body='';
@@ -2732,11 +2719,11 @@ function renderCamp(){
   else if(CAMP_TAB==='shop') body=campShopHTML();
   else if(CAMP_TAB==='support') body=campSupportHTML();
   else body=campBagHTML();
-  const nSup=campSupportAvail().filter(p=>(V2.supports[pairKey(p.a,p.b)]||0)<3 && V2.supportLock[pairKey(p.a,p.b)]!==V2.stageId).length;
+  const nSup=campSupportAvail().filter(p=>(SESSION.campaignState.supports[pairKey(p.a,p.b)]||0)<3 && SESSION.campaignState.supportLock[pairKey(p.a,p.b)]!==SESSION.campaignState.stageId).length;
   app().innerHTML=`<div id="camp">
     ${journeyTrail('camp')}
     <h2>${n?n.title:'거점 — 부대 정비'}</h2>
-    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span></div>
+    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${SESSION.campaignState.gold}냥</b></span><span>부대 ${SESSION.campaignState.party.length}명</span></div>
     <div class="camp-tabs">
       <button class="btn small ${CAMP_TAB==='unit'?'on':''}" onclick="campTab('unit')">편성·승급</button>
       <button class="btn small ${CAMP_TAB==='shop'?'on':''}" onclick="campTab('shop')">상점</button>
@@ -2752,14 +2739,14 @@ function renderCamp(){
 }
 function v2Depart(){
   const n=CAMP_CTX.node;
-  if(!V2.cleared.includes(V2.stageId)) V2.cleared.push(V2.stageId);
+  if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
   v2Advance(n);
 }
 function campUnitHTML(){
   return `<table class="camptable"><tr><th>협객</th><th>Lv</th><th>병기</th><th>보구</th><th>무공</th><th>승급</th></tr>`+
-  V2.party.map(cid=>{
-    const r=V2.roster[cid], c=CHARS[cid];
-    const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  SESSION.campaignState.party.map(cid=>{
+    const r=SESSION.campaignState.roster[cid], c=CHARS[cid];
+    const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
     const opts=k=>{
       const kind=k==='w'?'weapon':'acc';
       let o=`<option value="">—</option>`;
@@ -2772,17 +2759,17 @@ function campUnitHTML(){
     };
     const promo=c.promo;
     let pcell='—';
-    if(V2.promoted[cid]) pcell=`<span style="color:var(--gold2)">${V2.promoted[cid]}</span>`;
+    if(SESSION.campaignState.promoted[cid]) pcell=`<span style="color:var(--gold2)">${SESSION.campaignState.promoted[cid]}</span>`;
     else if(promo){
       const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;
       pcell=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button>
         <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}<br>${promotionEffectText(promo)}</div>`;
     }
-    return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${V2.promoted[cid]||c.cls}</div></td>
+    return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${SESSION.campaignState.promoted[cid]||c.cls}</div></td>
       <td>${r.lvl}</td>
       <td><select onchange="v2Equip('${cid}','w',this.value)">${opts('w')}</select></td>
       <td><select onchange="v2Equip('${cid}','a',this.value)">${opts('a')}</select></td>
-      <td><button class="btn small" onclick="openSkillLoadout('${cid}')">편성</button><div style="font-size:11px;color:var(--dim)">${((V2.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(V2.extraSkills[cid]||[]).length))}/3</div></td>
+      <td><button class="btn small" onclick="openSkillLoadout('${cid}')">편성</button><div style="font-size:11px;color:var(--dim)">${((SESSION.campaignState.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(SESSION.campaignState.extraSkills[cid]||[]).length))}/3</div></td>
       <td>${pcell}</td></tr>`;
   }).join('')+`</table>`;
 }
@@ -2794,52 +2781,52 @@ function promotionEffectText(promo){
 }
 function v2Equip(cid, slot, id){
   SFX.play('equip');
-  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
-  if(eq[slot]){ V2.inv[eq[slot]]=(V2.inv[eq[slot]]||0)+1; eq[slot]=null; }
+  const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
+  if(eq[slot]){ SESSION.campaignState.inv[eq[slot]]=(SESSION.campaignState.inv[eq[slot]]||0)+1; eq[slot]=null; }
   if(id){
-    if((V2.inv[id]||0)<=0){ v2Save(); renderCamp(); return; }
-    V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+    if((SESSION.campaignState.inv[id]||0)<=0){ v2Save(); renderCamp(); return; }
+    SESSION.campaignState.inv[id]--; if(SESSION.campaignState.inv[id]<=0) delete SESSION.campaignState.inv[id];
     eq[slot]=id;
   }
   v2Save(); renderCamp();
 }
 function v2Promote(cid){
-  const c=CHARS[cid], promo=c.promo, r=V2.roster[cid];
-  if(!promo||V2.promoted[cid]||r.lvl<promo.lvl||(V2.inv[promo.item]||0)<=0) return;
-  V2.inv[promo.item]--; if(V2.inv[promo.item]<=0) delete V2.inv[promo.item];
+  const c=CHARS[cid], promo=c.promo, r=SESSION.campaignState.roster[cid];
+  if(!promo||SESSION.campaignState.promoted[cid]||r.lvl<promo.lvl||(SESSION.campaignState.inv[promo.item]||0)<=0) return;
+  SESSION.campaignState.inv[promo.item]--; if(SESSION.campaignState.inv[promo.item]<=0) delete SESSION.campaignState.inv[promo.item];
   for(const k in (promo.bonus||{})) r.stats[k]=(r.stats[k]||0)+promo.bonus[k];
-  V2.promoted[cid]=promo.cls;
+  SESSION.campaignState.promoted[cid]=promo.cls;
   unlockAchv('promote');
   if(promo.skill){
-    V2.extraSkills[cid]=V2.extraSkills[cid]||[];
-    if(!V2.extraSkills[cid].includes(promo.skill)) V2.extraSkills[cid].push(promo.skill);
+    SESSION.campaignState.extraSkills[cid]=SESSION.campaignState.extraSkills[cid]||[];
+    if(!SESSION.campaignState.extraSkills[cid].includes(promo.skill)) SESSION.campaignState.extraSkills[cid].push(promo.skill);
   }
   v2Save(); renderCamp();
 }
 function campShopHTML(){
   const list=campShopList();
-  const buy=list.map(id=>{const it=ITEMS[id],price=shopPrice(it);return `<tr><td style="text-align:left"><b>${it.name}</b><div style="font-size:11px;color:var(--dim)">${it.desc}</div></td><td>${price}냥${price<it.price?` <del style="color:var(--dim);font-size:10px">${it.price}</del>`:''}</td><td><button class="btn small" ${V2.gold>=price?'':'disabled'} onclick="v2Buy('${id}')">구입</button></td></tr>`;}).join('');
-  const inv=Object.keys(V2.inv);
-  const sell=inv.length?inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left">${it.name} ×${V2.inv[id]}</td><td>${Math.floor(it.price/2)}냥</td><td><button class="btn small" onclick="v2Sell('${id}')">매각</button></td></tr>`;}).join(''):`<tr><td colspan="3" style="color:var(--dim)">매각할 물건이 없습니다</td></tr>`;
+  const buy=list.map(id=>{const it=ITEMS[id],price=shopPrice(it);return `<tr><td style="text-align:left"><b>${it.name}</b><div style="font-size:11px;color:var(--dim)">${it.desc}</div></td><td>${price}냥${price<it.price?` <del style="color:var(--dim);font-size:10px">${it.price}</del>`:''}</td><td><button class="btn small" ${SESSION.campaignState.gold>=price?'':'disabled'} onclick="v2Buy('${id}')">구입</button></td></tr>`;}).join('');
+  const inv=Object.keys(SESSION.campaignState.inv);
+  const sell=inv.length?inv.map(id=>{const it=ITEMS[id];return `<tr><td style="text-align:left">${it.name} ×${SESSION.campaignState.inv[id]}</td><td>${Math.floor(it.price/2)}냥</td><td><button class="btn small" onclick="v2Sell('${id}')">매각</button></td></tr>`;}).join(''):`<tr><td colspan="3" style="color:var(--dim)">매각할 물건이 없습니다</td></tr>`;
   return `<div class="camp-cols"><div><h3>구입</h3><table class="camptable">${buy}</table></div>
   <div><h3>매각 <span style="font-size:11px;color:var(--dim)">(정가의 절반)</span></h3><table class="camptable">${sell}</table></div></div>`;
 }
-function shopPrice(it){ return shopPriceFor(it.price,V2.reputation); }
-function v2Buy(id){ const it=ITEMS[id],price=it?shopPrice(it):0; if(!it||V2.gold<price) return; V2.gold-=price; V2.inv[id]=(V2.inv[id]||0)+1; SFX.play('gold'); v2Save(); renderCamp(); }
-function v2Sell(id){ if((V2.inv[id]||0)<=0) return; V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id]; V2.gold+=Math.floor(ITEMS[id].price/2); SFX.play('gold'); v2Save(); renderCamp(); }
+function shopPrice(it){ return shopPriceFor(it.price,SESSION.campaignState.reputation); }
+function v2Buy(id){ const it=ITEMS[id],price=it?shopPrice(it):0; if(!it||SESSION.campaignState.gold<price) return; SESSION.campaignState.gold-=price; SESSION.campaignState.inv[id]=(SESSION.campaignState.inv[id]||0)+1; SFX.play('gold'); v2Save(); renderCamp(); }
+function v2Sell(id){ if((SESSION.campaignState.inv[id]||0)<=0) return; SESSION.campaignState.inv[id]--; if(SESSION.campaignState.inv[id]<=0) delete SESSION.campaignState.inv[id]; SESSION.campaignState.gold+=Math.floor(ITEMS[id].price/2); SFX.play('gold'); v2Save(); renderCamp(); }
 function campBagHTML(){
   return `<table class="camptable">${invRowsHTML()}</table>`;
 }
 /* ── 지원 대화(인연) 탭 ── */
 function campSupportAvail(){
-  return SUPPORTS.pairs.filter(p=>V2.party.includes(p.a)&&V2.party.includes(p.b));
+  return SUPPORTS.pairs.filter(p=>SESSION.campaignState.party.includes(p.a)&&SESSION.campaignState.party.includes(p.b));
 }
 function campSupportHTML(){
   const avail=campSupportAvail();
   if(!avail.length) return `<p style="color:var(--dim);padding:10px 4px">아직 인연을 나눌 동료가 모이지 않았습니다. 이야기가 진행되면 새 인연이 열립니다.</p>`;
   const rows=avail.map(p=>{
-    const key=pairKey(p.a,p.b), rank=V2.supports[key]||0;
-    const locked=V2.supportLock[key]===V2.stageId;
+    const key=pairKey(p.a,p.b), rank=SESSION.campaignState.supports[key]||0;
+    const locked=SESSION.campaignState.supportLock[key]===SESSION.campaignState.stageId;
     const maxed=rank>=3;
     const rankBadge=rank?`<span style="color:#e8a0c0">인연 ${RANK_NAME[rank]}</span>`:`<span style="color:var(--dim)">인연 없음</span>`;
     let btn;
@@ -2855,13 +2842,13 @@ function campSupportHTML(){
 }
 function viewSupport(key){
   const p=SUPPORT_MAP[key]; if(!p) return;
-  const rank=V2.supports[key]||0;
-  if(rank>=3||V2.supportLock[key]===V2.stageId) return;
+  const rank=SESSION.campaignState.supports[key]||0;
+  if(rank>=3||SESSION.campaignState.supportLock[key]===SESSION.campaignState.stageId) return;
   const conv=p.convs[SUPPORTS.ranks[rank]];
   SFX.play('ui');
   const done=()=>{
-    V2.supports[key]=rank+1;
-    V2.supportLock[key]=V2.stageId;
+    SESSION.campaignState.supports[key]=rank+1;
+    SESSION.campaignState.supportLock[key]=SESSION.campaignState.stageId;
     if(rank+1>=3){ SFX.play('levelup'); unlockAchv('bond_max'); } else SFX.play('heal');
     v2Save();
     CAMP_TAB='support';
@@ -2873,11 +2860,11 @@ function viewSupport(key){
 /* ── 루트 맵 ── */
 function showRouteMap(){
   startBGM('calm');
-  const C=CAMPAIGNS[V2.camp];
+  const C=CAMPAIGNS[SESSION.campaignState.camp];
   const rows=C.order.map(id=>{
     const n=C.stages[id];
-    const cleared=V2.cleared.includes(id);
-    const cur=V2.stageId===id;
+    const cleared=SESSION.campaignState.cleared.includes(id);
+    const cur=SESSION.campaignState.stageId===id;
     const icon=cleared?'✓':(cur?'▶':'·');
     const cls=cleared?'done':(cur?'cur':'lock');
     const kindTxt={battle:'전투',camp:'거점',choice:'분기',talk:'이야기',end:'종막'}[n.kind]||'';
@@ -2885,14 +2872,14 @@ function showRouteMap(){
     return `<button type="button" class="route-row ${cls}" ${cur?'aria-current="step" onclick="v2Enter()"':'disabled'}>
       <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}${sourceTxt}</span></button>`;
   }).join('');
-  const rep=V2.reputation||{hyeop:0,jeong:0,se:0};
+  const rep=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0};
   const perks=reputationPerks(rep);
   app().innerHTML=`<div id="routemap">
     ${journeyTrail('route')}
     <h2>${C.name}</h2>
-    <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${V2.history&&V2.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${V2.history.length}</button>`:''}</div>
+    <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${SESSION.campaignState.history&&SESSION.campaignState.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${SESSION.campaignState.history.length}</button>`:''}</div>
     ${perks.length?`<div class="reputation-perks">강호의 반향 · ${perks.join(' · ')}</div>`:''}
-    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span><span>행적 ${Object.keys(V2.flags).length}건</span></div>
+    <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${SESSION.campaignState.gold}냥</b></span><span>부대 ${SESSION.campaignState.party.length}명</span><span>행적 ${Object.keys(SESSION.campaignState.flags).length}건</span></div>
     <div class="route-list">${rows}</div>
     <div style="text-align:center;margin-top:14px">
       <button class="btn" onclick="v2Enter()">진행 ▶</button>
@@ -2903,15 +2890,15 @@ function showRouteMap(){
 }
 
 function showRewindHistory(){
-  const history=V2.history||[];
+  const history=SESSION.campaignState.history||[];
   const rows=history.map((h,i)=>`<div class="rewind-row"><div><b>${h.title}</b><small>${h.label}</small></div><button class="btn small" onclick="rewindHistory(${i})">이 지점으로</button></div>`).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="rewind-modal"><div class="modal"><h3>강호 회고</h3><p class="modal-note">선택 직전의 상태로 돌아갑니다. 이후에 만든 행적은 현재 기기에 덮어씁니다.</p><div class="rewind-list">${rows||'<p>기록된 분기가 없습니다.</p>'}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('rewind-modal').remove()">닫기</button></div></div></div>`);
 }
 function rewindHistory(i){
-  const h=V2.history&&V2.history[i]; if(!h) return;
-  const kept=V2.history.slice(0,i);
-  SESSION.activateCampaign(deepClone(h.state)); V2.history=kept; V2.stageId=h.stageId;
-  V2.curBattle=null; B=null; v2Bind(); v2Save();
+  const h=SESSION.campaignState.history&&SESSION.campaignState.history[i]; if(!h) return;
+  const kept=SESSION.campaignState.history.slice(0,i);
+  SESSION.activateCampaign(deepClone(h.state)); SESSION.campaignState.history=kept; SESSION.campaignState.stageId=h.stageId;
+  SESSION.campaignState.curBattle=null; B=null; v2Bind(); v2Save();
   const m=document.getElementById('rewind-modal'); if(m)m.remove();
   v2Enter();
 }
@@ -2931,14 +2918,14 @@ function lockedCard(id, badge){
     <p style="color:var(--gold2);font-size:12.5px">해금 조건 (${done}/${req.length}): ${reqNames}</p></div>`;
 }
 function openSkillLoadout(cid){
-  const c=CHARS[cid], all=[...new Set([...c.skills,...(V2.extraSkills[cid]||[])])];
-  const selected=(V2.skillLoadouts[cid]&&V2.skillLoadouts[cid].filter(s=>all.includes(s)))||all.slice(0,3);
-  V2.skillLoadouts[cid]=selected;
+  const c=CHARS[cid], all=[...new Set([...c.skills,...(SESSION.campaignState.extraSkills[cid]||[])])];
+  const selected=(SESSION.campaignState.skillLoadouts[cid]&&SESSION.campaignState.skillLoadouts[cid].filter(s=>all.includes(s)))||all.slice(0,3);
+  SESSION.campaignState.skillLoadouts[cid]=selected;
   const rows=all.map(sid=>{const sk=SKILLS[sid], on=selected.includes(sid);return `<label class="skill-pick ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="toggleSkillLoadout('${cid}','${sid}',this.checked)"><span><b>${sk.name}</b><small>${sk.desc} · 기 ${masteryCost(sid)}<br>${masteryProgress(sid)} · 실제 효과: ${masteryEffectText(sid)}</small></span></label>`;}).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="skill-modal"><div class="modal"><h3>무공 편성 — ${c.name}</h3><p class="modal-note">출전 무공은 최대 3개입니다. 서로 다른 초식을 잇으면 연계 피해가 상승합니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeSkillLoadout()">완료</button></div></div></div>`);
 }
 function toggleSkillLoadout(cid,sid,on){
-  const list=V2.skillLoadouts[cid]=V2.skillLoadouts[cid]||[];
+  const list=SESSION.campaignState.skillLoadouts[cid]=SESSION.campaignState.skillLoadouts[cid]||[];
   if(on&&!list.includes(sid)){ if(list.length>=3){ SFX.play('miss'); openSkillLoadoutRefresh(cid); return; } list.push(sid); }
   if(!on){ const i=list.indexOf(sid); if(i>=0) list.splice(i,1); }
   if(!list.length) list.push(sid);
@@ -3037,23 +3024,23 @@ function showChallengeSelect(){
 /* ── 행낭(인벤토리) 모달 ── */
 function invRowsHTML(){
   const eqBy={};
-  for(const cid in (V2.equips||{})){
-    const e=V2.equips[cid];
+  for(const cid in (SESSION.campaignState.equips||{})){
+    const e=SESSION.campaignState.equips[cid];
     for(const k of ['w','a']) if(e[k]) (eqBy[e[k]]=eqBy[e[k]]||[]).push(CHARS[cid].name);
   }
-  const ids=[...new Set([...Object.keys(V2.inv),...Object.keys(eqBy)])];
+  const ids=[...new Set([...Object.keys(SESSION.campaignState.inv),...Object.keys(eqBy)])];
   if(!ids.length) return `<tr><td colspan="2" style="color:var(--dim)">행낭이 비었습니다</td></tr>`;
   const kindName={weapon:'병기',acc:'보구',use:'영약',key:'비급'};
   return ids.map(id=>{
     const it=ITEMS[id];
-    return `<tr><td style="text-align:left;white-space:nowrap"><b>${it.name}</b>${V2.inv[id]?` ×${V2.inv[id]}`:''}<div style="font-size:11px;color:var(--dim)">${kindName[it.kind]||''}</div></td>
+    return `<tr><td style="text-align:left;white-space:nowrap"><b>${it.name}</b>${SESSION.campaignState.inv[id]?` ×${SESSION.campaignState.inv[id]}`:''}<div style="font-size:11px;color:var(--dim)">${kindName[it.kind]||''}</div></td>
       <td style="text-align:left;font-size:12.5px;color:var(--dim)">${it.desc}${eqBy[id]?`<br><span style="color:var(--gold2)">장착 중: ${eqBy[id].join(' · ')}</span>`:''}</td></tr>`;
   }).join('');
 }
 function openInvModal(){
-  if(!V2) return;
+  if(!SESSION.campaignState) return;
   const html=`<div class="modal-back" id="inv-modal" onclick="if(event.target===this)this.remove()">
-    <div class="modal"><h3>행낭 · 소지금 <span style="color:var(--gold2)">${V2.gold}냥</span></h3>
+    <div class="modal"><h3>행낭 · 소지금 <span style="color:var(--gold2)">${SESSION.campaignState.gold}냥</span></h3>
     <table class="camptable">${invRowsHTML()}</table>
     <div class="btnrow"><button class="btn" onclick="document.getElementById('inv-modal').remove()">닫기</button></div>
     </div></div>`;
@@ -3063,12 +3050,12 @@ function openInvModal(){
 /* ── 전투 중 장비 교체 (즉시 반영, 행동 미소모) ── */
 function equipOpts(cid,k){
   const kind=k==='w'?'weapon':'acc';
-  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
   let o=`<option value="">— 없음 —</option>`;
   for(const id in ITEMS){
     if(ITEMS[id].kind!==kind) continue;
     if(eq[k]===id) o+=`<option value="${id}" selected>${ITEMS[id].name} (장착 중)</option>`;
-    else if((V2.inv[id]||0)>0) o+=`<option value="${id}">${ITEMS[id].name} ×${V2.inv[id]}</option>`;
+    else if((SESSION.campaignState.inv[id]||0)>0) o+=`<option value="${id}">${ITEMS[id].name} ×${SESSION.campaignState.inv[id]}</option>`;
   }
   return o;
 }
@@ -3098,13 +3085,13 @@ function closeEquipModal(){
 }
 function battleEquip(cid,slot,id){
   const u=B?B.units.find(x=>x.cid===cid&&x.alive):null;
-  const eq=V2.equips[cid]=V2.equips[cid]||{w:null,a:null};
+  const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
   const oldId=eq[slot]||null;
   if(oldId===(id||null)) return;
-  if(oldId){ V2.inv[oldId]=(V2.inv[oldId]||0)+1; eq[slot]=null; }
+  if(oldId){ SESSION.campaignState.inv[oldId]=(SESSION.campaignState.inv[oldId]||0)+1; eq[slot]=null; }
   if(id){
-    if((V2.inv[id]||0)<=0) return;
-    V2.inv[id]--; if(V2.inv[id]<=0) delete V2.inv[id];
+    if((SESSION.campaignState.inv[id]||0)<=0) return;
+    SESSION.campaignState.inv[id]--; if(SESSION.campaignState.inv[id]<=0) delete SESSION.campaignState.inv[id];
     eq[slot]=id;
   }
   if(u) unitApplyItemDiff(u, oldId?ITEMS[oldId]:null, id?ITEMS[id]:null);
@@ -3119,14 +3106,14 @@ function battleEquip(cid,slot,id){
 export function boot(){
   importClassicAsChronicle();
   buildPortraitDefs();
-  initUIAccessibility();
+  initModalAccessibility();
   showTitle();
 }
 /* 자동 테스트용 디버그 훅 (게임 로직에는 미사용) */
 export const DEBUG = {
   get B(){ return B; },
-  get V2(){ return V2; },
-  get ENDLESS(){ return ENDLESS; },
+  get campaignState(){ return SESSION.campaignState; },
+  get challengeState(){ return SESSION.challengeState; },
   get G(){ return G; },
   winCheck(){ return checkEnd(); },
   calc(a,d,skill){ return calcStrike(a,d,skill); },
@@ -3144,7 +3131,11 @@ export const DEBUG = {
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },
   backupProbe(){ return createBackupPayload(localStorage); },
   backupInspection(input){ const result=inspectBackupPayload(input); return {ok:result.ok,count:result.count,issues:result.issues}; },
+  backupRestore(input){ const result=restoreBackupPayload(input,localStorage); return {ok:result.ok,count:result.count,issues:result.issues}; },
+  checkpointProbe(){ return deepClone(V3STORE.checkpoints||{latest:null,history:[]}); },
   sessionContext(){ return {context:runtimeContext(),outcome:SESSION.outcome(),campaign:SESSION.campaign()?.camp||null,challenge:SESSION.challenge()?.mode||null}; },
+  openCurrentDeploy(){ const node=curNode(); if(node?.kind==='battle') v2Deploy(node); },
+  forceDefeat(){ if(B){ B.over=true; showDefeat(); } },
   previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
   CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS, DISCOVERED_CAMPAIGN_IDS,
 };
@@ -3159,7 +3150,7 @@ export const GLOBALS = {
   campTab, campBack, campFromDeploy, campFromRoute,
   openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, showRewindHistory, rewindHistory,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
-  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, viewSupport,
+  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, showSaveHealth, restoreCampaignCheckpoint, viewSupport,
   showSettings, setDiff, setSpeed, toggleFastEnemy, toggleReducedFx,
   showAchievements, chooseNgPlus, ngStart,
   exportSave, triggerImport,

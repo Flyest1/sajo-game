@@ -1,4 +1,5 @@
 /* v3 통합 세이브 저장소. 기존 키는 보존하고 손상된 구획만 격리한다. */
+import { emptyCheckpoints } from './checkpoints.js';
 export const V3_SAVE_KEY = 'kimyong_save_v3';
 export const V3_VERSION = 3;
 export const BACKUP_FORMAT_VERSION = 2;
@@ -30,6 +31,7 @@ export function emptyV3Save(){
     challenges: {endless:{bestWave:0},roam:{},trials:{}},
     legacy: {classicV1:null, importedV2:[]},
     lastSession: null,
+    checkpoints: emptyCheckpoints(),
     quarantine: {sections:{},issues:[]},
   };
 }
@@ -78,6 +80,16 @@ export function normalizeV3(raw){
 
   base.lastSession=raw.lastSession===null||raw.lastSession===undefined?null:
     (isRecord(raw.lastSession)?clone(raw.lastSession):(isolate(base,'lastSession',raw.lastSession,'object expected'),null));
+
+  const checkpoints=recordOr(base,'checkpoints',raw.checkpoints,emptyCheckpoints());
+  base.checkpoints.latest=typeof checkpoints.latest==='string'?checkpoints.latest:null;
+  if(Array.isArray(checkpoints.history)){
+    for(const [index,item] of checkpoints.history.entries()){
+      if(isRecord(item)&&typeof item.id==='string'&&typeof item.campaignId==='string'&&isRecord(item.state)) base.checkpoints.history.push(clone(item));
+      else isolate(base,`checkpoints.history.${index}`,item,'checkpoint record invalid');
+    }
+    base.checkpoints.history=base.checkpoints.history.slice(0,12);
+  }else if(checkpoints.history!==undefined) isolate(base,'checkpoints.history',checkpoints.history,'array expected');
 
   const oldQuarantine=isRecord(raw.quarantine)?raw.quarantine:null;
   if(oldQuarantine){

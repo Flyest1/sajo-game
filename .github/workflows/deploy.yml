@@ -27,12 +27,14 @@ jobs:
         run: npm ci
       - name: Validate game data
         run: npm run validate
+      - name: Build
+        run: npm run build
+      - name: Verify offline build
+        run: npm run verify:build
       - name: Install browser for smoke tests
         run: npx playwright install --with-deps chromium
       - name: Browser smoke tests
         run: npm run test:smoke
-      - name: Build
-        run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
