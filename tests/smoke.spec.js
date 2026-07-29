@@ -338,7 +338,7 @@ test('manual update prompt is readable and dismissible', async ({ page }) => {
   await expect(notice).toHaveCount(0);
 });
 
-test('seeded roam creates a 12-15 node route and opens actions on the first unit tap', async ({ page }, testInfo) => {
+test('seeded roam keeps direct movement and shows the action menu after moving', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: /도전과 회상/ }).click();
   await page.getByRole('button', { name: /유람 시작/ }).click();
   await page.getByLabel('시드 코드').fill('R17-SMOKE');
@@ -355,16 +355,41 @@ test('seeded roam creates a 12-15 node route and opens actions on the first unit
   await expect(page.getByText(/승리 조건: 습격자 격파/)).toBeVisible();
   await page.getByRole('button', { name: '출 전 !' }).click();
   const firstUid=await page.evaluate(() => window.__dbg.B.units.find(unit=>unit.team==='P').uid);
-  await page.locator(`#ug-${firstUid}`).click();
-  const actionMenu=page.getByRole('menu');
-  await expect(actionMenu).toBeVisible();
-  await expect(actionMenu).toHaveAttribute('aria-label',/행동$/);
-  await expect(actionMenu.getByRole('button',{name:'이동'})).toBeVisible();
-  await actionMenu.getByRole('button',{name:'이동'}).click();
-  await expect(actionMenu).toHaveCount(0);
-  expect(await page.evaluate(() => window.__dbg.B.mode)).toBe('move');
-  await page.evaluate(() => window.uiCancel());
-  expect(await page.evaluate(() => window.__dbg.B.sel)).toBeNull();
+  const directMove=async()=>{
+    await page.locator(`#ug-${firstUid}`).click();
+    await expect.poll(() => page.evaluate(() => window.__dbg.B.mode)).toBe('move');
+    const actionMenu=page.getByRole('menu');
+    await expect(actionMenu).toHaveCount(0);
+    const destination=await page.evaluate(() => {
+      const battle=window.__dbg.B,unit=battle.sel;
+      return [...battle.mr.keys()].map(key=>key.split(',').map(Number))
+        .filter(([x,y])=>(x!==unit.x||y!==unit.y)&&!battle.units.some(other=>other.alive&&other.x===x&&other.y===y))
+        .sort((a,b)=>(Math.abs(a[0]-unit.x)+Math.abs(a[1]-unit.y))-(Math.abs(b[0]-unit.x)+Math.abs(b[1]-unit.y)))[0];
+    });
+    expect(destination).toBeTruthy();
+    const mapBox=await page.locator('#mapsvg').boundingBox();
+    const mapSize=await page.evaluate(() => ({w:window.__dbg.B.w,h:window.__dbg.B.h}));
+    await page.mouse.click(mapBox.x+(destination[0]+.5)*mapBox.width/mapSize.w,mapBox.y+(destination[1]+.5)*mapBox.height/mapSize.h);
+    await expect(actionMenu).toBeVisible();
+    await expect(actionMenu).toHaveAttribute('aria-label',/행동$/);
+    await expect(actionMenu.getByRole('button',{name:'이동'})).toHaveCount(0);
+    const placement=await actionMenu.evaluate(el=>{const r=el.getBoundingClientRect();return {parent:el.parentElement.tagName,position:getComputedStyle(el).position,top:r.top,bottom:r.bottom,height:innerHeight};});
+    await actionMenu.getByRole('button',{name:'취소'}).click();
+    return placement;
+  };
+  const portrait=await directMove();
+  expect(portrait).toMatchObject({parent:'BODY',position:'fixed'});
+  expect(portrait.top).toBeGreaterThanOrEqual(0);
+  expect(portrait.bottom).toBeLessThanOrEqual(portrait.height);
+  if(testInfo.project.name==='mobile-chromium'){
+    const originalViewport=page.viewportSize();
+    await page.setViewportSize({width:851,height:393});
+    const landscape=await directMove();
+    expect(landscape).toMatchObject({parent:'BODY',position:'fixed'});
+    expect(landscape.top).toBeGreaterThanOrEqual(0);
+    expect(landscape.bottom).toBeLessThanOrEqual(landscape.height);
+    await page.setViewportSize(originalViewport);
+  }
   await expect(page.locator('.intent-mark')).toHaveCount(5);
   await expect(page.locator('.intent-mark text')).toHaveCount(0);
   await expect(page.locator('.intent-mark title').first()).toHaveText(/공격 예고|이동 예고|대기 예고/);

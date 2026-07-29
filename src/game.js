@@ -709,9 +709,8 @@ function clearSel(){
 }
 function selectUnit(u){
   SFX.play('select');
-  B.sel=u; B.orig={x:u.x,y:u.y}; B.mode='menu'; B.mr=moveRange(u); B.inspect=null;
+  B.sel=u; B.orig={x:u.x,y:u.y}; B.mode='move'; B.mr=moveRange(u); B.inspect=null;
   renderBattle();
-  openMenu();
 }
 function inspectEnemy(u){
   if(B.inspect===u){ B.inspect=null; B.mr=null; }
@@ -868,7 +867,7 @@ function openMenu(){
   if(!u||!u.alive||u.acted||B.phase!=='P') return;
   const campaign=SESSION.campaign();
   const enemiesNear=foes().filter(e=>u.range.includes(dist(u,e)));
-  let html=`<button class="btn" onclick="menuAct('move')">이동</button>`;
+  let html='';
   if(enemiesNear.length) html+=`<button class="btn" onclick="menuAct('attack')">공격</button>`;
   u.skills.forEach((sid,i)=>{
     const sk=SKILLS[sid];
@@ -893,21 +892,19 @@ function openMenu(){
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
   m.id='amenu'; m.setAttribute('role','menu'); m.setAttribute('aria-label',`${u.name} 행동`); m.innerHTML=html;
-  const sizer=document.getElementById('mapsizer')||document.getElementById('mapwrap');
-  const sc=mapScale();
-  const menuW=165, menuH=12+m.querySelectorAll('button').length*38;
-  let mx=((u.x+1)*TS+6)*sc, my=(u.y*TS-10)*sc;
-  if(mx>B.w*TS*sc-menuW) mx=Math.max(2,u.x*TS*sc-menuW);
-  my=Math.max(4,Math.min(my,Math.max(4,B.h*TS*sc-menuH)));
+  document.body.appendChild(m);
+  const token=document.getElementById(`ug-${u.uid}`), rect=token?.getBoundingClientRect();
+  const menuW=Math.max(165,m.offsetWidth), menuH=Math.min(m.scrollHeight,window.innerHeight-16);
+  let mx=(rect?.right||8)+6, my=(rect?.top||8)-10;
+  if(mx+menuW>window.innerWidth-8) mx=Math.max(8,(rect?.left||window.innerWidth)-menuW-6);
+  my=Math.max(8,Math.min(my,window.innerHeight-menuH-8));
   m.style.left=mx+'px'; m.style.top=my+'px';
-  sizer.appendChild(m);
 }
 function hideMenu(){ const m=document.getElementById('amenu'); if(m) m.remove(); }
 function menuAct(act,idx){
   SFX.play('ui');
   const u=B.sel;
   if(act==='cancel'){ clearSel(); return; }
-  if(act==='move'){ hideMenu(); B.mode='move'; B.mr=moveRange(u); renderBattle(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
   hideMenu();
   if(act==='tool'){ openToolMenu(u); return; }

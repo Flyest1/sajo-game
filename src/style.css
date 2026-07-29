@@ -312,7 +312,7 @@ body:has(#battle.full){align-items:flex-start;}
 #log .imp{color:var(--gold2);}
 
 /* 액션 메뉴 */
-#amenu{position:absolute;z-index:48;display:flex;flex-direction:column;gap:4px;background:rgba(24,19,12,.98);border:1px solid var(--gold);border-radius:6px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.56);}
+#amenu{position:fixed;z-index:48;display:flex;flex-direction:column;gap:4px;background:rgba(24,19,12,.98);border:1px solid var(--gold);border-radius:6px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.56);}
 #amenu .btn{width:150px;text-align:left;font-size:14px;padding:6px 12px;}
 
 /* 모달 */
