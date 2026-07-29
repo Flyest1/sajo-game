@@ -39,23 +39,17 @@ for (const id in CHARS) CHARS[id].skills.forEach(s => { if (!SKILLS[s]) errs.pus
 
 
 /* ── v2 캠페인 그래프 검증 ── */
-const HWASAN = J('stages_hwasan.json');
-const SAJO = J('stages_sajo.json');
-const SINJO = J('stages_sinjo.json');
-const UICHEON = J('stages_uicheon.json');
-const CHUNRYONG = J('stages_chunryong.json');
-const HOOILDAM = J('stages_hooildam.json');
-const JINFINAL = J('stages_jinfinal.json');
-const WOLNYEO = J('stages_wolnyeo.json');
-const DOKGO = J('stages_dokgo.json');
-const HWALSA = J('stages_hwalsa.json');
-const PUNGREUNG = J('stages_pungreung.json');
+const campaignDir=new URL('../src/data/',import.meta.url);
+const CAMPAIGN_FILES=fs.readdirSync(campaignDir)
+  .filter(name=>/^stages_.+\.json$/.test(name))
+  .map(name=>J(name));
+const campaignById=id=>CAMPAIGN_FILES.find(campaign=>campaign.id===id);
+const WOLNYEO=campaignById('wolnyeo'), HWALSA=campaignById('hwalsa');
 const ITEMS = J('items.json');
 const CAMPAIGN_MANIFEST = J('campaigns.json');
 const STORY_EXPANSIONS = J('story_expansions.json');
 const BATTLE_EXPANSIONS = J('battle_expansions.json');
 const BATTLE_UPDATES = J('battle_updates.json');
-const CAMPAIGN_FILES = [HWASAN, SAJO, SINJO, UICHEON, CHUNRYONG, HOOILDAM, WOLNYEO, DOKGO, HWALSA, PUNGREUNG, JINFINAL];
 const MAIN_CAMPAIGNS = new Set(['sajo','sinjo','uicheon','chunryong']);
 const SPECIAL_OBJECTIVES = new Set(['survive','seize','escape','subdue','all','any']);
 const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan']);
@@ -121,6 +115,11 @@ for (const [campId,updates] of Object.entries(BATTLE_UPDATES.campaigns||{})) {
   }
 }
 const CAMPAIGN_IDS = new Set([...CAMPAIGN_FILES.map(c=>c.id),'chronicle']);
+const discoveredIds=CAMPAIGN_FILES.map(c=>c.id);
+if(new Set(discoveredIds).size!==discoveredIds.length) errs.push('campaign files contain duplicate ids');
+const declaredIds=new Set(CAMPAIGN_MANIFEST.groups.flatMap(group=>group.campaigns));
+for(const id of discoveredIds) if(!declaredIds.has(id)) errs.push(`campaign file ${id}: missing from manifest groups`);
+for(const id of declaredIds) if(id!=='chronicle'&&!discoveredIds.includes(id)) errs.push(`campaign manifest ${id}: stages file not discovered`);
 for (const group of CAMPAIGN_MANIFEST.groups) {
   if (!group.id || !group.name || !Array.isArray(group.campaigns)) errs.push(`campaign group invalid ${JSON.stringify(group)}`);
   group.campaigns.forEach(id => { if (!CAMPAIGN_IDS.has(id)) errs.push(`campaign group ${group.id}: unknown ${id}`); });

@@ -1,21 +1,12 @@
 import { CHAPTERS } from './data.js';
-import HWASAN from './data/stages_hwasan.json';
-import SAJO from './data/stages_sajo.json';
-import SINJO from './data/stages_sinjo.json';
-import UICHEON from './data/stages_uicheon.json';
-import CHUNRYONG from './data/stages_chunryong.json';
-import HOOILDAM from './data/stages_hooildam.json';
-import JINFINAL from './data/stages_jinfinal.json';
-import WOLNYEO from './data/stages_wolnyeo.json';
-import DOKGO from './data/stages_dokgo.json';
-import HWALSA from './data/stages_hwalsa.json';
-import PUNGREUNG from './data/stages_pungreung.json';
 import CAMPAIGN_MANIFEST from './data/campaigns.json';
 import STORY_EXPANSIONS from './data/story_expansions.json';
 import BATTLE_EXPANSIONS from './data/battle_expansions.json';
 import BATTLE_UPDATES from './data/battle_updates.json';
 
 const clone = value => JSON.parse(JSON.stringify(value));
+const CAMPAIGN_MODULES=import.meta.glob('./data/stages_*.json',{eager:true,import:'default'});
+const DATA_CAMPAIGNS=Object.fromEntries(Object.values(CAMPAIGN_MODULES).map(campaign=>[campaign.id,campaign]));
 
 function makeChronicleCampaign(){
   const stages={}, order=[];
@@ -83,12 +74,11 @@ function applyBattleExpansions(registry){
 }
 
 export function createCampaignRegistry(){
-  const registry={
-    sajo:clone(SAJO), sinjo:clone(SINJO), uicheon:clone(UICHEON), chunryong:clone(CHUNRYONG),
-    hwasan:clone(HWASAN), hooildam:clone(HOOILDAM), wolnyeo:clone(WOLNYEO), dokgo:clone(DOKGO),
-    hwalsa:clone(HWALSA), pungreung:clone(PUNGREUNG), jinfinal:clone(JINFINAL),
-    chronicle:makeChronicleCampaign(),
-  };
+  const registeredIds=new Set(CAMPAIGN_MANIFEST.groups.flatMap(group=>group.campaigns));
+  const registry=Object.fromEntries([...registeredIds]
+    .filter(id=>id!=='chronicle'&&DATA_CAMPAIGNS[id])
+    .map(id=>[id,clone(DATA_CAMPAIGNS[id])]));
+  registry.chronicle=makeChronicleCampaign();
   applyStoryExpansions(registry);
   applyBattleExpansions(registry);
   applyBattleUpdates(registry);
@@ -97,3 +87,4 @@ export function createCampaignRegistry(){
 
 export const CAMPAIGN_META = CAMPAIGN_MANIFEST.campaigns;
 export const CAMPAIGN_GROUPS = CAMPAIGN_MANIFEST.groups;
+export const DISCOVERED_CAMPAIGN_IDS = Object.keys(DATA_CAMPAIGNS).sort();

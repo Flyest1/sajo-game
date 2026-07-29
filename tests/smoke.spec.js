@@ -29,6 +29,77 @@ test('canonical bridge scenes are visible on the campaign route', async ({ page 
   await expect(page.getByText('이야기 · 정사 보강', { exact:true })).toHaveCount(13);
 });
 
+test('campaign JSON files are auto-discovered and manifest registered', async ({ page }) => {
+  const registry=await page.evaluate(() => ({
+    discovered:window.__dbg.DISCOVERED_CAMPAIGN_IDS,
+    registered:Object.keys(window.__dbg.CAMPAIGNS).sort(),
+  }));
+  expect(registry.discovered).toHaveLength(11);
+  expect(registry.registered).toEqual([...registry.discovered,'chronicle'].sort());
+  expect(registry.discovered).toEqual(expect.arrayContaining(['sajo','sinjo','uicheon','chunryong','wolnyeo','jinfinal']));
+});
+
+test('v3 save quarantines damaged sections and backup carries validation metadata', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('kimyong_save_v3',JSON.stringify({
+      version:3,
+      profile:'damaged-profile',
+      campaigns:{sajo:{camp:'sajo',stageId:'s2'},sinjo:'damaged-campaign'},
+      challenges:{endless:{bestWave:4}},
+      legacy:{importedV2:['sajo']},
+    }));
+  });
+  await page.reload();
+  const report=await page.evaluate(() => {
+    const saved=JSON.parse(localStorage.getItem('kimyong_save_v3'));
+    const backup=window.__dbg.backupProbe();
+    const partial=window.__dbg.backupInspection({app:'kangho',formatVersion:2,schemaVersion:3,data:{
+      kimyong_save_v3:localStorage.getItem('kimyong_save_v3'),
+      kimyong_v2_sajo:'{damaged',
+    }});
+    return {saved,backup,partial};
+  });
+  expect(report.saved.campaigns.sajo.stageId).toBe('s2');
+  expect(report.saved.campaigns.sinjo).toBeUndefined();
+  expect(report.saved.profile.settings.diff).toBe('std');
+  expect(report.saved.quarantine.issues.map(issue=>issue.path)).toEqual(expect.arrayContaining(['profile','campaigns.sinjo']));
+  expect(report.backup).toMatchObject({app:'kangho',formatVersion:2,schemaVersion:3});
+  expect(report.backup.validation.valid).toBe(false);
+  expect(report.partial).toMatchObject({ok:true,count:1});
+  expect(report.partial.issues.map(issue=>issue.path)).toEqual(expect.arrayContaining([
+    'kimyong_save_v3.profile',
+    'kimyong_save_v3.campaigns.sinjo',
+    'kimyong_v2_sajo',
+  ]));
+});
+
+test('legacy v2 migration keeps valid campaigns and quarantines damaged siblings', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('kimyong_v2_sajo',JSON.stringify({camp:'sajo',stageId:'s3',gold:777,roster:['gj']}));
+    localStorage.setItem('kimyong_v2_sinjo','{damaged');
+  });
+  await page.reload();
+  const saved=await page.evaluate(() => JSON.parse(localStorage.getItem('kimyong_save_v3')));
+  expect(saved.campaigns.sajo).toMatchObject({camp:'sajo',stageId:'s3',gold:777});
+  expect(saved.campaigns.sinjo).toBeUndefined();
+  expect(saved.legacy.importedV2).toContain('sajo');
+  expect(saved.quarantine.issues.map(issue=>issue.path)).toContain('legacy.campaigns.sinjo');
+});
+
+test('session runtime identifies campaign mode without battle-engine mode flags', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/강호연대기/}).click();
+  const card=page.locator('.camp-card').filter({hasText:'사조영웅전'});
+  await card.getByRole('button',{name:'시작하기'}).click();
+  const session=await page.evaluate(() => window.__dbg.sessionContext());
+  expect(session.context).toMatchObject({mode:'campaign',campaignId:'sajo'});
+  expect(session.campaign).toBe('sajo');
+  expect(session.challenge).toBeNull();
+});
+
 test('U6 enriches all four main campaigns with the requested ensembles', async ({ page }) => {
   const report=await page.evaluate(() => {
     const ids=['sajo','sinjo','uicheon','chunryong'];
