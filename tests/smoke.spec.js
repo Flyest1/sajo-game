@@ -18,6 +18,40 @@ test('v3 title has one canonical campaign entry', async ({ page }) => {
   await expect(page.getByText('원작 본편').first()).toBeVisible();
 });
 
+test('title keeps native keyboard activation and recent campaign resumes in one click', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button',{name:/강호연대기/})).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading',{name:'강호연대기'})).toBeVisible();
+  const sajoCard=page.locator('.camp-card').filter({hasText:'사조영웅전'});
+  await sajoCard.getByRole('button',{name:'시작하기'}).click();
+  const last=await page.evaluate(() => JSON.parse(localStorage.getItem('kimyong_save_v3')).lastSession);
+  expect(last).toMatchObject({mode:'campaign',campaignId:'sajo'});
+  await page.evaluate(() => window.toTitle());
+  const resume=page.locator('.resume-btn');
+  await expect(resume).toContainText('이어하기');
+  await expect(resume).toContainText('사조영웅전');
+  await resume.click();
+  expect(await page.evaluate(() => window.__dbg.sessionContext().campaign)).toBe('sajo');
+});
+
+test('campaign route exposes keyboard-operable journey stages', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/강호연대기/}).click();
+  const sajoCard=page.locator('.camp-card').filter({hasText:'사조영웅전'});
+  await sajoCard.getByRole('button',{name:'시작하기'}).click();
+  await page.evaluate(() => window.showRouteMap());
+  await expect(page.locator('.journey-trail [aria-current="step"]')).toHaveText('막 지도');
+  const current=page.locator('.route-row[aria-current="step"]');
+  await expect(current).toBeEnabled();
+  await current.focus();
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => window.__dbg.sessionContext().campaign)).toBe('sajo');
+});
+
 test('canonical bridge scenes are visible on the campaign route', async ({ page }) => {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
@@ -282,6 +316,10 @@ test('seeded roam creates a ten-node route and enters deployment', async ({ page
   await page.evaluate(() => window.__dbg.previewCutin());
   await expect(page.locator('.martial-cutin')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '턴 종료' })).toBeEnabled();
+  if(testInfo.project.name==='mobile-chromium'){
+    await expect(page.locator('#battle-mobile-bar')).toBeVisible();
+    await expect(page.locator('#battle-mobile-bar').getByRole('button')).toHaveCount(4);
+  }
 });
 
 test('legacy classic save is copied into the unified chronicle', async ({ page }) => {

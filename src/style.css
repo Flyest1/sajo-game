@@ -23,6 +23,9 @@ h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 }
 .btn:hover{background:linear-gradient(180deg,#5d4f37,#40372a);box-shadow:0 0 10px rgba(217,179,108,.35);}
 .btn:disabled{opacity:.35;cursor:default;box-shadow:none;}
+.btn:focus-visible,.dep-card:focus-visible,.route-row:focus-visible,.pop-x:focus-visible,input:focus-visible,select:focus-visible{
+  outline:3px solid #fff0ad;outline-offset:3px;box-shadow:0 0 0 5px rgba(126,94,42,.5);
+}
 .update-notice{position:fixed;z-index:120;right:14px;bottom:14px;width:min(430px,calc(100vw - 28px));display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px 13px 16px;border:1px solid var(--gold);border-left:4px solid var(--gold2);border-radius:8px;background:rgba(28,23,16,.97);box-shadow:0 12px 38px rgba(0,0,0,.5);color:var(--text);}
 .update-notice>div:first-child{display:grid;gap:3px;min-width:0}.update-notice b{color:var(--gold2);font-size:14px}.update-notice span{color:var(--dim);font-size:12px;line-height:1.45}.update-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto}.notice-close{width:28px;height:28px;border:0;background:transparent;color:var(--dim);font-size:22px;line-height:1;cursor:pointer}.notice-close:hover{color:var(--text)}
 .update-notice.is-ready{border-color:#52745e;border-left-color:#79ad83}.update-notice.is-ready b{color:#a9d6af}
@@ -86,7 +89,7 @@ body:has(#battle.full){align-items:flex-start;}
 #battle.full #topbar{position:sticky;top:0;z-index:40;background:rgba(26,21,14,.94);
   padding:7px 6px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;backdrop-filter:blur(3px);}
 #battlebody{position:relative;}
-#battle.full #mapscroll{max-height:calc(100vh - 66px);}
+#battle.full #mapscroll{max-height:calc(100vh - 108px);}
 /* 팝업 HUD */
 #ucard-pop.pop,#info-pop.pop{position:absolute;z-index:30;padding:12px 13px;font-size:13.5px;
   box-shadow:0 8px 28px rgba(0,0,0,.55);animation:scrfade .18s ease;overflow:auto;background:rgba(38,32,23,.96);}
@@ -122,6 +125,7 @@ body:has(#battle.full){align-items:flex-start;}
 .set-sub{font-size:11px;color:var(--dim);margin-top:3px;font-weight:400;letter-spacing:0;}
 #topbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--dim);flex-wrap:wrap;}
 #topbar .btn.small{padding:7px 13px;}
+#battle-mobile-bar{display:none;}
 #mapscroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%;border-radius:6px;}
 #mapsizer{position:relative;}
 #mapwrap{position:absolute;left:0;top:0;transform-origin:0 0;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000;touch-action:manipulation;}
@@ -345,6 +349,8 @@ body:has(#battle.full){align-items:flex-start;}
 .dep-sub{color:var(--dim);font-size:13px;margin-bottom:12px;line-height:1.6;}
 .dep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-bottom:16px;}
 .dep-card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 4px;text-align:center;cursor:pointer;transition:all .15s;}
+.dep-card{width:100%;color:inherit;font-family:inherit;}
+.dep-card:disabled{cursor:default;}
 .dep-card .pt{width:56px;height:56px;margin:0 auto 5px;border-radius:50%;overflow:hidden;border:2px solid var(--line);background:#4a4032;}
 .dep-card.on{border-color:var(--gold);box-shadow:0 0 8px rgba(217,179,108,.3);}
 .dep-card.on .pt{border-color:var(--gold);}
@@ -453,12 +459,19 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 .reveal-word{display:inline-block;will-change:opacity;}
 .route-list{display:flex;flex-direction:column;gap:6px;max-width:660px;}
 .route-row{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:14px;}
+.route-row{width:100%;color:var(--text);font-family:inherit;text-align:left;}
+.route-row:disabled{cursor:default;}
 .route-row.cur{border-color:var(--gold);box-shadow:0 0 8px rgba(217,179,108,.25);cursor:pointer;}
 .route-row.done{opacity:.75;}
 .route-row.lock{opacity:.45;}
 .route-row .ri{width:18px;color:var(--gold2);text-align:center;}
 .route-row .rt{flex:1;}
 .route-row .rk{color:var(--dim);font-size:12px;}
+.journey-trail{display:flex;align-items:center;gap:7px;max-width:720px;margin:0 0 14px;padding:8px 10px;border:1px solid rgba(217,179,108,.2);border-radius:6px;background:rgba(37,31,23,.72);overflow-x:auto;color:#81745f;font-family:Geist,'Malgun Gothic',sans-serif;font-size:11px;white-space:nowrap;}
+.journey-trail span{padding:4px 7px;border-radius:999px;border:1px solid transparent;}
+.journey-trail span.done{color:#9dbb8b;}.journey-trail span.current{color:var(--gold2);border-color:var(--gold);background:rgba(217,179,108,.12);font-weight:700;}
+.journey-trail i{font-style:normal;opacity:.45;}
+.result-screen .journey-trail{margin:0 auto 24px;text-align:left;}
 @media(max-width:760px){
   .camp-cols{grid-template-columns:1fr;}
   .camptable{font-size:12.5px;}
@@ -474,6 +487,13 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
   .timeline-rail .camp-card:before{left:-20px;}
   .challenge-grid{grid-template-columns:1fr;}
   .challenge-grid .challenge-card{grid-column:span 1;}
+  .journey-trail{margin-bottom:9px;padding:5px 7px;gap:3px;font-size:10px;scrollbar-width:none;}
+  .journey-trail span{padding:3px 5px;}
+  .desktop-battle-action{display:none!important;}
+  #battle-mobile-bar{position:fixed;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));left:0;right:0;bottom:0;z-index:46;gap:5px;padding:7px max(7px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left));background:rgba(23,18,12,.98);border-top:1px solid var(--gold);box-shadow:0 -7px 24px rgba(0,0,0,.48);}
+  #battle-mobile-bar .btn{min-width:0;padding:10px 4px;font-size:12px;letter-spacing:.02em;}
+  #amenu{position:fixed!important;left:7px!important;right:7px!important;top:auto!important;bottom:calc(66px + env(safe-area-inset-bottom))!important;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:45vh;overflow-y:auto;padding:8px;box-shadow:0 -8px 30px rgba(0,0,0,.6);}
+  #amenu .btn{width:100%;min-width:0;text-align:center;}
   .martial-cutin,.boss-reveal{inset:48px 0 0;}
   .cutin-portraits{left:-2%;width:58vw;height:58vh;bottom:-8%;}
   .cutin-portrait{width:54vw;height:56vh;}.cutin-portrait.partner{left:32%;width:46vw;}
@@ -502,6 +522,7 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 }
 /* ── 세로 모바일: 전투 맵 풀-블리드 + 정보/상태 팝업을 맵 아래로 ── */
 @media (max-width:760px){
+  body:has(#battle.full){padding-bottom:calc(72px + env(safe-area-inset-bottom));}
   #mapscroll{margin:0 -6px;max-width:100vw;}
   #battle.full #mapscroll{max-height:58vh;}
   /* 팝업 HUD를 절대배치 대신 맵 아래 흐름으로 (빈 공간 활용) */

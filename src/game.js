@@ -1224,6 +1224,15 @@ function updateBattleParallax(){
 }
 function weatherLine(){ const w=(B&&B.weather)||'clear', time=currentBattleTime(), h=WEATHER_HIT[w]; return `날씨: <b>${WEATHER_NAME[w]}</b> · 시간: <b>${TIME_NAME[time]}</b>${h?` <span style="color:#e0a84a">명중 ${h}</span>`:''}`; }
 
+const JOURNEY_STEPS=[['route','막 지도'],['camp','거점'],['deploy','출전'],['battle','전투'],['aftermath','전후']];
+function journeyTrail(active){
+  if(!SESSION.isCampaign()) return '';
+  const current=Math.max(0,JOURNEY_STEPS.findIndex(([id])=>id===active));
+  return `<nav class="journey-trail" aria-label="캠페인 진행 단계">${JOURNEY_STEPS.map(([id,label],i)=>
+    `<span class="${i<current?'done':i===current?'current':''}" ${i===current?'aria-current="step"':''}>${i<current?'✓ ':''}${label}</span>`
+  ).join('<i aria-hidden="true">›</i>')}</nav>`;
+}
+
 /* ── 전투 화면 골격 (전체 화면 + 오버레이 HUD) ── */
 let UCARD_HIDE=false, INFO_OPEN=false;
 function toggleInfoPop(){ INFO_OPEN=!INFO_OPEN; SFX.play('ui'); if(B) renderSide(); }
@@ -1233,17 +1242,18 @@ function renderScreenBattle(){
   UCARD_HIDE=false; INFO_OPEN=false;
   app().innerHTML=`
   <div id="battle" class="full">
+    ${journeyTrail('battle')}
     <div id="topbar">
       <span id="tb-info"></span>
       <span style="flex:1"></span>
       ${SESSION.isCampaign()?`<button class="btn small" onclick="openInvModal()">행낭</button>`:''}
       <button class="btn small snd-btn" onclick="sndToggleUI()">${sndOn()?'♪':'∅'}</button>
       <button class="btn small" onclick="showSettings()">⚙</button>
-      <button class="btn small" id="tb-cancel" onclick="uiCancel()">취소</button>
+      <button class="btn small desktop-battle-action" data-battle-action="cancel" onclick="uiCancel()">취소</button>
       <button class="btn small" onclick="cycleZoom()">배율 <span id="tb-zoom">${MAPZOOM===0?'자동':'×'+MAPZOOM}</span></button>
-      <button class="btn small" id="tb-threat" onclick="toggleThreats()">위험 표시</button>
-      <button class="btn small" id="tb-detail" onclick="toggleInfoPop()">정보</button>
-      <button class="btn small" id="tb-end" onclick="endPlayerPhase()">턴 종료</button>
+      <button class="btn small desktop-battle-action" data-battle-action="threat" onclick="toggleThreats()">위험 표시</button>
+      <button class="btn small desktop-battle-action" data-battle-action="detail" onclick="toggleInfoPop()">정보</button>
+      <button class="btn small desktop-battle-action" data-battle-action="end" onclick="endPlayerPhase()">턴 종료</button>
     </div>
     <div id="battlebody">
       <div id="mapscroll"><div id="mapsizer">
@@ -1260,6 +1270,12 @@ function renderScreenBattle(){
       <div id="ucard-pop" class="hidden"></div>
       <div id="info-pop" class="hidden"></div>
     </div>
+    <nav id="battle-mobile-bar" aria-label="전투 빠른 행동">
+      <button class="btn small" data-battle-action="cancel" onclick="uiCancel()">취소</button>
+      <button class="btn small" data-battle-action="threat" onclick="toggleThreats()">위험 표시</button>
+      <button class="btn small" data-battle-action="detail" onclick="toggleInfoPop()">정보</button>
+      <button class="btn small danger" data-battle-action="end" onclick="endPlayerPhase()">턴 종료</button>
+    </nav>
   </div>`;
   const wrap=document.getElementById('mapwrap');
   wrap.addEventListener('click',e=>{
@@ -1462,9 +1478,10 @@ function renderSide(){
   const op=objectiveProgress(), surviveTop=op?` · 목표 ${op}`:'';
   const tbi=document.getElementById('tb-info');
   if(tbi) tbi.innerHTML=`${B.turn}턴 · ${B.phase==='P'?'아군':'<span style="color:#e09080">적군</span>'}${surviveTop} · 적 ${foes().length}`;
-  const te=document.getElementById('tb-end'); if(te) te.disabled=(B.phase!=='P'||B.busy);
-  const tt=document.getElementById('tb-threat'); if(tt) tt.textContent=B.showThreats?'위험 켜짐':'위험 꺼짐';
-  const tc=document.getElementById('tb-cancel'); if(tc) tc.disabled=(B.mode==='idle'&&!B.inspect);
+  document.querySelectorAll('[data-battle-action="end"]').forEach(el=>{ el.disabled=(B.phase!=='P'||B.busy); });
+  document.querySelectorAll('[data-battle-action="threat"]').forEach(el=>{ el.textContent=B.showThreats?'위험 켜짐':'위험 꺼짐'; el.setAttribute('aria-pressed',String(B.showThreats)); });
+  document.querySelectorAll('[data-battle-action="detail"]').forEach(el=>{ el.setAttribute('aria-pressed',String(INFO_OPEN)); });
+  document.querySelectorAll('[data-battle-action="cancel"]').forEach(el=>{ el.disabled=(B.mode==='idle'&&!B.inspect); });
   /* 팝업 배치: 선택/조작 중인 유닛의 반대쪽에 두어 명령 메뉴와 겹치지 않게 함 */
   const focusU=B.sel||B.inspect;
   const oppSide = focusU ? (focusU.x > (B.w-1)/2 ? 'left' : 'right') : 'right';
@@ -1694,6 +1711,7 @@ function showDeploy(){
 function renderDeploy(cap){
   const ch=curCh();
   app().innerHTML=`<div id="deploy">
+    ${journeyTrail('deploy')}
     <h2>${ch.title} — 출전 준비</h2>
     <div class="dep-sub">출전할 협객을 선택하세요 (<b id="dep-n">${G.deploy.length}</b>/${cap}명)${(()=>{
       const forcedIds=[...new Set([partyLeader(),...((ch.deploy&&ch.deploy.forced)||[])])].filter(c=>c&&G.party.includes(c));
@@ -1701,11 +1719,11 @@ function renderDeploy(cap){
     })()} · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${deployPool(ch).map(cid=>{
       const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
-      return `<div class="dep-card ${on?'on':'off'} ${lock?'lock':''}" onclick="toggleDeploy('${cid}',${cap})">
+      return `<button type="button" class="dep-card ${on?'on':'off'} ${lock?'lock':''}" aria-pressed="${on}" ${lock?'disabled aria-label="'+c.name+' 필수 출전"':''} onclick="toggleDeploy('${cid}',${cap})">
         <div class="pt">${ptSVG(cid)}</div>
         <div class="dep-name">${c.name}${lock?' ★':''}</div>
         <div class="dep-info">Lv.${r.lvl} · ${TYPE_NAME[c.type]}</div>
-      </div>`;}).join('')}</div>
+      </button>`;}).join('')}</div>
     <div style="text-align:center">
       <button class="btn" onclick="startBattle()">출 전 !</button>
       ${SESSION.isCampaign()?`<button class="btn small" style="margin-left:8px" onclick="campFromDeploy()">거점 (장비·승급·상점)</button>`:''}
@@ -1771,6 +1789,7 @@ function showVictory(){
       ...(n.rewardItems||[]).map(id=>`전리품 ${ITEMS[id].name}`)
     ].filter(Boolean).join(' · ');
     app().innerHTML=`<div class="result-screen">
+      ${journeyTrail('aftermath')}
       ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
       <p>${n.title} — 클리어!${learnMsg}${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${campaign.gold}냥</p>
       <button class="btn" onclick="v2AfterBattle()">계속</button>
@@ -1877,14 +1896,42 @@ function showEnding(){
 /* ── 저장/불러오기 ── */
 const SAVE_KEY='kimyong_srpg_save_v1';
 const LASTPLAY_KEY='kimyong_lastplay';
-function markPlay(kind,camp){
+function normalizeLastPlay(value){
+  if(!value||typeof value!=='object') return null;
+  const legacy={v2:'campaign',classic:'campaign',endless:'endless',roam:'roam'};
+  const mode=value.mode||legacy[value.k];
+  if(!['campaign','endless','roam'].includes(mode)) return null;
+  const campaignId=value.campaignId||value.c||(value.k==='classic'?'chronicle':null);
+  return {mode,campaignId:campaignId||null,at:Number(value.at||value.t)||Date.now()};
+}
+function markPlay(mode,campaignId){
   try{
-    const last={k:kind,c:camp||null,t:Date.now()};
+    const last={mode,campaignId:campaignId||null,at:Date.now()};
     V3STORE=setLastSession(V3STORE,last);
     localStorage.setItem(LASTPLAY_KEY, JSON.stringify(last));
   }catch(e){}
 }
-function lastPlay(){ return V3STORE.lastSession||null; }
+function lastPlay(){ return normalizeLastPlay(V3STORE.lastSession); }
+function recentSessionInfo(){
+  const last=lastPlay(); if(!last) return null;
+  if(last.mode==='campaign'){
+    const id=last.campaignId;
+    if(!id||!CAMPAIGNS[id]||!v2LoadSave(id)) return null;
+    const source=CAMPAIGN_META[id]?.source;
+    return {last,label:CAMPAIGNS[id].name,shortLabel:source&&source.length<=14?source:CAMPAIGNS[id].name,action:'이어하기'};
+  }
+  if(last.mode==='roam'&&V3STORE.challenges.roam?.current) return {last,label:'강호유람',shortLabel:'강호유람',action:'이어하기'};
+  if(last.mode==='endless') return {last,label:'영웅집결 무한 모드',shortLabel:'영웅집결',action:'다시 도전'};
+  return null;
+}
+function resumeLastSession(){
+  const recent=recentSessionInfo();
+  if(!recent){ showSaveHub(); return; }
+  const {last}=recent;
+  if(last.mode==='campaign') startCampaignV2(last.campaignId,true);
+  else if(last.mode==='roam') resumeRoam();
+  else startEndless();
+}
 function saveGame(nextCh){
   try{
     const prev=loadGame();
@@ -1893,29 +1940,23 @@ function saveGame(nextCh){
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     V3STORE.legacy.classicV1=deepClone(state);
     V3STORE=writeV3(V3STORE);
-    markPlay('classic');
+    markPlay('campaign','chronicle');
   }catch(e){}
 }
 /* ── 통합 세이브 허브 (클래식 v1 + 캠페인 v2 + 무한 모드) ── */
 function saveHubResume(){
-  const lp=lastPlay();
   const m=document.getElementById('hub-modal'); if(m) m.remove();
-  if(!lp){ showCampaignSelect('chronicles'); return; }
-  if(lp.k==='classic') startCampaignV2('chronicle',true);
-  else if(lp.k==='v2'&&lp.c&&v2LoadSave(lp.c)) startCampaignV2(lp.c,true);
-  else if(lp.k==='endless') startEndless();
-  else continueGame();
+  resumeLastSession();
 }
 function hubContinue(kind,camp){
   const m=document.getElementById('hub-modal'); if(m) m.remove();
-  if(kind==='classic') startCampaignV2('chronicle',true);
-  else if(kind==='v2') startCampaignV2(camp,true);
+  if(kind==='campaign') startCampaignV2(camp,true);
+  else if(kind==='roam') resumeRoam();
   else if(kind==='endless') startEndless();
 }
 function showSaveHub(){
   SFX.play('ui');
-  const lp=lastPlay();
-  const lpName = lp ? (lp.k==='classic'?'초대판 회상록':(lp.k==='v2'&&CAMPAIGNS[lp.c]?CAMPAIGNS[lp.c].name:'영웅집결 무한 모드')) : null;
+  const recent=recentSessionInfo();
   const rows=[];
   for(const id in CAMPAIGNS){
     const sv=v2LoadSave(id);
@@ -1923,15 +1964,18 @@ function showSaveHub(){
     const done=sv.cleared&&sv.cleared.some(x=>String(x).startsWith('end'));
     const meta=CAMPAIGN_META[id]||{};
     rows.push(`<tr><td style="text-align:left"><b>${CAMPAIGNS[id].name}</b><div class="hub-sub">${meta.canon||''} · ${done?'완주':'진행 '+(sv.cleared?sv.cleared.length:0)+'단계'} · ${sv.gold||0}냥</div></td>
-      <td><button class="btn small" onclick="hubContinue('v2','${id}')">이어하기</button></td></tr>`);
+      <td><button class="btn small" onclick="hubContinue('campaign','${id}')">이어하기</button></td></tr>`);
   }
+  const roam=V3STORE.challenges.roam||{};
+  if(roam.current) rows.push(`<tr><td style="text-align:left"><b>강호유람</b><div class="hub-sub">시드 ${roam.current.seed} · ${roam.current.pos||0}/10 노드</div></td>
+    <td><button class="btn small" onclick="hubContinue('roam')">이어하기</button></td></tr>`);
   if(bestWave()>0){
     rows.push(`<tr><td style="text-align:left"><b>영웅집결 무한 모드</b><div class="hub-sub">역대 최고 ${bestWave()}파</div></td>
       <td><button class="btn small" onclick="hubContinue('endless')">도전</button></td></tr>`);
   }
   const html=`<div class="modal-back" id="hub-modal" onclick="if(event.target===this)this.remove()">
     <div class="modal"><h3>이어하기 — 통합 기록</h3>
-    ${lpName?`<div class="hub-last"><span>최근 플레이: <b>${lpName}</b></span><button class="btn small" onclick="saveHubResume()">바로 이어하기 ▶</button></div>`:''}
+    ${recent?`<div class="hub-last"><span>최근 플레이: <b>${recent.label}</b></span><button class="btn small" onclick="saveHubResume()">${recent.action} ▶</button></div>`:''}
     ${rows.length?`<table class="camptable">${rows.join('')}</table>`:'<p style="color:var(--dim)">저장된 기록이 없습니다.</p>'}
     <div class="btnrow"><button class="btn" onclick="document.getElementById('hub-modal').remove()">닫기</button></div>
     </div></div>`;
@@ -2048,6 +2092,7 @@ function roamNodes(seed){
 }
 function saveRoam(){
   if(!ENDLESS||ENDLESS.mode!=='roam') return;
+  markPlay('roam');
   const {ch,...run}=ENDLESS;
   V3STORE.challenges.roam=V3STORE.challenges.roam||{};
   V3STORE.challenges.roam.current=deepClone({...run,roster:G.roster,party:G.party,extra:G.extraSkills,deploy:G.deploy});
@@ -2175,15 +2220,17 @@ function toggleReducedFx(){
 function showTitle(){
   startBGM('calm');
   const hasAny=Object.keys(CAMPAIGNS).some(id=>v2LoadSave(id)) || bestWave()>0;
+  const recent=recentSessionInfo();
   app().innerHTML=`<div id="title-screen">
     ${titleArtSVG()}
     <div class="title-main">사조영웅전<span style="font-size:24px;color:var(--dim)"> ─ </span>강호의 별</div>
     <div class="title-sub">江湖의 별 · v3 통합판</div>
     <div class="title-menu">
       <div><button class="btn primary" onclick="showCampaignSelect('chronicles')">강호연대기 <span>정식 본편</span></button></div>
-      <div><button class="btn" onclick="showSaveHub()" ${hasAny?'':'disabled'}>이어하기 <span>최근 여정</span></button></div>
+      <div><button class="btn resume-btn" onclick="resumeLastSession()" ${recent?'':'disabled'}>${recent?`${recent.action} · ${recent.shortLabel}`:'이어할 여정 없음'} <span>최근 여정</span></button></div>
       <div><button class="btn" onclick="showCampaignSelect('legends')">강호외전 <span>단편·창작</span></button></div>
       <div><button class="btn" onclick="showChallengeSelect()">도전과 회상 <span>무한·19전</span></button></div>
+      <div><button class="btn" onclick="showSaveHub()" ${hasAny||V3STORE.challenges.roam?.current||recent?'':'disabled'}>모든 기록 <span>통합 세이브</span></button></div>
       <div><button class="btn" onclick="showAchievements()">기록 · 업적 <span style="font-size:12px;color:var(--gold2)">${ACHV.filter(a=>ACHV_DONE[a.id]).length}/${ACHV.length}</span></button></div>
       <div><button class="btn" onclick="showHelp()">유파 안내 (도움말)</button></div>
       <div><button class="btn" onclick="showSettings()">설정 <span style="font-size:12px;color:var(--dim)">난이도 ${DIFFS[SETTINGS.diff].name} · ×${SETTINGS.speed}</span></button></div>
@@ -2277,10 +2324,56 @@ function keyNextUnit(){
   const u=ps[(idx+1)%ps.length];
   clearSel(); B.tileSel={x:u.x,y:u.y}; focusUnit(u); selectUnit(u);
 }
+const MODAL_FOCUS=new WeakMap();
+function enhanceModal(backdrop){
+  if(!backdrop||MODAL_FOCUS.has(backdrop)) return;
+  MODAL_FOCUS.set(backdrop,document.activeElement);
+  backdrop.setAttribute('role','dialog');
+  backdrop.setAttribute('aria-modal','true');
+  const panel=backdrop.querySelector('.modal');
+  if(panel&&!panel.hasAttribute('tabindex')) panel.tabIndex=-1;
+  requestAnimationFrame(()=>{
+    const target=backdrop.querySelector('input:not([disabled]),button:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    (target||panel||backdrop).focus?.();
+  });
+}
+function initUIAccessibility(){
+  const observer=new MutationObserver(records=>{
+    for(const record of records) for(const node of record.addedNodes){
+      if(!(node instanceof Element)) continue;
+      if(node.matches('.modal-back')) enhanceModal(node);
+      node.querySelectorAll?.('.modal-back').forEach(enhanceModal);
+    }
+    for(const record of records) for(const node of record.removedNodes){
+      if(!(node instanceof Element)||!node.matches('.modal-back')) continue;
+      const previous=MODAL_FOCUS.get(node);
+      if(previous?.isConnected) requestAnimationFrame(()=>previous.focus());
+    }
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+}
+function trapModalFocus(e,modal){
+  const focusable=[...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')];
+  if(!focusable.length){ e.preventDefault(); modal.querySelector('.modal')?.focus(); return; }
+  const first=focusable[0],last=focusable[focusable.length-1];
+  if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
+}
 document.addEventListener('keydown',e=>{
-  /* 모달/입력 중이면 전투 조작키 무시 (Esc/Enter만 처리) */
+  const modals=document.querySelectorAll('.modal-back');
+  const modal=modals.length?modals[modals.length-1]:null;
+  if(modal){
+    if(e.key==='Escape'){
+      if(modal.id==='fc-modal') cancelForecast(); else modal.remove();
+      e.preventDefault();
+    }
+    else if(e.key==='Tab') trapModalFocus(e,modal);
+    return;
+  }
+  if(!B) return; /* 메뉴 화면에서는 브라우저의 기본 Tab/Enter/Space 조작을 보존 */
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||'');
   if(typing) return;
+  if(e.target?.closest?.('button,a,[role="button"]')) return;
   switch(e.key){
     case 'Escape': keyCancel(); e.preventDefault(); return;
     case 'Enter': keyConfirm(); e.preventDefault(); return;
@@ -2394,12 +2487,13 @@ function importClassicAsChronicle(){
   st.diff=old.diff||SETTINGS.diff;
   V3STORE=setCampaignSave(V3STORE,'chronicle',st);
   localStorage.setItem(v2Key('chronicle'),JSON.stringify(st));
-  if(V3STORE.lastSession&&V3STORE.lastSession.k==='classic'){
-    V3STORE=setLastSession(V3STORE,{k:'v2',c:'chronicle',t:V3STORE.lastSession.t||Date.now()});
+  const last=normalizeLastPlay(V3STORE.lastSession);
+  if(last?.campaignId==='chronicle'){
+    V3STORE=setLastSession(V3STORE,{mode:'campaign',campaignId:'chronicle',at:last.at});
   }
 }
 function v2Save(){
-  markPlay('v2', V2&&V2.camp);
+  markPlay('campaign', V2&&V2.camp);
   if(!V2) return;
   try{
     const {curBattle, ...st}=V2;
@@ -2539,6 +2633,7 @@ function v2Advance(n){
 }
 function showChoiceNode(n){
   app().innerHTML=`<div class="result-screen" style="padding:44px 0">
+    ${journeyTrail('aftermath')}
     <h2 style="font-size:26px">${n.title}</h2>
     <p>${n.prompt}</p>
     ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&V2.flags[x.o.hideIf])).map(x=>`<div style="margin:12px 0">
@@ -2639,6 +2734,7 @@ function renderCamp(){
   else body=campBagHTML();
   const nSup=campSupportAvail().filter(p=>(V2.supports[pairKey(p.a,p.b)]||0)<3 && V2.supportLock[pairKey(p.a,p.b)]!==V2.stageId).length;
   app().innerHTML=`<div id="camp">
+    ${journeyTrail('camp')}
     <h2>${n?n.title:'거점 — 부대 정비'}</h2>
     <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${V2.gold}냥</b></span><span>부대 ${V2.party.length}명</span></div>
     <div class="camp-tabs">
@@ -2786,12 +2882,13 @@ function showRouteMap(){
     const cls=cleared?'done':(cur?'cur':'lock');
     const kindTxt={battle:'전투',camp:'거점',choice:'분기',talk:'이야기',end:'종막'}[n.kind]||'';
     const sourceTxt=n.source==='canon'?' · 정사 보강':n.source==='original'?' · 창작':'';
-    return `<div class="route-row ${cls}" ${cur?`onclick="v2Enter()"`:''}>
-      <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}${sourceTxt}</span></div>`;
+    return `<button type="button" class="route-row ${cls}" ${cur?'aria-current="step" onclick="v2Enter()"':'disabled'}>
+      <span class="ri">${icon}</span><span class="rt">${n.title||id}</span><span class="rk">${kindTxt}${sourceTxt}</span></button>`;
   }).join('');
   const rep=V2.reputation||{hyeop:0,jeong:0,se:0};
   const perks=reputationPerks(rep);
   app().innerHTML=`<div id="routemap">
+    ${journeyTrail('route')}
     <h2>${C.name}</h2>
     <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${V2.history&&V2.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${V2.history.length}</button>`:''}</div>
     ${perks.length?`<div class="reputation-perks">강호의 반향 · ${perks.join(' · ')}</div>`:''}
@@ -3022,6 +3119,7 @@ function battleEquip(cid,slot,id){
 export function boot(){
   importClassicAsChronicle();
   buildPortraitDefs();
+  initUIAccessibility();
   showTitle();
 }
 /* 자동 테스트용 디버그 훅 (게임 로직에는 미사용) */
@@ -3061,7 +3159,7 @@ export const GLOBALS = {
   campTab, campBack, campFromDeploy, campFromRoute,
   openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, showRewindHistory, rewindHistory,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
-  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, viewSupport,
+  toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, viewSupport,
   showSettings, setDiff, setSpeed, toggleFastEnemy, toggleReducedFx,
   showAchievements, chooseNgPlus, ngStart,
   exportSave, triggerImport,
