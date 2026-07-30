@@ -16,6 +16,7 @@ import {
 import { bossPhaseDefs as resolveBossPhaseDefs, applyBossPhaseStats } from './boss-patterns.js';
 import {
   bondRankWithReputation, reputationCombatEffects, shopPriceFor, lootMultiplier, reputationPerks,
+  factionRelationTier, characterTrustTier, characterTrustEffects,
 } from './reputation.js';
 import {
   migrateLegacy, profileValue, setProfileValue, getCampaignSave, setCampaignSave,
@@ -352,7 +353,7 @@ function calcStrike(a,d,skillId){
   const mst=(sk&&a.team==='P')?masteryTier(skillId):0;
   const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
   const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
-  let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) + (a.repAtk||0) - mit - dT.def - (d.repDef||0));
+  let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) + (a.repAtk||0) + (a.trustAtk||0) - mit - dT.def - (d.repDef||0) - (d.trustDef||0));
   const guarded=d.guardMax>0&&d.guard>0;
   if(guarded) dmg=Math.max(1,Math.round(dmg*.65));
   else if(d.broken) dmg=Math.round(dmg*1.35);
@@ -360,7 +361,7 @@ function calcStrike(a,d,skillId){
   if(comboStep) dmg=Math.round(dmg*(1+comboStep*.08));
   const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)):0;
   const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) + (a.repHit||0) - d.stats.spd*2 - dT.avoid + wHit));
+  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) + (a.repHit||0) + (a.trustHit||0) - d.stats.spd*2 - dT.avoid + wHit));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
   return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep};
@@ -684,7 +685,7 @@ function checkEnd(){
   if(B.over) return true;
   const ch=curCh();
   const o=activeObjective();
-  const leaderDown=B.units.some(u=>u.leader&&!u.alive);
+  const leaderDown=ch.defeat?.type==='all'?false:B.units.some(u=>u.leader&&!u.alive);
   const protectDown=objectiveLeaves(o).flatMap(x=>x.protect||[]).some(cid=>B.units.some(u=>u.cid===cid&&!u.alive));
   if(leaderDown||protectDown||players().length===0){
     B.over=true; B.busy=true;
@@ -1061,8 +1062,13 @@ function applyReputationCombatEffects(){
   const campaign=SESSION.campaign();
   if(!campaign||!B) return [];
   const effects=reputationCombatEffects(campaign.reputation,campaign.factions);
-  players().forEach(u=>{ u.repDef=effects.repDef; u.repAtk=effects.repAtk; u.repHit=effects.repHit; });
-  return effects.labels;
+  players().forEach(u=>{
+    const trust=characterTrustEffects(campaign.trusts,u.cid);
+    u.repDef=effects.repDef; u.repAtk=effects.repAtk; u.repHit=effects.repHit;
+    u.trustDef=trust.trustDef; u.trustAtk=trust.trustAtk; u.trustHit=trust.trustHit;
+  });
+  const trusted=players().filter(u=>characterTrustTier(campaign.trusts?.[u.cid]||0).rank>=2);
+  return [...effects.labels,...trusted.map(u=>`${u.name} 신뢰 · 명중 +3${u.trustAtk?'·공격 +1':''}${u.trustDef?'·방어 +1':''}`)];
 }
 function startBattle(){
   const ch=curCh();
@@ -1719,6 +1725,7 @@ function showDeploy(){
 }
 function renderDeploy(cap){
   const ch=curCh();
+  const requiredLeader=partyLeader();
   app().innerHTML=`<div id="deploy">
     ${journeyTrail('deploy')}
     <h2>${ch.title} — 출전 준비</h2>
@@ -1727,7 +1734,7 @@ function renderDeploy(cap){
       return forcedIds.length?` · ★필수 출전: ${forcedIds.map(c=>CHARS[c].name).join('·')}`:'';
     })()} · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${deployPool(ch).map(cid=>{
-      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=!!c.leader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
+      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=cid===requiredLeader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
       return `<button type="button" class="dep-card ${on?'on':'off'} ${lock?'lock':''}" aria-pressed="${on}" ${lock?'disabled aria-label="'+c.name+' 필수 출전"':''} onclick="toggleDeploy('${cid}',${cap})">
         <div class="pt">${ptSVG(cid)}</div>
         <div class="dep-name">${c.name}${lock?' ★':''}</div>
@@ -2098,7 +2105,7 @@ function makeEndlessWave(wave){
     enemies.push({cid,x,y,boss:true,boost:Math.round((boost+0.15)*100)/100});
   }
   return { no:4+wave, title:`영웅집결 — 제${wave}파`, joins:[], map:base.map, spawns:base.spawns,
-    enemies, win:{type:'rout', text:`제${wave}파 전멸`}, lose:'곽정이 쓰러지면 패배', pre:[], post:[] };
+    enemies, win:{type:'rout', text:`제${wave}파 전멸`}, lose:'전원 퇴각 시 패배', defeat:{type:'all'}, pre:[], post:[] };
 }
 function startEndless(){
   markPlay('endless');
@@ -2170,7 +2177,7 @@ function makeRoamBattle(pos,boss){
   shuffleSeeded(cells,rng);const enemies=[],count=5+Math.floor(pos*.55),boost=1+pos*.045;
   for(let i=0;i<count&&cells.length;i++){const pool=pos>3&&rng()<.35?elites:minions,[x,y]=cells.pop();enemies.push({cid:pool[Math.floor(rng()*pool.length)],x,y,boost});}
   if(boss&&cells.length){const [x,y]=cells.pop();enemies.push({cid:bosses[Math.floor(rng()*bosses.length)],x,y,boss:true,boost:boost+.18});}
-  return {no:6+pos,title:boss?'강호유람 — 천하 고수':'강호유람 — 길 위의 습격',joins:[],map:base.map,spawns:base.spawns,enemies,win:{type:'rout',text:boss?'천하 고수와 수하 격파':'습격자 격파'},lose:'원정대가 전멸하면 패배',pre:[],post:[]};
+  return {no:6+pos,title:boss?'강호유람 — 천하 고수':'강호유람 — 길 위의 습격',joins:[],map:base.map,spawns:base.spawns,enemies,win:{type:'rout',text:boss?'천하 고수와 수하 격파':'습격자 격파'},lose:'전원 퇴각 시 패배',defeat:{type:'all'},pre:[],post:[]};
 }
 function showRoamMap(){
   const run=normalizeRoam(SESSION.challengeState);
@@ -2519,7 +2526,7 @@ function v2New(campId){
   const C = CAMPAIGNS[campId];
   return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
            cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null,
-           supports:{}, supportLock:{}, skillLoadouts:{}, history:[], reputation:{hyeop:0,jeong:0,se:0}, factions:{}, diff:SETTINGS.diff };
+           supports:{}, supportLock:{}, skillLoadouts:{}, history:[], reputation:{hyeop:0,jeong:0,se:0}, factions:{}, trusts:{}, choiceMemory:{}, diff:SETTINGS.diff };
 }
 function importClassicAsChronicle(){
   if(v2LoadSave('chronicle')||!V3STORE.legacy.classicV1) return;
@@ -2577,6 +2584,7 @@ function startCampaignV2(campId, useSave, ngBonus){
   SESSION.campaignState.supports=SESSION.campaignState.supports||{}; SESSION.campaignState.supportLock=SESSION.campaignState.supportLock||{}; /* 구 세이브 호환 */
   SESSION.campaignState.skillLoadouts=SESSION.campaignState.skillLoadouts||{}; SESSION.campaignState.history=SESSION.campaignState.history||[];
   SESSION.campaignState.reputation=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0}; SESSION.campaignState.factions=SESSION.campaignState.factions||{};
+  SESSION.campaignState.trusts=SESSION.campaignState.trusts||{}; SESSION.campaignState.choiceMemory=SESSION.campaignState.choiceMemory||{};
   if(!loaded&&C.inherit){ /* 전권 세이브에서 플래그·보너스 계승 */
     const src=v2LoadSave(C.inherit.from);
     if(src){
@@ -2615,7 +2623,7 @@ function v2Lines(lines){
 function v2BattleDef(n){
   const battles=SESSION.campaignState.cleared.filter(id=>{const st=CAMPAIGNS[SESSION.campaignState.camp].stages[id];return st&&st.kind==='battle';}).length;
   return { no:battles+1, joins:[], title:n.title, map:n.map, spawns:n.spawns, enemies:n.enemies,
-    reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', pre:[], post:[],
+    reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', defeat:n.defeat||null, pre:[], post:[],
     treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null,
     learn:n.learn||null, objective:n.objective||null, bossPhases:n.bossPhases||null,
     sceneTheme:n.sceneTheme||null };
@@ -2687,24 +2695,31 @@ function v2Advance(n){
 }
 function showChoiceNode(n){
   saveCampaignCheckpoint('choice',`${n.title} · 선택 직전`);
+  const memory=SESSION.campaignState.choiceMemory?.[SESSION.campaignState.stageId];
   app().innerHTML=`<div class="result-screen" style="padding:44px 0">
     ${journeyTrail('aftermath')}
     <h2 style="font-size:26px">${n.title}</h2>
     <p>${n.prompt}</p>
-    ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&SESSION.campaignState.flags[x.o.hideIf])).map(x=>`<div style="margin:12px 0">
-      <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${x.i})">${x.o.label}</button>
+    ${n.options.map((o,i)=>({o,i})).filter(x=>!(x.o.hideIf&&SESSION.campaignState.flags[x.o.hideIf])).map(x=>`<div class="choice-route ${memory?(memory.seen||[]).includes(x.i)?'seen':'unseen':''}">
+      <button class="btn" style="min-width:min(480px,88vw)" onclick="pickChoice(${x.i})">${x.o.label}${memory?` <small>${(memory.seen||[]).includes(x.i)?'✓ 확인한 분기':'◆ 미확인 분기'}</small>`:''}</button>
       <div style="color:var(--dim);font-size:12.5px;margin-top:4px">${x.o.desc||''}</div></div>`).join('')}
   </div>`;
 }
 function pickChoice(i){
   const n=curNode(), o=n.options[i];
-  const {history,curBattle,...snapshot}=SESSION.campaignState;
+  const stageId=SESSION.campaignState.stageId;
+  SESSION.campaignState.choiceMemory=SESSION.campaignState.choiceMemory||{};
+  const memory=SESSION.campaignState.choiceMemory[stageId]||{title:n.title,prompt:n.prompt,options:n.options.map(x=>x.label),seen:[]};
+  if(!memory.seen.includes(i)) memory.seen.push(i);
+  SESSION.campaignState.choiceMemory[stageId]=memory;
+  const {history,curBattle,choiceMemory,...snapshot}=SESSION.campaignState;
   SESSION.campaignState.history=SESSION.campaignState.history||[];
-  SESSION.campaignState.history.push({stageId:SESSION.campaignState.stageId,title:n.title,label:o.label,at:Date.now(),state:deepClone(snapshot)});
+  SESSION.campaignState.history.push({stageId,title:n.title,label:o.label,optionIndex:i,options:n.options.map(x=>x.label),at:Date.now(),state:deepClone(snapshot)});
   if(o.set) Object.assign(SESSION.campaignState.flags,o.set);
   if(o.add) for(const k in o.add) SESSION.campaignState.flags[k]=(SESSION.campaignState.flags[k]||0)+o.add[k];
   if(o.rep) for(const k in o.rep) SESSION.campaignState.reputation[k]=(SESSION.campaignState.reputation[k]||0)+o.rep[k];
   if(o.faction) for(const k in o.faction) SESSION.campaignState.factions[k]=(SESSION.campaignState.factions[k]||0)+o.faction[k];
+  if(o.trust) for(const k in o.trust) SESSION.campaignState.trusts[k]=(SESSION.campaignState.trusts[k]||0)+o.trust[k];
   if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
   SESSION.campaignState.stageId=o.to; v2Save(); v2Enter();
 }
@@ -2942,10 +2957,13 @@ function showRouteMap(){
   }).join('');
   const rep=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0};
   const perks=reputationPerks(rep);
+  const factionEntries=Object.entries(SESSION.campaignState.factions||{}).filter(([,v])=>v).sort((a,b)=>b[1]-a[1]);
+  const trustEntries=Object.entries(SESSION.campaignState.trusts||{}).filter(([,v])=>v).sort((a,b)=>b[1]-a[1]);
+  const factionLead=factionEntries[0], trustLead=trustEntries[0];
   app().innerHTML=`<div id="routemap">
     ${journeyTrail('route')}
     <h2>${C.name}</h2>
-    <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${SESSION.campaignState.history&&SESSION.campaignState.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${SESSION.campaignState.history.length}</button>`:''}</div>
+    <div class="reputation-strip"><span>俠 협 <b>${rep.hyeop||0}</b></span><span>情 정 <b>${rep.jeong||0}</b></span><span>勢 세 <b>${rep.se||0}</b></span>${factionLead?`<span>문파 <b>${escHtml(factionLead[0])}·${factionRelationTier(factionLead[1]).label}</b></span>`:''}${trustLead?`<span>신뢰 <b>${escHtml(CHARS[trustLead[0]]?.name||trustLead[0])}·${characterTrustTier(trustLead[1]).label}</b></span>`:''}<button class="btn small" onclick="showRelationshipLedger()">강호 관계록</button>${SESSION.campaignState.history&&SESSION.campaignState.history.length?`<button class="btn small" onclick="showRewindHistory()">강호 회고 ${SESSION.campaignState.history.length}</button>`:''}</div>
     ${perks.length?`<div class="reputation-perks">강호의 반향 · ${perks.join(' · ')}</div>`:''}
     <div class="camp-head"><span>소지금 <b style="color:var(--gold2)">${SESSION.campaignState.gold}냥</b></span><span>부대 ${SESSION.campaignState.party.length}명</span><span>행적 ${Object.keys(SESSION.campaignState.flags).length}건</span></div>
     <div class="route-list">${rows}</div>
@@ -2955,17 +2973,35 @@ function showRouteMap(){
       <button class="btn small danger" style="margin-left:8px" onclick="toTitle()">타이틀로</button>
     </div>
   </div>`;
+  window.scrollTo(0,0);
+}
+
+function showRelationshipLedger(){
+  const state=SESSION.campaignState;
+  const factions=Object.entries(state.factions||{}).sort((a,b)=>b[1]-a[1]);
+  const trusts=Object.entries(state.trusts||{}).sort((a,b)=>b[1]-a[1]);
+  const factionRows=factions.map(([name,score])=>{const tier=factionRelationTier(score);return `<div class="relation-row"><b>${escHtml(name)}</b><span>${tier.label}</span><small>${score}점</small></div>`;}).join('');
+  const trustRows=trusts.map(([cid,score])=>{const tier=characterTrustTier(score);return `<div class="relation-row"><b>${escHtml(CHARS[cid]?.name||cid)}</b><span>${tier.label}</span><small>${score}점</small></div>`;}).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="relation-modal"><div class="modal relation-modal"><h3>강호 관계록</h3><p class="modal-note">선택이 쌓이면 문파의 지원과 인물의 신뢰가 전투에 반영됩니다. 신뢰 2부터 해당 인물 명중 +3, 4부터 공격 +1, 6부터 방어 +1입니다.</p><div class="relation-columns"><section><h4>문파 관계</h4>${factionRows||'<p class="empty-relation">아직 맺은 문파 인연이 없습니다.</p>'}</section><section><h4>인물 신뢰</h4>${trustRows||'<p class="empty-relation">아직 쌓인 개인 신뢰가 없습니다.</p>'}</section></div><div class="btnrow"><button class="btn" onclick="document.getElementById('relation-modal').remove()">닫기</button></div></div></div>`);
 }
 
 function showRewindHistory(){
   const history=SESSION.campaignState.history||[];
-  const rows=history.map((h,i)=>`<div class="rewind-row"><div><b>${h.title}</b><small>${h.label}</small></div><button class="btn small" onclick="rewindHistory(${i})">이 지점으로</button></div>`).join('');
+  const memory=SESSION.campaignState.choiceMemory||{};
+  const rows=history.map((h,i)=>{
+    const seen=memory[h.stageId]?.seen||[];
+    const branches=(h.options||[]).map((label,j)=>`<em class="branch-memory ${seen.includes(j)?'seen':'unseen'}">${seen.includes(j)?'✓':'◆'} ${escHtml(label)}</em>`).join('');
+    return `<div class="rewind-row"><div><b>${h.title}</b><small>선택: ${h.label}</small><div class="branch-list">${branches}</div></div><button class="btn small" onclick="rewindHistory(${i})">이 지점으로</button></div>`;
+  }).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="rewind-modal"><div class="modal"><h3>강호 회고</h3><p class="modal-note">선택 직전의 상태로 돌아갑니다. 이후에 만든 행적은 현재 기기에 덮어씁니다.</p><div class="rewind-list">${rows||'<p>기록된 분기가 없습니다.</p>'}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('rewind-modal').remove()">닫기</button></div></div></div>`);
 }
 function rewindHistory(i){
   const h=SESSION.campaignState.history&&SESSION.campaignState.history[i]; if(!h) return;
   const kept=SESSION.campaignState.history.slice(0,i);
+  const choiceMemory=deepClone(SESSION.campaignState.choiceMemory||{});
   SESSION.activateCampaign(deepClone(h.state)); SESSION.campaignState.history=kept; SESSION.campaignState.stageId=h.stageId;
+  SESSION.campaignState.reputation=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0}; SESSION.campaignState.factions=SESSION.campaignState.factions||{};
+  SESSION.campaignState.trusts=SESSION.campaignState.trusts||{}; SESSION.campaignState.choiceMemory=choiceMemory;
   SESSION.campaignState.curBattle=null; B=null; v2Bind(); v2Save();
   const m=document.getElementById('rewind-modal'); if(m)m.remove();
   v2Enter();
@@ -3194,6 +3230,7 @@ export const DEBUG = {
     combat:reputationCombatEffects(reputation,factions), price:shopPriceFor(100,reputation),
     loot:lootMultiplier(reputation), bond:bondRankWithReputation(1,reputation), perks:reputationPerks(reputation),
   }; },
+  relationshipProbe(score=2,cid='gj'){ return {faction:factionRelationTier(score),trust:characterTrustTier(score),effects:characterTrustEffects({[cid]:score},cid)}; },
   masteryProbe(sid='seoncheon',uses=0){ return masteryInfo(sid,uses); },
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },
@@ -3219,6 +3256,7 @@ export const GLOBALS = {
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
   openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, showRewindHistory, rewindHistory,
+  showRelationshipLedger,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
   toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, showSaveHealth, restoreCampaignCheckpoint, viewSupport,
   showSettings, setDiff, setSpeed, toggleFastEnemy, toggleReducedFx,

@@ -11,6 +11,40 @@ export function reputationCombatEffects(reputation={},factions={}){
   return effects;
 }
 
+const FACTION_TIERS=[
+  {min:6,label:'맹약',rank:4},
+  {min:4,label:'동맹',rank:3},
+  {min:2,label:'우호',rank:2},
+  {min:1,label:'인연',rank:1},
+  {min:-Infinity,label:'중립',rank:0},
+];
+const TRUST_TIERS=[
+  {min:6,label:'생사',rank:4},
+  {min:4,label:'의탁',rank:3},
+  {min:2,label:'신뢰',rank:2},
+  {min:1,label:'호감',rank:1},
+  {min:-Infinity,label:'낯섦',rank:0},
+];
+
+function relationTier(score,tiers){
+  const value=Number(score)||0;
+  const tier=tiers.find(item=>value>=item.min)||tiers[tiers.length-1];
+  return {...tier,score:value};
+}
+
+export function factionRelationTier(score=0){ return relationTier(score,FACTION_TIERS); }
+export function characterTrustTier(score=0){ return relationTier(score,TRUST_TIERS); }
+
+export function characterTrustEffects(trusts={},cid=''){
+  const tier=characterTrustTier(trusts[cid]||0);
+  return {
+    trustAtk:tier.rank>=3?1:0,
+    trustDef:tier.rank>=4?1:0,
+    trustHit:tier.rank>=2?3:0,
+    tier,
+  };
+}
+
 export function shopPriceFor(basePrice,reputation={}){
   const discount=Math.min(.2,(reputation.hyeop||0)*.04);
   return Math.max(1,Math.round(basePrice*(1-discount)));

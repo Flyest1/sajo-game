@@ -190,6 +190,65 @@ test('campaign rewind restores a recorded choice snapshot', async ({ page }) => 
   expect(await page.evaluate(() => window.__dbg.campaignState.gold)).toBe(111);
 });
 
+test('R18 third pass records trust and preserves seen branches across rewind', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.evaluate(() => {
+    window.startCampaignV2('sajo',false);
+    window.__dbg.campaignState.stageId='c5a';
+    window.v2Enter();
+  });
+  await page.getByRole('button',{name:/정\(情\)으로/}).click();
+  const changed=await page.evaluate(() => ({
+    rep:window.__dbg.campaignState.reputation,
+    trust:window.__dbg.campaignState.trusts.ygang,
+    memory:window.__dbg.campaignState.choiceMemory.c5a,
+    tier:window.__dbg.relationshipProbe(2,'ygang'),
+  }));
+  expect(changed.rep.jeong).toBe(2);
+  expect(changed.trust).toBe(2);
+  expect(changed.memory.seen).toEqual([0]);
+  expect(changed.tier).toMatchObject({faction:{label:'우호'},trust:{label:'신뢰'},effects:{trustHit:3}});
+
+  await page.evaluate(() => window.showRouteMap());
+  await page.getByRole('button',{name:'강호 관계록'}).click();
+  await expect(page.locator('#relation-modal')).toContainText('양강');
+  await expect(page.locator('#relation-modal')).toContainText('신뢰');
+  await page.locator('#relation-modal').getByRole('button',{name:'닫기'}).click();
+  await page.getByRole('button',{name:/강호 회고/}).click();
+  await page.getByRole('button',{name:'이 지점으로'}).click();
+  await expect(page.getByRole('button',{name:/정\(情\)으로.*확인한 분기/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/의\(義\)로.*미확인 분기/})).toBeVisible();
+  const rewound=await page.evaluate(() => ({rep:window.__dbg.campaignState.reputation.jeong,trust:window.__dbg.campaignState.trusts.ygang||0,memory:window.__dbg.campaignState.choiceMemory.c5a.seen}));
+  expect(rewound).toEqual({rep:0,trust:0,memory:[0]});
+});
+
+test('hero gathering allows Wang Chongyang and only loses after all allies retreat', async ({ page }) => {
+  await page.evaluate(() => { localStorage.clear(); window.startEndless(); });
+  const wang=page.locator('.dep-card').filter({hasText:'왕중양'});
+  await expect(wang).toBeEnabled();
+  if(await wang.getAttribute('aria-pressed')==='false'){
+    const reserve=page.locator('.dep-card[aria-pressed="true"]:not(:disabled)').first();
+    await reserve.click();
+    await wang.click();
+  }
+  await expect(wang).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:/출 전/}).click();
+  await expect.poll(() => page.evaluate(() => !!window.__dbg.B)).toBe(true);
+  const outcome=await page.evaluate(() => {
+    const battle=window.__dbg.B;
+    const leader=battle.units.find(unit=>unit.cid==='gj'&&unit.team==='P');
+    leader.alive=false;
+    const leaderResult=window.__dbg.winCheck(), overAfterLeader=battle.over;
+    battle.units.filter(unit=>unit.team==='P').forEach(unit=>{unit.alive=false;});
+    const allResult=window.__dbg.winCheck();
+    return {leaderResult,overAfterLeader,allResult,overAfterAll:battle.over,lose:window.__dbg.challengeState.ch.lose};
+  });
+  expect(outcome).toEqual({leaderResult:false,overAfterLeader:false,allResult:true,overAfterAll:true,lose:'전원 퇴각 시 패배'});
+  const finalRules=await page.evaluate(() => Object.values(window.__dbg.CAMPAIGNS.jinfinal.stages).filter(stage=>stage.kind==='battle').map(stage=>stage.defeat?.type));
+  expect(finalRules).toEqual(['all','all']);
+});
+
 test('U6 enriches all four main campaigns with the requested ensembles', async ({ page }) => {
   const report=await page.evaluate(() => {
     const ids=['sajo','sinjo','uicheon','chunryong'];
