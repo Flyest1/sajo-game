@@ -518,6 +518,73 @@ test('R17 roam shop, faction build, and completion legends persist', async ({ pa
   expect(legends.every(item=>item.title&&item.scar&&item.seed==='R17-BUILD')).toBe(true);
 });
 
+test('Tianxia Lunjian runs eight data-driven rounds and persists blessings and records', async ({ page }, testInfo) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/도전과 회상/}).click();
+  await expect(page.getByRole('heading',{name:'천하논검'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'전투 수수께끼'})).toBeVisible();
+  await page.getByRole('button',{name:/논검 시작/}).click();
+  await expect(page.locator('.lunjian-picks .dep-card')).toHaveCount(12);
+  if(process.env.CHALLENGE_VISUAL) await page.screenshot({path:`test-results/challenge-lunjian-${testInfo.project.name}.png`,fullPage:true});
+  await page.getByRole('button',{name:'네 협객으로 시작'}).click();
+  await expect(page.locator('.gauntlet-node')).toHaveCount(8);
+  await page.getByRole('button',{name:/1관 출전 준비/}).click();
+  await expect(page.locator('.dep-card[aria-pressed="true"]')).toHaveCount(4);
+  await page.getByRole('button',{name:/출 전/}).click();
+  const battle=await page.evaluate(() => ({mode:window.__dbg.challengeState.mode,boss:window.__dbg.B.units.find(unit=>unit.boss)?.cid,party:window.__dbg.B.units.filter(unit=>unit.team==='P').length}));
+  expect(battle).toEqual({mode:'lunjian',boss:'mcp',party:4});
+  await page.evaluate(() => { const boss=window.__dbg.B.units.find(unit=>unit.boss);boss.alive=false;window.__dbg.winCheck(); });
+  await expect(page.getByRole('heading',{name:'1관 돌파'})).toBeVisible();
+  const before=await page.evaluate(() => ({...window.__dbg.G.roster.gj.stats}));
+  await page.getByRole('button',{name:/파진결/}).click();
+  const after=await page.evaluate(() => ({stats:{...window.__dbg.G.roster.gj.stats},run:window.__dbg.challengeProbe().lunjian.current}));
+  expect(after.stats.str).toBe(before.str+1);
+  expect(after.stats.int).toBe(before.int+1);
+  expect(after.run).toMatchObject({round:1,blessings:['power']});
+
+  await page.reload();
+  await page.getByRole('button',{name:/이어하기 · 천하논검/}).click();
+  await expect(page.getByRole('button',{name:/2관 출전 준비/})).toBeVisible();
+
+  await page.evaluate(() => { window.__dbg.challengeState.round=7;window.showLunjianMap(); });
+  await page.getByRole('button',{name:/8관 출전 준비/}).click();
+  await page.getByRole('button',{name:/출 전/}).click();
+  await page.evaluate(() => { const boss=window.__dbg.B.units.find(unit=>unit.boss);boss.alive=false;window.__dbg.winCheck(); });
+  await expect(page.getByRole('heading',{name:'천하논검 제패'})).toBeVisible();
+  const records=await page.evaluate(() => window.__dbg.challengeProbe().lunjian);
+  expect(records.bestRound).toBe(8);
+  expect(records.records).toHaveLength(1);
+  expect(records.current).toBeUndefined();
+});
+
+test('combat riddles expose ten deterministic trials and save the best medal', async ({ page }, testInfo) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button',{name:/도전과 회상/}).click();
+  await page.getByRole('button',{name:/수수께끼 풀기/}).click();
+  await expect(page.locator('.trial-card')).toHaveCount(10);
+  if(process.env.CHALLENGE_VISUAL) await page.screenshot({path:`test-results/challenge-trials-${testInfo.project.name}.png`,fullPage:true});
+  await page.locator('.trial-card').first().click();
+  await expect(page.getByRole('heading',{name:'전광의 한 수'})).toBeVisible();
+  await page.getByRole('button',{name:'수수께끼 시작'}).click();
+  await expect(page.locator('.dep-card')).toHaveCount(2);
+  await page.getByRole('button',{name:/출 전/}).click();
+  const deterministic=await page.evaluate(() => {
+    const attacker=window.__dbg.B.units.find(unit=>unit.team==='P'),defender=window.__dbg.B.units.find(unit=>unit.team==='E');
+    return {mode:window.__dbg.challengeState.mode,result:window.__dbg.calc(attacker,defender,attacker.skills[0])};
+  });
+  expect(deterministic.mode).toBe('trial');
+  expect(deterministic.result).toMatchObject({hit:100,crit:0});
+  await page.evaluate(() => { window.__dbg.B.turn=1;window.__dbg.B.units.filter(unit=>unit.team==='E').forEach(unit=>{unit.alive=false;});window.__dbg.winCheck(); });
+  await expect(page.getByRole('heading',{name:/전광의 한 수/})).toBeVisible();
+  await expect(page.getByText(/완전한 해법/)).toBeVisible();
+  const probe=await page.evaluate(() => window.__dbg.challengeProbe());
+  expect(probe).toMatchObject({rounds:8,trialCount:10,trials:{medals:{flash:'gold'}}});
+  await page.getByRole('button',{name:'목록'}).click();
+  await expect(page.locator('.trial-card.gold')).toHaveCount(1);
+});
+
 test('legacy classic save is copied into the unified chronicle', async ({ page }) => {
   await page.evaluate(() => {
     localStorage.clear();

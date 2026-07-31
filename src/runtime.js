@@ -38,7 +38,7 @@ export function createSessionRuntime({classic}){
     outcome(){
       const run=challenge(), story=campaign();
       if(story?.curBattle) return 'campaign';
-      if(run?.mode==='roam') return 'roam';
+      if(run?.mode) return run.mode;
       if(run) return 'endless';
       return 'classic';
     },

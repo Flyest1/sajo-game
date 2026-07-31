@@ -10,6 +10,10 @@ import { makeCampaignCheckpoint, appendCheckpoint, checkpointById } from './chec
 import { loadMotion, killMotionTriggers } from './motion.js';
 import { ROAM_RELICS, ROAM_NODE_META, buildRoamNodes, relicOffers, applyRelic, legendFor } from './roam.js';
 import {
+  LUNJIAN_HEROES, LUNJIAN_ROUNDS, LUNJIAN_BLESSINGS, TRIALS,
+  makeLunjianBattle, makeTrialBattle, trialById, evaluateTrial, betterMedal,
+} from './challenges.js';
+import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
 } from './battle-objectives.js';
@@ -31,14 +35,17 @@ const SUPPORT_MAP = {};
 for(const p of SUPPORTS.pairs) SUPPORT_MAP[pairKey(p.a,p.b)] = p;
 const RANK_NAME = ['—','C','B','A'];
 function bondRank(cidA,cidB){
+  const key=pairKey(cidA,cidB);
+  if(SESSION.isChallenge('trial')) return SUPPORT_MAP[key]?3:0;
+  if(SESSION.isChallenge('lunjian')) return SUPPORT_MAP[key]?1:0;
   const campaign=SESSION.campaign();
   if(!campaign?.supports) return 0;
-  const base=campaign.supports[pairKey(cidA,cidB)]||0;
+  const base=campaign.supports[key]||0;
   return bondRankWithReputation(base,campaign.reputation);
 }
 /* 유닛 u 기준, 인접 아군 중 최고 인연 랭크(0~3) */
 function adjBond(u){
-  if(!B||!SESSION.isCampaign()) return 0;
+  if(!B||(!SESSION.isCampaign()&&!SESSION.isChallenge('trial')&&!SESSION.isChallenge('lunjian'))) return 0;
   let best=0;
   for(const o of B.units){
     if(o.alive&&o!==u&&o.team===u.team&&dist(o,u)===1){
@@ -153,6 +160,9 @@ const ACHV = [
   {id:'promote', name:'환골탈태', desc:'협객을 처음 승급시킨다'},
   {id:'endless10', name:'십중포위', desc:'무한 모드 10파 격퇴'},
   {id:'endless20', name:'불굴의 아레나', desc:'무한 모드 20파 격퇴'},
+  {id:'lunjian_clear', name:'천하논검 제패', desc:'천하논검 8관을 완주'},
+  {id:'trial_first', name:'수수께끼의 해답', desc:'전투 수수께끼에서 첫 메달 획득'},
+  {id:'trial_gold_all', name:'무결의 해법', desc:'전투 수수께끼 10개에서 모두 금메달 획득'},
   {id:'clear_sajo', name:'사조영웅전 완주', desc:'제1권을 완주'},
   {id:'clear_sinjo', name:'신조협려 완주', desc:'제2권을 완주'},
   {id:'clear_uicheon', name:'의천도룡기 완주', desc:'제3권을 완주'},
@@ -363,6 +373,7 @@ function calcStrike(a,d,skillId){
   const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
   let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) + (a.repHit||0) + (a.trustHit||0) - d.stats.spd*2 - dT.avoid + wHit));
   let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
+  if(SESSION.isChallenge('trial')){ hit=100; crit=0; }
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
   return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep};
 }
@@ -545,6 +556,7 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
       d.guard=Math.max(0,d.guard-gp);
       fx(d.x,d.y,`강기 -${gp}`,'guard');
       if(d.guard===0){
+        if(a.team==='P'&&d.team==='E') B.guardBreaks=(B.guardBreaks||0)+1;
         d.broken=true; fx(d.x,d.y,'破 파훼!','break'); SFX.play('crit'); shakeMap(true);
         log(`<b>${d.name}의 호신강기가 무너졌다!</b> 남은 협객의 공격이 강해진다.`,true);
       }
@@ -552,7 +564,10 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     const obj=activeObjective();
     const subdue=obj.type==='subdue'&&d.cid===obj.target&&a.team==='P';
     const floor=subdue?Math.max(1,Math.ceil(d.maxhp*(obj.threshold||.2))):0;
+    const hpBefore=d.hp;
     d.hp=Math.max(floor,d.hp-dmg);
+    if(d.team==='P') B.damageTaken=(B.damageTaken||0)+Math.max(0,hpBefore-d.hp);
+    if(a.team==='P'&&c.bA>0) B.bondStrikes=(B.bondStrikes||0)+1;
     if(isCrit&&a.team==='P'){ STATS.crits++; if(STATS.crits>=50) unlockAchv('crit50'); saveStats(); }
     SFX.play(isCrit?'crit':'hit');
     flashTile(d.x,d.y,isCrit?'crit':'');
@@ -567,6 +582,7 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     }
     if(subdue&&d.hp<=floor){
       d.subdued=true; d.acted=true;
+      B.subdues=(B.subdues||0)+1;
       fx(d.x,d.y,'제압!','break');
       log(`<b>${d.name}을(를) 살상하지 않고 제압했다.</b>`,true);
     }else if(d.hp<=0){
@@ -577,6 +593,7 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
         grantExp(a, 30 + Math.max(0,(d.lvl-a.lvl))*4 + (d.boss?40:0));
         log(`<b>${d.name} 격파!</b>`,true);
         if(a.team==='P'){ STATS.kills++; if(d.boss) STATS.bosses++;
+          B.enemyKills=(B.enemyKills||0)+1;
           if(STATS.kills>=50) unlockAchv('kills50'); if(STATS.kills>=200) unlockAchv('kills200');
           if(STATS.bosses>=10) unlockAchv('boss10'); saveStats(); }
       }else{
@@ -1090,6 +1107,7 @@ function startBattle(){
     weather:pickWeather(),
     sceneSeed:strSeed(ctx.sceneKey),
     timeBase:pickBattleTime(),
+    enemyKills:0,guardBreaks:0,bondStrikes:0,subdues:0,damageTaken:0,
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
@@ -1816,6 +1834,14 @@ function showVictory(){
     roamBattleWon();
     return;
   }
+  if(outcome==='lunjian'){
+    lunjianBattleWon();
+    return;
+  }
+  if(outcome==='trial'){
+    trialBattleWon();
+    return;
+  }
   if(outcome==='endless'){
     const w=SESSION.challengeValue('wave',1);
     setBestWave(w);
@@ -1878,6 +1904,16 @@ function showDefeat(){
     app().innerHTML=`<div class="result-screen">${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">유람 중 패배</h2><p>이 노드에 들어오기 전 기록에서 다시 도전할 수 있습니다.</p><button class="btn" onclick="enterRoamNode()">재도전</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
     return;
   }
+  if(outcome==='lunjian'){
+    const run=SESSION.challenge();run.ch=null;saveLunjian();
+    app().innerHTML=`<div class="result-screen">${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">논검 패배</h2><p>${run.round+1}관의 초식을 넘지 못했습니다.<br>관문 직전의 전력으로 다시 도전할 수 있습니다.</p><button class="btn" onclick="enterLunjianRound()">현재 관문 재도전</button><button class="btn small" onclick="showLunjianMap()">논검 지도</button><button class="btn danger" onclick="toTitle()">잠시 멈춤</button></div>`;
+    return;
+  }
+  if(outcome==='trial'){
+    const id=SESSION.challengeValue('id');
+    app().innerHTML=`<div class="result-screen">${sealSVG('敗','#6a7488')}<h2 style="color:#e07a5a">해법 미완성</h2><p>배치를 다시 읽고 다른 순서로 초식을 이어 보십시오.</p><button class="btn" onclick="startTrial('${id}')">다시 풀기</button><button class="btn danger" onclick="showTrialSelect()">수수께끼 목록</button></div>`;
+    return;
+  }
   if(outcome==='endless'){
     const w=SESSION.challengeValue('wave',1);
     setBestWave(w-1);
@@ -1916,9 +1952,9 @@ const SAVE_KEY='kimyong_srpg_save_v1';
 const LASTPLAY_KEY='kimyong_lastplay';
 function normalizeLastPlay(value){
   if(!value||typeof value!=='object') return null;
-  const legacy={v2:'campaign',classic:'campaign',endless:'endless',roam:'roam'};
+  const legacy={v2:'campaign',classic:'campaign',endless:'endless',roam:'roam',lunjian:'lunjian'};
   const mode=value.mode||legacy[value.k];
-  if(!['campaign','endless','roam'].includes(mode)) return null;
+  if(!['campaign','endless','roam','lunjian'].includes(mode)) return null;
   const campaignId=value.campaignId||value.c||(value.k==='classic'?'chronicle':null);
   return {mode,campaignId:campaignId||null,at:Number(value.at||value.t)||Date.now()};
 }
@@ -1939,6 +1975,7 @@ function recentSessionInfo(){
     return {last,label:CAMPAIGNS[id].name,shortLabel:source&&source.length<=14?source:CAMPAIGNS[id].name,action:'이어하기'};
   }
   if(last.mode==='roam'&&V3STORE.challenges.roam?.current) return {last,label:'강호유람',shortLabel:'강호유람',action:'이어하기'};
+  if(last.mode==='lunjian'&&V3STORE.challenges.lunjian?.current) return {last,label:'천하논검',shortLabel:'천하논검',action:'이어하기'};
   if(last.mode==='endless') return {last,label:'영웅집결 무한 모드',shortLabel:'영웅집결',action:'다시 도전'};
   return null;
 }
@@ -1948,6 +1985,7 @@ function resumeLastSession(){
   const {last}=recent;
   if(last.mode==='campaign') startCampaignV2(last.campaignId,true);
   else if(last.mode==='roam') resumeRoam();
+  else if(last.mode==='lunjian') resumeLunjian();
   else startEndless();
 }
 function saveGame(nextCh){
@@ -1970,6 +2008,7 @@ function hubContinue(kind,camp){
   const m=document.getElementById('hub-modal'); if(m) m.remove();
   if(kind==='campaign') startCampaignV2(camp,true);
   else if(kind==='roam') resumeRoam();
+  else if(kind==='lunjian') resumeLunjian();
   else if(kind==='endless') startEndless();
 }
 function showSaveHub(){
@@ -1987,6 +2026,8 @@ function showSaveHub(){
   const roam=V3STORE.challenges.roam||{};
   if(roam.current) rows.push(`<tr><td style="text-align:left"><b>강호유람</b><div class="hub-sub">시드 ${escHtml(roam.current.seed)} · ${roam.current.pos||0}/${roam.current.nodes?.length||10} 노드</div></td>
     <td><button class="btn small" onclick="hubContinue('roam')">이어하기</button></td></tr>`);
+  const lunjian=V3STORE.challenges.lunjian||{};
+  if(lunjian.current) rows.push(`<tr><td style="text-align:left"><b>천하논검</b><div class="hub-sub">${(lunjian.current.round||0)+1}/8관 · ${DIFFS[lunjian.current.diff]?.name||'표준'}</div></td><td><button class="btn small" onclick="hubContinue('lunjian')">이어하기</button></td></tr>`);
   if(bestWave()>0){
     rows.push(`<tr><td style="text-align:left"><b>영웅집결 무한 모드</b><div class="hub-sub">역대 최고 ${bestWave()}파</div></td>
       <td><button class="btn small" onclick="hubContinue('endless')">도전</button></td></tr>`);
@@ -2252,6 +2293,119 @@ function showRoamLegends(){
   const legends=(V3STORE.challenges.roam&&V3STORE.challenges.roam.legends)||[];
   const rows=legends.length?legends.map(x=>`<div class="legend-row"><b>${x.name}</b><span>${x.title} · ${x.scar}</span><small>SEED ${escHtml(x.seed)} · ${x.nodes}노드 · ${(x.relics||[]).map(id=>ROAM_RELICS[id]?.name).filter(Boolean).join(' · ')||'무보물'}</small></div>`).join(''):'<p>아직 기록된 강호전설이 없습니다.</p>';
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="legend-modal"><div class="modal"><h3>강호전설</h3><div class="legend-list">${rows}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('legend-modal').remove()">닫기</button></div></div></div>`);
+}
+
+/* ── 천하논검: 4인 편성·8관 연전 ── */
+let LUNJIAN_PICK=['gj','yg','jmk','sb'];
+function fixedChallengeRoster(ids,level){
+  G.roster={};G.party=[];G.extraSkills={};G.deploy=null;
+  const names=['hp','str','int','def','res','spd','skl'];
+  for(const cid of ids){
+    const c=CHARS[cid],stats=statObj(c.base),growth=c.grow?.length?c.grow:[60,40,40,40,40,40,40];
+    names.forEach((name,i)=>{stats[name]+=Math.round((level-1)*(growth[i]||40)/100);});
+    stats.ki+=level-1;
+    G.roster[cid]={cid,lvl:level,exp:0,stats};G.party.push(cid);
+  }
+}
+function lunjianStore(){
+  V3STORE.challenges.lunjian=V3STORE.challenges.lunjian||{bestRound:0,clears:0,records:[]};
+  return V3STORE.challenges.lunjian;
+}
+function saveLunjian(){
+  const run=SESSION.challenge();if(!run||run.mode!=='lunjian')return;
+  const {ch,...state}=run,store=lunjianStore();
+  store.current=deepClone({...state,roster:G.roster,party:G.party,extra:G.extraSkills,deploy:G.deploy});
+  V3STORE=writeV3(V3STORE);markPlay('lunjian');
+}
+function showLunjianStart(){
+  const saved=lunjianStore().current;
+  LUNJIAN_PICK=['gj','yg','jmk','sb'];
+  app().innerHTML=`<div id="campsel" class="chronicle-screen trial-screen"><div class="chronicle-head"><div><div class="eyebrow">天下論劍</div><h2>천하논검</h2><p>네 협객을 골라 여덟 관주의 호신강기와 전용 초식을 연속으로 파훼하십시오. 관문 사이에는 하나의 심법을 택해 부대를 강화합니다.</p></div><button class="btn small danger" onclick="showChallengeSelect()">도전 목록</button></div>
+    ${saved?`<div class="challenge-resume"><b>진행 중인 논검 · ${saved.round+1}/8관</b><button class="btn" onclick="resumeLunjian()">이어하기</button></div>`:''}
+    <div class="trial-rule"><span>편성 <b id="lj-count">${LUNJIAN_PICK.length}/4</b></span><span>난이도 <b>${curDiff().name}</b></span><span>전투마다 체력·기력 회복</span></div>
+    <div class="lunjian-picks">${LUNJIAN_HEROES.map(cid=>`<button class="dep-card ${LUNJIAN_PICK.includes(cid)?'on':'off'}" aria-pressed="${LUNJIAN_PICK.includes(cid)}" onclick="toggleLunjianPick('${cid}')"><div class="pt">${ptSVG(cid)}</div><div class="dep-name">${CHARS[cid].name}</div><div class="dep-info">${TYPE_NAME[CHARS[cid].type]} · ${CHARS[cid].cls}</div></button>`).join('')}</div>
+    <div class="btnrow"><button id="lj-start" class="btn" onclick="beginLunjian()">네 협객으로 시작</button></div></div>`;
+}
+function toggleLunjianPick(cid){
+  const i=LUNJIAN_PICK.indexOf(cid);
+  if(i>=0)LUNJIAN_PICK.splice(i,1);else if(LUNJIAN_PICK.length<4)LUNJIAN_PICK.push(cid);
+  document.querySelectorAll('.lunjian-picks .dep-card').forEach((card,index)=>{const on=LUNJIAN_PICK.includes(LUNJIAN_HEROES[index]);card.classList.toggle('on',on);card.classList.toggle('off',!on);card.setAttribute('aria-pressed',String(on));});
+  const count=document.getElementById('lj-count');if(count)count.textContent=`${LUNJIAN_PICK.length}/4`;
+  const start=document.getElementById('lj-start');if(start)start.disabled=LUNJIAN_PICK.length!==4;
+}
+function beginLunjian(){
+  if(LUNJIAN_PICK.length!==4)return;
+  B=null;fixedChallengeRoster(LUNJIAN_PICK,12);
+  SESSION.activateChallenge({mode:'lunjian',round:0,totalTurns:0,blessings:[],diff:SETTINGS.diff,ch:null});
+  saveLunjian();showLunjianMap();
+}
+function resumeLunjian(){
+  const saved=lunjianStore().current;if(!saved)return showLunjianStart();
+  const {roster,party,extra,deploy,...run}=deepClone(saved);
+  B=null;SESSION.activateChallenge({...run,mode:'lunjian',ch:null});
+  G.roster=roster;G.party=party;G.extraSkills=extra||{};G.deploy=deploy||null;
+  showLunjianMap();
+}
+function showLunjianMap(){
+  const run=SESSION.challenge(),store=lunjianStore();if(!run||run.mode!=='lunjian')return showLunjianStart();
+  const nodes=LUNJIAN_ROUNDS.map((round,i)=>`<div class="gauntlet-node ${i<run.round?'done':i===run.round?'cur':'lock'}"><i>${i<run.round?'✓':i+1}</i><b>${CHARS[round.boss].name}</b><small>${round.title}</small></div>`).join('');
+  const blessings=(run.blessings||[]).map(id=>LUNJIAN_BLESSINGS[id]?.name).filter(Boolean).join(' · ')||'아직 얻은 심법 없음';
+  app().innerHTML=`<div class="result-screen gauntlet-screen"><div class="eyebrow">BEST ${store.bestRound||0}/8</div><h2>天下論劍 천하논검</h2><div class="gauntlet-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="gauntlet-path">${nodes}</div><p class="gauntlet-bless"><b>누적 심법</b> ${blessings}</p><button class="btn" onclick="enterLunjianRound()">${run.round+1}관 출전 준비</button><button class="btn danger" onclick="saveLunjian();toTitle()">잠시 멈춤</button></div>`;
+}
+function enterLunjianRound(){
+  const run=SESSION.challenge();if(!run||run.mode!=='lunjian')return;
+  run.ch=makeLunjianBattle(run.round,CHAPTERS);G.deploy=[...G.party];saveLunjian();showDeploy();
+}
+function lunjianBattleWon(){
+  const run=SESSION.challenge(),store=lunjianStore();
+  run.totalTurns=(run.totalTurns||0)+B.turn;run.round++;run.ch=null;store.bestRound=Math.max(store.bestRound||0,run.round);
+  if(run.round>=LUNJIAN_ROUNDS.length){
+    store.clears=(store.clears||0)+1;
+    const record={party:[...G.party],diff:run.diff,blessings:[...(run.blessings||[])],turns:run.totalTurns,at:Date.now()};
+    const diffRank={story:1,std:2,hero:3};
+    store.records=[record,...(store.records||[])].sort((a,b)=>(diffRank[b.diff]||0)-(diffRank[a.diff]||0)||(a.turns||999)-(b.turns||999)).slice(0,12);
+    delete store.current;V3STORE=writeV3(V3STORE);unlockAchv('lunjian_clear');
+    app().innerHTML=`<div class="result-screen">${sealSVG('魁','#c0392e')}<h2>천하논검 제패</h2><p>여덟 관주의 초식을 모두 꿰뚫었습니다.<br>${G.party.map(cid=>CHARS[cid].name).join(' · ')}의 이름이 논검록에 남았습니다.</p><button class="btn" onclick="showLunjianRecords()">논검록</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;
+    return;
+  }
+  saveLunjian();
+  app().innerHTML=`<div class="result-screen blessing-screen">${sealSVG('破','#c0392e')}<h2>${run.round}관 돌파</h2><p>다음 관문을 앞두고 하나의 심법을 새깁니다.</p><div class="blessing-grid">${Object.entries(LUNJIAN_BLESSINGS).map(([id,item])=>`<button class="btn blessing" onclick="lunjianChoose('${id}')"><b>${item.name}</b><span>${item.desc}</span></button>`).join('')}</div></div>`;
+}
+function lunjianChoose(id){
+  const run=SESSION.challenge(),blessing=LUNJIAN_BLESSINGS[id];if(!run||!blessing)return;
+  for(const cid of G.party)for(const [stat,value] of Object.entries(blessing.stats))G.roster[cid].stats[stat]+=value;
+  run.blessings.push(id);saveLunjian();showLunjianMap();
+}
+function showLunjianRecords(){
+  const records=lunjianStore().records||[];
+  const rows=records.map((record,i)=>`<div class="legend-row"><b>#${i+1} ${record.party.map(cid=>CHARS[cid]?.name||cid).join('·')}</b><span>${DIFFS[record.diff]?.name||record.diff} · 총 ${record.turns}턴</span><small>${(record.blessings||[]).map(id=>LUNJIAN_BLESSINGS[id]?.name).filter(Boolean).join(' · ')||'무심법'} · ${new Date(record.at).toLocaleDateString('ko-KR')}</small></div>`).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="lunjian-records"><div class="modal"><h3>천하 논검록</h3><div class="legend-list">${rows||'<p>아직 완주 기록이 없습니다.</p>'}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('lunjian-records').remove()">닫기</button></div></div></div>`);
+}
+
+/* ── 전투 수수께끼: 고정 전력·결정론 전투·메달 ── */
+const MEDAL_ICON={gold:'🥇',silver:'🥈',bronze:'🥉',none:'○'};
+function trialStore(){V3STORE.challenges.trials=V3STORE.challenges.trials||{medals:{}};V3STORE.challenges.trials.medals=V3STORE.challenges.trials.medals||{};return V3STORE.challenges.trials;}
+function showTrialSelect(){
+  const medals=trialStore().medals;
+  const gold=TRIALS.filter(trial=>medals[trial.id]==='gold').length;
+  app().innerHTML=`<div id="campsel" class="chronicle-screen trial-screen"><div class="chronicle-head"><div><div class="eyebrow">武林謎題</div><h2>전투 수수께끼</h2><p>고정된 인물과 무공으로 목표를 해결합니다. 모든 명중은 확정되고 필살은 발생하지 않아 같은 선택은 같은 결과를 냅니다.</p></div><button class="btn small danger" onclick="showChallengeSelect()">도전 목록</button></div><div class="trial-rule"><span>금메달 <b>${gold}/${TRIALS.length}</b></span><span>고정 난이도 <b>표준</b></span><span>최고 메달 영구 저장</span></div><div class="trial-grid">${TRIALS.map((trial,i)=>{const medal=medals[trial.id]||'none';return `<button class="trial-card ${medal}" onclick="showTrialBrief('${trial.id}')"><i>${MEDAL_ICON[medal]}</i><div><small>${String(i+1).padStart(2,'0')} · ${trial.school}</small><b>${trial.title}</b><span>${trial.brief}</span><em>금 ${trial.goldText}</em></div></button>`;}).join('')}</div></div>`;
+}
+function showTrialBrief(id){
+  const trial=trialById(id);if(!trial)return;
+  app().innerHTML=`<div class="result-screen trial-brief"><div class="eyebrow">${trial.school} 試鍊</div><h2>${trial.title}</h2><p>${trial.brief}</p><div class="trial-party">${trial.party.map(cid=>`<span>${ptSVG(cid)}<b>${CHARS[cid].name}</b><small>${TYPE_NAME[CHARS[cid].type]}</small></span>`).join('')}</div><div class="medal-conditions"><div><b>🥇 금</b>${trial.goldText}</div><div><b>🥈 은</b>${trial.silverText}</div><div><b>🥉 동</b>승리</div></div><button class="btn" onclick="startTrial('${id}')">수수께끼 시작</button><button class="btn danger" onclick="showTrialSelect()">목록</button></div>`;
+}
+function startTrial(id){
+  const trial=trialById(id);if(!trial)return;
+  B=null;fixedChallengeRoster(trial.party,trial.level);
+  SESSION.activateChallenge({mode:'trial',id,diff:'std',ch:makeTrialBattle(trial)});G.deploy=[...G.party];showDeploy();
+}
+function trialMetrics(){return {turn:B.turn,allyLost:!!B.allyLost,damageTaken:B.damageTaken||0,guardBreaks:B.guardBreaks||0,bondStrikes:B.bondStrikes||0,enemyKills:B.enemyKills||0,subdues:B.subdues||0};}
+function trialBattleWon(){
+  const run=SESSION.challenge(),trial=trialById(run.id),metrics=trialMetrics(),medal=evaluateTrial(trial,metrics),store=trialStore();
+  store.medals[trial.id]=betterMedal(store.medals[trial.id],medal);V3STORE=writeV3(V3STORE);unlockAchv('trial_first');
+  if(TRIALS.every(item=>store.medals[item.id]==='gold'))unlockAchv('trial_gold_all');
+  const next=TRIALS[TRIALS.findIndex(item=>item.id===trial.id)+1];
+  app().innerHTML=`<div class="result-screen trial-result">${sealSVG(medal==='gold'?'金':medal==='silver'?'銀':'銅',medal==='gold'?'#d9b36c':medal==='silver'?'#aab3bd':'#a96b45')}<h2>${MEDAL_ICON[medal]} ${trial.title}</h2><p>${medal==='gold'?'완전한 해법입니다.':medal==='silver'?'빈틈을 줄이면 금의 해법에 닿습니다.':'해결했습니다. 이제 더 날카로운 해법에 도전할 수 있습니다.'}<br>완료 ${metrics.turn}턴 · 받은 피해 ${metrics.damageTaken} · 파훼 ${metrics.guardBreaks}회 · 협공 ${metrics.bondStrikes}회</p><button class="btn" onclick="startTrial('${trial.id}')">다시 풀기</button>${next?`<button class="btn" onclick="showTrialBrief('${next.id}')">다음 수수께끼</button>`:''}<button class="btn danger" onclick="showTrialSelect()">목록</button></div>`;
 }
 
 /* ── 타이틀 ── */
@@ -3110,6 +3264,9 @@ function showCampaignSelect(groupId='chronicles'){
 function showChallengeSelect(){
   const best=bestWave();
   const roam=V3STORE.challenges.roam||{};
+  const lunjian=V3STORE.challenges.lunjian||{};
+  const trialMedals=V3STORE.challenges.trials?.medals||{};
+  const trialGold=TRIALS.filter(trial=>trialMedals[trial.id]==='gold').length;
   app().innerHTML=`<div id="campsel" class="chronicle-screen">
     <div class="chronicle-head"><div><div class="eyebrow">試鍊과 回想</div><h2>도전과 회상</h2><p>정사 진행과 분리된 반복 도전 및 초대판 기록입니다.</p></div>
       <button class="btn small danger" onclick="toTitle()">타이틀</button></div>
@@ -3117,6 +3274,8 @@ function showChallengeSelect(){
       <div class="camp-card challenge-card"><div class="camp-meta"><span>반복 도전</span><span>비정사</span></div><h3>영웅집결 무한 모드</h3>
         <p>전 영웅을 이끌고 강해지는 적의 파도에 맞섭니다. 3파마다 강적이 출현합니다.</p>
         <button class="btn" onclick="startEndless()">도전하기${best?` · 최고 ${best}파`:''}</button></div>
+      <div class="camp-card"><div class="camp-meta"><span>8관 연전</span><span>비정사</span></div><h3>천하논검</h3><p>네 협객을 편성해 여덟 관주의 전용 초식을 파훼합니다. 관문마다 심법을 골라 자신만의 논검 부대를 완성합니다.</p><button class="btn" onclick="showLunjianStart()">${lunjian.current?'이어하기 / 새 논검':'논검 시작'}${lunjian.bestRound?` · 최고 ${lunjian.bestRound}/8관`:''}</button>${lunjian.records?.length?`<button class="btn small" onclick="showLunjianRecords()">논검록 ${lunjian.records.length}</button>`:''}</div>
+      <div class="camp-card"><div class="camp-meta"><span>고정 전술 10제</span><span>비정사</span></div><h3>전투 수수께끼</h3><p>고정된 협객과 확정 명중 규칙으로 파훼·제압·점거·탈출의 해법을 찾습니다. 금·은·동 최고 기록이 보존됩니다.</p><button class="btn" onclick="showTrialSelect()">수수께끼 풀기 · 금 ${trialGold}/${TRIALS.length}</button></div>
       ${campCard('chronicle','19전 압축')}
       <div class="camp-card challenge-card"><div class="camp-meta"><span>시드 원정</span><span>비정사</span></div><h3>강호유람</h3><p>네 협객으로 12~15개 노드의 격전·기연·객잔·장터·문파 사건을 지나 천하 고수에게 도전합니다. 완주 기록은 별호와 흉터를 지닌 강호전설로 남습니다.</p><button class="btn" onclick="showRoamStart()">${roam.current?'이어하기 / 새 유람':'유람 시작'}${roam.best?` · 최고 ${roam.best}노드`:''}</button>${roam.legends?.length?`<button class="btn small" onclick="showRoamLegends()">강호전설 ${roam.legends.length}</button>`:''}</div>
     </div>
@@ -3239,6 +3398,7 @@ export const DEBUG = {
   backupRestore(input){ const result=restoreBackupPayload(input,localStorage); return {ok:result.ok,count:result.count,issues:result.issues}; },
   checkpointProbe(){ return deepClone(V3STORE.checkpoints||{latest:null,history:[]}); },
   roamProbe(){ return deepClone(V3STORE.challenges.roam||{}); },
+  challengeProbe(){ return {lunjian:deepClone(V3STORE.challenges.lunjian||{}),trials:deepClone(V3STORE.challenges.trials||{}),rounds:LUNJIAN_ROUNDS.length,trialCount:TRIALS.length}; },
   sessionContext(){ return {context:runtimeContext(),outcome:SESSION.outcome(),campaign:SESSION.campaign()?.camp||null,challenge:SESSION.challenge()?.mode||null}; },
   openCurrentDeploy(){ const node=curNode(); if(node?.kind==='battle') v2Deploy(node); },
   forceDefeat(){ if(B){ B.over=true; showDefeat(); } },
@@ -3252,6 +3412,8 @@ export const GLOBALS = {
   showChapterSelect, jumpChapter, startEndless, nextWave, toTitle, retryChapter, afterVictory,
   showRoamStart, startRoamFromInput, resumeRoam, showRoamMap, enterRoamNode, roamChoice,
   showRoamShop, roamBuyRelic, showRoamFaction, roamFactionChoice, advanceRoamNode, showRoamLegends,
+  showLunjianStart, toggleLunjianPick, beginLunjian, resumeLunjian, showLunjianMap, enterLunjianRound, saveLunjian, lunjianChoose, showLunjianRecords,
+  showTrialSelect, showTrialBrief, startTrial,
   showCampaignSelect, showChallengeSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,

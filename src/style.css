@@ -15,7 +15,7 @@ body{
     radial-gradient(ellipse at 50% -20%, #2e2418 0%, #1b1712 60%);
 }
 #app{width:1040px;max-width:98vw;}
-body:has(#routemap),body:has(#campsel),body:has(#camp),body:has(#deploy){align-items:flex-start;padding-top:8px;padding-bottom:32px;}
+body:has(#routemap),body:has(#campsel),body:has(#camp),body:has(#deploy),body:has(.gauntlet-screen),body:has(.trial-brief){align-items:flex-start;padding-top:8px;padding-bottom:32px;}
 h1,h2,h3{font-weight:700;color:var(--gold2);letter-spacing:.06em;}
 .btn{
   display:inline-block;background:linear-gradient(180deg,#4a3f2c,#332c21);
@@ -466,6 +466,14 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 .challenge-grid .camp-card{margin:0;min-height:190px;display:flex;flex-direction:column;align-items:flex-start;}
 .challenge-grid .camp-card p{flex:1;}
 .challenge-grid .challenge-card{grid-column:span 2;background:linear-gradient(120deg,#493725,#28231d 72%);}
+.challenge-resume{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--gold);background:rgba(217,179,108,.1)}
+.trial-rule{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.trial-rule span{padding:6px 10px;border:1px solid rgba(217,179,108,.3);background:rgba(217,179,108,.07);color:var(--dim);font-size:12px}.trial-rule b{color:var(--gold2)}
+.lunjian-picks{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.lunjian-picks .dep-card{width:auto;margin:0;min-height:132px}.lunjian-picks .dep-info{font-size:10px;white-space:normal}.lunjian-picks .pt{width:60px;height:60px}
+.gauntlet-screen{width:min(1000px,96vw);margin:auto}.gauntlet-party,.trial-party{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:10px 0 18px}.gauntlet-party span{padding:5px 9px;border:1px solid rgba(217,179,108,.3);background:rgba(217,179,108,.08);font-size:12px;color:var(--gold2)}
+.gauntlet-path{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0}.gauntlet-node{display:grid;grid-template-columns:auto 1fr;gap:2px 9px;text-align:left;padding:10px;border:1px solid var(--line);background:var(--panel);opacity:.42}.gauntlet-node i{grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--line);border-radius:50%;font-style:normal}.gauntlet-node b{font-size:13px}.gauntlet-node small{font-size:10px;color:var(--dim)}.gauntlet-node.cur{opacity:1;border-color:var(--gold);box-shadow:0 0 16px rgba(217,179,108,.16)}.gauntlet-node.done{opacity:.78}.gauntlet-node.done i{background:#6b5428;color:#fff0bd}.gauntlet-bless{font-size:13px!important;margin:12px 0 18px!important}.gauntlet-bless b{color:var(--gold2)}
+.blessing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:760px;margin:18px auto}.btn.blessing{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;white-space:normal}.btn.blessing b{font-size:17px}.btn.blessing span{color:#d2c09b;font-size:12px;letter-spacing:0}
+.trial-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.trial-card{display:grid;grid-template-columns:46px 1fr;gap:10px;align-items:center;padding:12px;text-align:left;background:var(--panel);color:var(--text);border:1px solid var(--line);font-family:inherit;cursor:pointer}.trial-card>i{font-size:28px;font-style:normal;text-align:center}.trial-card>div{display:grid;gap:3px}.trial-card small{color:#9a8053}.trial-card b{color:var(--gold2);font-size:15px}.trial-card span{color:var(--dim);font-size:11.5px;line-height:1.45}.trial-card em{color:#d4b66f;font-size:10.5px;font-style:normal}.trial-card.gold{border-color:#d9b36c}.trial-card.silver{border-color:#aab3bd}.trial-card.bronze{border-color:#a96b45}
+.trial-brief{max-width:800px;margin:auto}.trial-party>span{display:grid;grid-template-columns:56px auto;grid-template-rows:1fr 1fr;gap:0 8px;align-items:center;padding:7px 10px;border:1px solid var(--line);background:var(--panel);text-align:left}.trial-party svg{grid-row:1/3;width:56px;height:56px;border-radius:50%;overflow:hidden}.trial-party b{align-self:end;color:var(--gold2)}.trial-party small{align-self:start;color:var(--dim)}.medal-conditions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:720px;margin:16px auto}.medal-conditions>div{padding:11px;border:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--dim)}.medal-conditions b{display:block;margin-bottom:5px;color:var(--gold2)}
 .reveal-word{display:inline-block;will-change:opacity;}
 .route-list{display:flex;flex-direction:column;gap:6px;max-width:660px;}
 .route-row{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:14px;}
@@ -497,6 +505,7 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
   .timeline-rail .camp-card:before{left:-20px;}
   .challenge-grid{grid-template-columns:1fr;}
   .challenge-grid .challenge-card{grid-column:span 1;}
+  .lunjian-picks{grid-template-columns:repeat(3,minmax(0,1fr));}.gauntlet-path{display:flex;overflow-x:auto}.gauntlet-node{flex:0 0 170px}.trial-grid{grid-template-columns:1fr}.blessing-grid,.medal-conditions{grid-template-columns:1fr}.trial-party>span{min-width:140px}.trial-brief p{font-size:14px}.challenge-resume{align-items:flex-start}
   .roam-build{grid-template-columns:1fr;}.roam-shop{grid-template-columns:1fr}.legend-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .journey-trail{margin-bottom:9px;padding:5px 7px;gap:3px;font-size:10px;scrollbar-width:none;}
   .journey-trail span{padding:3px 5px;}

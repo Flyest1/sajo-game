@@ -3,11 +3,21 @@
    맵 크기·타일 유효성, 스폰/적 배치, 스킬·캐릭터 참조 검사
    ============================================================ */
 import fs from 'fs';
+import {LUNJIAN_HEROES,LUNJIAN_ROUNDS,TRIALS,makeLunjianBattle} from '../src/challenges.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
 
 const errs = [];
+const validateTrialObjective=(objective,trial,path='objective')=>{
+  if(!['rout','boss','survive','seize','escape','subdue','all','any'].includes(objective.type))errs.push(`trial/${trial.id} ${path} unknown type ${objective.type}`);
+  if((objective.type==='all'||objective.type==='any')){
+    if(!Array.isArray(objective.objectives)||!objective.objectives.length)errs.push(`trial/${trial.id} ${path} requires objectives`);
+    (objective.objectives||[]).forEach((child,i)=>validateTrialObjective(child,trial,`${path}.${i}`));
+  }
+  if(objective.boss&&!trial.enemies.some(enemy=>enemy.cid===objective.boss))errs.push(`trial/${trial.id} ${path} boss missing ${objective.boss}`);
+  if(objective.target&&!trial.enemies.some(enemy=>enemy.cid===objective.target))errs.push(`trial/${trial.id} ${path} target missing ${objective.target}`);
+};
 CHAPTERS.forEach((ch, ci) => {
   const tag = `ch${ci + 1}`;
   if (ch.map.length !== 10) errs.push(`${tag}: map rows=${ch.map.length}`);
@@ -287,7 +297,51 @@ const SUPPORTS = J('supports.json');
   });
 }
 
+/* ── 데이터 기반 도전 모드 검증 ── */
+{
+  if(LUNJIAN_ROUNDS.length!==8) errs.push(`lunjian rounds ${LUNJIAN_ROUNDS.length} != 8`);
+  if(TRIALS.length!==10) errs.push(`combat trials ${TRIALS.length} != 10`);
+  for(const cid of LUNJIAN_HEROES) if(!CHARS[cid]) errs.push(`lunjian hero unknown ${cid}`);
+  LUNJIAN_ROUNDS.forEach((round,index)=>{
+    const battle=makeLunjianBattle(index,CHAPTERS),tag=`lunjian#${index+1}`;
+    if(!CHARS[round.boss]) errs.push(`${tag} boss unknown ${round.boss}`);
+    battle.enemies.forEach(enemy=>{if(!CHARS[enemy.cid])errs.push(`${tag} enemy unknown ${enemy.cid}`);});
+    if(!battle.enemies.some(enemy=>enemy.cid===battle.win.boss&&enemy.boss))errs.push(`${tag} win boss missing`);
+    (round.phases||[]).forEach((phase,i)=>{if(!(phase.at>0&&phase.at<1))errs.push(`${tag} phase${i} threshold invalid`);});
+  });
+  const trialIds=new Set();
+  TRIALS.forEach(trial=>{
+    const tag=`trial/${trial.id}`;
+    if(trialIds.has(trial.id))errs.push(`${tag} duplicate id`);trialIds.add(trial.id);
+    if(trial.map.length!==8||trial.map.some(row=>row.length!==12))errs.push(`${tag} map must be 12x8`);
+    trial.map.forEach((row,y)=>[...row].forEach(tile=>{if(!TILE[tile])errs.push(`${tag} row${y} unknown tile ${tile}`);}));
+    trial.party.forEach(cid=>{if(!CHARS[cid])errs.push(`${tag} party unknown ${cid}`);});
+    trial.enemies.forEach(enemy=>{if(!CHARS[enemy.cid])errs.push(`${tag} enemy unknown ${enemy.cid}`);});
+    validateTrialObjective(trial.objective,trial);
+    if(!trial.goldText||!trial.silverText)errs.push(`${tag} medal text missing`);
+    if(trial.gold.guardBreaks&&!trial.enemies.some(enemy=>(enemy.guard||0)>0||enemy.boss))errs.push(`${tag} gold requires guard break without guarded enemy`);
+    if(trial.gold.bondStrikes){
+      const hasBond=SUPPORTS.pairs.some(pair=>trial.party.includes(pair.a)&&trial.party.includes(pair.b));
+      if(!hasBond)errs.push(`${tag} gold requires bond strikes without support pair`);
+    }
+    if(trial.gold.enemyKillsMax===0&&trial.objective.type!=='subdue')errs.push(`${tag} zero-kill gold requires subdue objective`);
+    const leaves=(objective)=>objective.objectives?objective.objectives.flatMap(leaves):[objective];
+    for(const objective of leaves(trial.objective)){
+      const targets=objective.tiles||objective.zones||[];
+      if(targets.length&&trial.gold.turns){
+        const maxMove=Math.max(...trial.party.map(cid=>CHARS[cid].base[7]))*trial.gold.turns;
+        for(const target of targets){
+          const [x,y]=Array.isArray(target)?target:[target.x,target.y];
+          const nearest=Math.min(...trial.spawns.slice(0,trial.party.length).map(([sx,sy])=>Math.abs(sx-x)+Math.abs(sy-y)));
+          if(nearest>maxMove)errs.push(`${tag} gold target (${x},${y}) unreachable in ${trial.gold.turns} turns`);
+        }
+      }
+    }
+  });
+}
+
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
+console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

@@ -4,6 +4,7 @@
    이상치(즉사·무피해·명중 과소)를 플래그한다. (오프라인, DOM 불필요)
    ============================================================ */
 import fs from 'fs';
+import {LUNJIAN_ROUNDS,TRIALS} from '../src/challenges.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
 const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
@@ -159,3 +160,31 @@ for(const diff of ['story','std','hero']){
 }
 if(wolnyeoFlags.length) wolnyeoFlags.forEach(flag=>console.log('  - '+flag));
 else console.log('  전 난이도에서 주인공 유효 피해·생존 안전선 통과');
+
+console.log('\n## 천하논검 8관 — 기본 4인 표준 압력');
+const lunjianFlags=[];
+for(const [index,round] of LUNJIAN_ROUNDS.entries()){
+  const boss=mkUnit(round.boss,0,1,true);
+  for(const key in boss.stats)boss.stats[key]=Math.max(1,Math.round(boss.stats[key]*round.boost));
+  boss.maxhp=boss.stats.hp;
+  const allies=['gj','yg','jmk','sb'].map(cid=>mkUnit(cid,12,1,false));
+  const strikes=allies.map(ally=>calc(ally,boss,SKILLS[CHARS[ally.cid].skills[0]]));
+  const guardPerTurn=strikes.reduce((sum,strike)=>sum+(2+(strike.dmg>0?1:0))*strike.hit/100,0);
+  const breakTurns=round.guard/Math.max(.1,guardPerTurn);
+  const damagePerTurn=strikes.reduce((sum,strike)=>sum+strike.dmg*strike.hit/100,0);
+  const finishTurns=boss.maxhp/Math.max(.1,damagePerTurn);
+  const bossSkill=SKILLS[CHARS[round.boss].skills[0]],incoming=Math.max(...allies.map(ally=>calc(boss,ally,bossSkill).dmg/ally.maxhp));
+  console.log(`  ${index+1}관 ${CHARS[round.boss].name}: 호신 ${round.guard} 파훼 ${breakTurns.toFixed(1)}턴 · 본체 ${finishTurns.toFixed(1)}턴 · 단일 최대 ${Math.round(incoming*100)}%HP`);
+  if(breakTurns>2.5)lunjianFlags.push(`${index+1}관 파훼 ${breakTurns.toFixed(1)}턴`);
+  if(finishTurns>3.5)lunjianFlags.push(`${index+1}관 본체 ${finishTurns.toFixed(1)}턴`);
+  if(incoming>.65)lunjianFlags.push(`${index+1}관 단일 피해 ${Math.round(incoming*100)}%`);
+}
+if(lunjianFlags.length)lunjianFlags.forEach(flag=>console.log(`  - [논검 주의] ${flag}`));
+else console.log('  기본 4인 기준 전 관문 파훼·생존 안전선 통과');
+
+console.log('\n## 전투 수수께끼 10제 — 구성 안전선');
+for(const trial of TRIALS){
+  const bosses=trial.enemies.filter(enemy=>enemy.boss),gold=trial.goldText;
+  console.log(`  ${trial.id}: ${trial.party.length}인 vs ${trial.enemies.length}적${bosses.length?` · 보스 ${CHARS[bosses[0].cid].name}`:''} · 금 ${gold}`);
+}
+console.log('  고정 명중·무필살, 목표 도달성·인연/파훼 요구는 데이터 검증에서 통과');
