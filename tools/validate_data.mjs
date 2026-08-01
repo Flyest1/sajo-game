@@ -4,6 +4,7 @@
    ============================================================ */
 import fs from 'fs';
 import {LUNJIAN_HEROES,LUNJIAN_ROUNDS,TRIALS,makeLunjianBattle} from '../src/challenges.js';
+import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal} from '../src/internals.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -340,8 +341,33 @@ const SUPPORTS = J('supports.json');
   });
 }
 
+/* ── 원작 기반 내공·고유 특성 검증 ── */
+{
+  const statKeys=new Set(['hp','str','int','def','res','spd','skl','mov','ki']);
+  const allowedKinds=new Set(['내공','심법','경공','특성']);
+  if(Object.keys(HERO_INTERNALS).length!==12)errs.push(`internal heroes ${Object.keys(HERO_INTERNALS).length} != 12`);
+  for(const cid of LUNJIAN_HEROES){
+    const options=HERO_INTERNALS[cid];
+    if(!Array.isArray(options)||options.length<2)errs.push(`internal/${cid}: at least two options required`);
+    if(validInternal(cid,'missing')!==options?.[0])errs.push(`internal/${cid}: default selection invalid`);
+    for(const id of options||[]){
+      const item=INTERNALS[id];
+      if(!item){errs.push(`internal/${cid}: unknown ${id}`);continue;}
+      if(!allowedKinds.has(item.kind))errs.push(`internal/${id}: invalid kind ${item.kind}`);
+      if(!item.name||!item.role||!item.desc||!item.source)errs.push(`internal/${id}: documentation incomplete`);
+      if(item.unlockLevel!==undefined&&(!Number.isInteger(item.unlockLevel)||item.unlockLevel<1))errs.push(`internal/${id}: invalid unlockLevel ${item.unlockLevel}`);
+      if(!internalEffectText(id))errs.push(`internal/${id}: effect text missing`);
+      for(const key of Object.keys(item.effects?.stats||{}))if(!statKeys.has(key))errs.push(`internal/${id}: invalid stat ${key}`);
+      if((item.effects?.damage||0)>.2||(item.effects?.stationaryDamage||0)>.2||(item.effects?.damageTaken||0)>.2||(item.effects?.avoid||0)>12)errs.push(`internal/${id}: effect exceeds safety cap`);
+    }
+  }
+  if(INTERNALS[HERO_INTERNALS.gj?.[0]]?.name!=='구음진경')errs.push('internal/gj: canonical default must be 구음진경');
+  if((HERO_INTERNALS.gj||[]).some(id=>INTERNALS[id]?.name.includes('구양')))errs.push('internal/gj: 구양신공 must not be assigned to 곽정');
+}
+
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
+console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

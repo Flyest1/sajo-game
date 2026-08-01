@@ -558,6 +558,52 @@ test('Tianxia Lunjian runs eight data-driven rounds and persists blessings and r
   expect(records.current).toBeUndefined();
 });
 
+test('canonical internal styles are selectable and battle contribution reports persist', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  const canonical=await page.evaluate(() => {
+    const guo=window.__dbg.internalProbe('gj'),wuji=window.__dbg.internalProbe('jmk');
+    return {guo:{...guo,names:guo.options.map(id=>window.__dbg.INTERNALS[id].name)},wuji:{...wuji,names:wuji.options.map(id=>window.__dbg.INTERNALS[id].name)}};
+  });
+  expect(canonical.guo.item.name).toBe('구음진경');
+  expect(canonical.guo.options).toHaveLength(2);
+  expect(canonical.guo.names).not.toContain('구양신공');
+  expect(canonical.wuji.names).toContain('구양신공');
+
+  await page.evaluate(() => { window.startCampaignV2('sajo',false); window.openInternalLoadout('gj'); });
+  await expect(page.locator('.internal-pick.locked')).toContainText('구음진경');
+  await expect(page.locator('.internal-pick.locked')).toContainText('Lv.8 해금');
+  await expect(page.locator('.internal-pick:not(.locked)')).toContainText('전진현문내공');
+  await page.evaluate(() => { document.getElementById('internal-modal')?.remove(); localStorage.clear(); });
+  await page.reload();
+
+  await page.getByRole('button',{name:/도전과 회상/}).click();
+  await page.getByRole('button',{name:/논검 시작/}).click();
+  await page.getByLabel('곽정 내공·특성').selectOption('gj_quanzhen');
+  await page.getByRole('button',{name:'네 협객으로 시작'}).click();
+  const saved=await page.evaluate(() => window.__dbg.challengeProbe().lunjian.current.internals);
+  expect(saved.gj).toBe('gj_quanzhen');
+  await page.getByRole('button',{name:/1관 출전 준비/}).click();
+  await page.getByRole('button',{name:/출 전/}).click();
+  const unit=await page.evaluate(() => {
+    const guo=window.__dbg.B.units.find(item=>item.cid==='gj');
+    return {internalId:guo.internalId,name:guo.internal.name,maxki:guo.maxki};
+  });
+  expect(unit).toMatchObject({internalId:'gj_quanzhen',name:'전진현문내공'});
+  await page.evaluate(() => {
+    window.__dbg.B.contributions.gj.damage=17;
+    window.__dbg.B.contributions.gj.guard=4;
+    window.__dbg.B.units.find(item=>item.boss).alive=false;
+    window.__dbg.winCheck();
+  });
+  await expect(page.locator('.contribution-row').filter({hasText:'곽정'})).toContainText('피해 17 · 파훼 4');
+  const reports=await page.evaluate(() => window.__dbg.battleReports());
+  expect(reports[0]).toMatchObject({mode:'lunjian'});
+  expect(reports[0].members[0]).toMatchObject({cid:'gj',damage:17,guard:4,internalId:'gj_quanzhen'});
+  const persisted=await page.evaluate(() => JSON.parse(localStorage.getItem('kimyong_save_v3')).profile.battleReports);
+  expect(persisted).toHaveLength(1);
+});
+
 test('combat riddles expose ten deterministic trials and save the best medal', async ({ page }, testInfo) => {
   await page.evaluate(() => localStorage.clear());
   await page.reload();

@@ -14,6 +14,9 @@ import {
   makeLunjianBattle, makeTrialBattle, trialById, evaluateTrial, betterMedal,
 } from './challenges.js';
 import {
+  INTERNALS, HERO_INTERNALS, internalOptions, defaultInternal, internalById, validInternal, internalEffectText,
+} from './internals.js';
+import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
 } from './battle-objectives.js';
@@ -60,7 +63,7 @@ function adjBond(u){
    전투 엔진
    ============================================================ */
 
-const G = { chapterIdx:0, roster:{}, party:[], snapshot:null, extraSkills:{}, deploy:null };
+const G = { chapterIdx:0, roster:{}, party:[], snapshot:null, extraSkills:{}, internals:{}, deploy:null };
 let B = null;       // 현재 전투 상태
 const SESSION=createSessionRuntime({classic:G});
 let uidSeq = 0;
@@ -138,6 +141,7 @@ function bumpMastery(sid){
 
 /* ── 전적 통계 ── */
 let STATS = Object.assign({wins:0,kills:0,bosses:0,crits:0,camps:{}}, profileValue(V3STORE,'stats',{}));
+let BATTLE_REPORTS = Array.isArray(profileValue(V3STORE,'battleReports',[]))?profileValue(V3STORE,'battleReports',[]):[];
 function saveStats(){
   try{
     V3STORE=setProfileValue(V3STORE,'stats',STATS);
@@ -212,6 +216,7 @@ function recordCampaignClear(camp, endId){
 /* 전투 승리 시 업적 반영 */
 function recordBattleWin(){
   STATS.wins++; saveStats();
+  recordBattleReport();
   unlockAchv('first_win');
   if(B&&!B.allyLost) unlockAchv('flawless');
   if(B&&B.turn<=3) unlockAchv('swift');
@@ -230,6 +235,20 @@ function bgmTheme(){
   if(campaignId) return BGM_THEME[campaignId]||'default';
   if(SESSION.isChallenge()) return 'jinfinal';
   return 'default';
+}
+function contributionRows(){
+  if(!B)return [];
+  return Object.values(B.contributions||{}).map(item=>({...item,name:CHARS[item.cid]?.name||item.cid,internalId:B.units.find(u=>u.team==='P'&&u.cid===item.cid)?.internalId||null,score:Math.round(item.damage+item.guard*2+item.healing+item.kills*12+item.bond*3)})).sort((a,b)=>b.score-a.score);
+}
+function contributionHTML(){
+  const rows=contributionRows();if(!rows.length)return '';
+  return `<div class="contribution-box"><h3>전투 기여도</h3><div class="contribution-grid">${rows.map((item,i)=>`<div class="contribution-row ${i===0?'top':''}"><b>${i===0?'★ ':''}${item.name} <em>${item.score}</em></b><span>피해 ${item.damage} · 파훼 ${item.guard} · 회복 ${item.healing} · 격파 ${item.kills} · 협공 ${item.bond}</span><small>${internalById(item.internalId)?.name||'고유 심법 없음'}</small></div>`).join('')}</div></div>`;
+}
+function recordBattleReport(){
+  if(!B)return;
+  const ctx=runtimeContext(),ch=curCh(),members=contributionRows();
+  BATTLE_REPORTS=[{at:Date.now(),mode:SESSION.outcome(),campaignId:ctx.campaignId,title:ch?.title||'전투',difficulty:ctx.difficulty,turn:B.turn,members},...BATTLE_REPORTS].slice(0,30);
+  try{V3STORE=setProfileValue(V3STORE,'battleReports',BATTLE_REPORTS);}catch(e){}
 }
 function startBGM(mood){ BGM.start(mood, bgmTheme()); }
 
@@ -266,6 +285,22 @@ const dist = (a,b) => Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 function statObj(base){
   return {hp:base[0],str:base[1],int:base[2],def:base[3],res:base[4],spd:base[5],skl:base[6],mov:base[7],ki:base[8]};
 }
+function availableInternalOptions(cid){
+  const options=internalOptions(cid),campaign=SESSION.campaign();if(!campaign)return options;
+  const level=campaign.roster?.[cid]?.lvl||1;
+  return options.filter(id=>level>=(INTERNALS[id]?.unlockLevel||1));
+}
+function selectedInternal(cid){
+  const campaign=SESSION.campaign(),challenge=SESSION.challenge();
+  const selected=campaign?.internalLoadouts?.[cid]||challenge?.internals?.[cid]||G.internals?.[cid];
+  const available=availableInternalOptions(cid);
+  return available.includes(selected)?selected:(available[0]||null);
+}
+function applyInternalStats(stats,item){
+  const bonus={};
+  for(const [key,value] of Object.entries(item?.effects?.stats||{})){stats[key]=(stats[key]||0)+value;bonus[key]=value;}
+  return bonus;
+}
 function initRosterChar(cid){
   if(G.roster[cid]) return;
   const c=CHARS[cid];
@@ -280,7 +315,8 @@ function mkPlayerUnit(cid, x, y){
   const extra=(G.extraSkills&&G.extraSkills[cid]||[]).filter(s=>!c.skills.includes(s));
   const learned=[...c.skills,...extra];
   const loadout=(campaign?.skillLoadouts?.[cid]||[]).filter(s=>learned.includes(s));
-  const stats=deepClone(r.stats);
+  const stats=deepClone(r.stats),internalId=selectedInternal(cid),internal=internalById(internalId);
+  const internalBonus=applyInternalStats(stats,internal);
   let eqAtk=0, eqHit=0, eqCrit=0;
   const eqBonus={def:0,res:0,mov:0,hp:0}; /* 능력치 표시용 장비 보정 분리 */
   if(campaign?.equips?.[cid]){
@@ -299,7 +335,7 @@ function mkPlayerUnit(cid, x, y){
     skills:(loadout.length?loadout:learned).slice(0,3), healer:!!c.healer, leader:isLd, team:'P',
     x, y, stats, maxhp:stats.hp, hp:stats.hp,
     maxki:stats.ki, ki:stats.ki, lvl:r.lvl, exp:r.exp, acted:false, alive:true, boss:false, poison:0,
-    eqAtk, eqHit, eqCrit, eqBonus, comboLast:null, comboCount:0};
+    eqAtk, eqHit, eqCrit, eqBonus, internalId, internal, internalBonus, movedThisTurn:0, comboLast:null, comboCount:0};
 }
 function mkEnemyUnit(def){
   const c=CHARS[def.cid], st=statObj(c.base);
@@ -351,6 +387,10 @@ function adjAllies(u){
   if(!B) return 0;
   return Math.min(3, B.units.filter(o=>o.alive&&o!==u&&o.team===u.team&&dist(o,u)===1).length);
 }
+function adjEnemies(u){
+  if(!B)return 0;
+  return Math.min(4,B.units.filter(o=>o.alive&&o.team!==u.team&&dist(o,u)===1).length);
+}
 function calcStrike(a,d,skillId){
   const sk=skillId?SKILLS[skillId]:null;
   const tri=triangle(a.type,d.type);
@@ -363,19 +403,34 @@ function calcStrike(a,d,skillId){
   const mst=(sk&&a.team==='P')?masteryTier(skillId):0;
   const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
   const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
+  const ae=a.internal?.effects||{},de=d.internal?.effects||{};
   let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) + (a.repAtk||0) + (a.trustAtk||0) - mit - dT.def - (d.repDef||0) - (d.trustDef||0));
+  let internalMult=1+(ae.damage||0)+(supA*(ae.adjacentDamage||0));
+  if((a.movedThisTurn||0)===0)internalMult+=ae.stationaryDamage||0;
+  if(bA>0)internalMult+=ae.bondDamage||0;
+  if(a.hp/a.maxhp<=.5)internalMult+=ae.lowHpDamage||0;
+  if(d.type==='내')internalMult+=ae.vsInnerDamage||0;
+  internalMult+=adjEnemies(a)*(ae.surroundedDamage||0);
+  if(sk&&a.comboLast&&a.comboLast!==skillId)internalMult+=ae.comboDamage||0;
+  let reduction=(de.damageTaken||0)+(supD*(de.adjacentReduction||0));
+  if(d.hp/d.maxhp<=.5)reduction+=de.lowHpReduction||0;
+  dmg=Math.max(0,Math.round(dmg*internalMult*(1-Math.min(.4,reduction))));
   const guarded=d.guardMax>0&&d.guard>0;
   if(guarded) dmg=Math.max(1,Math.round(dmg*.65));
   else if(d.broken) dmg=Math.round(dmg*1.35);
   const comboStep=sk&&a.comboLast&&a.comboLast!==skillId?Math.min(3,(a.comboCount||0)+1):0;
   if(comboStep) dmg=Math.round(dmg*(1+comboStep*.08));
-  const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)):0;
+  const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)+(ae.guardDamage||0)):0;
   const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
-  let hit=Math.max(10, Math.min(100, 82 + a.stats.skl*2 + tri*10 + (sk&&sk.hit?sk.hit:0) + mHit + supA*4 + bA*4 - supD*3 - bD*3 + (a.eqHit||0) + (a.repHit||0) + (a.trustHit||0) - d.stats.spd*2 - dT.avoid + wHit));
-  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0));
+  let hit=Math.max(10,Math.min(100,
+    82+a.stats.skl*2+tri*10+(sk&&sk.hit?sk.hit:0)+mHit+supA*4+bA*4-supD*3-bD*3+
+    (a.eqHit||0)+(a.repHit||0)+(a.trustHit||0)-d.stats.spd*2-dT.avoid+wHit+
+    (ae.hit||0)+supA*(ae.adjacentHit||0)+(d.type==='내'?(ae.vsInnerHit||0):0)-(de.avoid||0)
+  ));
+  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0) + (ae.crit||0));
   if(SESSION.isChallenge('trial')){ hit=100; crit=0; }
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
-  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep};
+  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep,internalMult,reduction};
 }
 function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 
@@ -415,6 +470,7 @@ async function animMove(u, ox, oy){
 /* 선택 유닛을 (nx,ny)로 트윈 이동시킨 뒤 후속 동작 실행 */
 function moveSelTo(nx,ny,after){
   const u=B.sel, ox=u.x, oy=u.y;
+  u.movedThisTurn=(u.movedThisTurn||0)+Math.abs(nx-ox)+Math.abs(ny-oy);
   u.x=nx; u.y=ny; B.mode='menu'; B.busy=true; hideMenu();
   animMove(u,ox,oy).then(()=>{ if(!B||!B.sel) return; B.busy=false; renderBattle(); after(); });
 }
@@ -494,6 +550,11 @@ function log(msg,imp){
   const el=document.getElementById('log');
   if(el) el.innerHTML=B.log.map(l=>`<div class="${l.imp?'imp':''}">${l.msg}</div>`).join('');
 }
+function contribution(u){
+  if(!B||!u||u.team!=='P')return null;
+  B.contributions=B.contributions||{};
+  return B.contributions[u.cid]||(B.contributions[u.cid]={cid:u.cid,damage:0,guard:0,healing:0,taken:0,kills:0,bond:0});
+}
 
 /* ── 경험치/레벨 ── */
 function grantExp(u, amt){
@@ -554,9 +615,11 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     if(c.guarded){
       const gp=c.guardDmg+(isCrit?2:0);
       d.guard=Math.max(0,d.guard-gp);
+      const meter=contribution(a);if(meter)meter.guard+=gp;
       fx(d.x,d.y,`강기 -${gp}`,'guard');
       if(d.guard===0){
         if(a.team==='P'&&d.team==='E') B.guardBreaks=(B.guardBreaks||0)+1;
+        if(a.team==='P'&&a.internal?.effects?.kiOnBreak)a.ki=Math.min(a.maxki,a.ki+a.internal.effects.kiOnBreak);
         d.broken=true; fx(d.x,d.y,'破 파훼!','break'); SFX.play('crit'); shakeMap(true);
         log(`<b>${d.name}의 호신강기가 무너졌다!</b> 남은 협객의 공격이 강해진다.`,true);
       }
@@ -566,8 +629,12 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     const floor=subdue?Math.max(1,Math.ceil(d.maxhp*(obj.threshold||.2))):0;
     const hpBefore=d.hp;
     d.hp=Math.max(floor,d.hp-dmg);
+    const actualDamage=Math.max(0,hpBefore-d.hp),attackMeter=contribution(a),defendMeter=contribution(d);
+    if(attackMeter){attackMeter.damage+=actualDamage;if(c.bA>0)attackMeter.bond++;}
+    if(defendMeter)defendMeter.taken+=actualDamage;
     if(d.team==='P') B.damageTaken=(B.damageTaken||0)+Math.max(0,hpBefore-d.hp);
     if(a.team==='P'&&c.bA>0) B.bondStrikes=(B.bondStrikes||0)+1;
+    if(a.team==='P'&&a.internal?.effects?.kiOnHit)a.ki=Math.min(a.maxki,a.ki+a.internal.effects.kiOnHit);
     if(isCrit&&a.team==='P'){ STATS.crits++; if(STATS.crits>=50) unlockAchv('crit50'); saveStats(); }
     SFX.play(isCrit?'crit':'hit');
     flashTile(d.x,d.y,isCrit?'crit':'');
@@ -594,6 +661,7 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
         log(`<b>${d.name} 격파!</b>`,true);
         if(a.team==='P'){ STATS.kills++; if(d.boss) STATS.bosses++;
           B.enemyKills=(B.enemyKills||0)+1;
+          const meter=contribution(a);if(meter)meter.kills++;
           if(STATS.kills>=50) unlockAchv('kills50'); if(STATS.kills>=200) unlockAchv('kills200');
           if(STATS.bosses>=10) unlockAchv('boss10'); saveStats(); }
       }else{
@@ -679,7 +747,8 @@ async function healAction(a,t,skillId){
   a.ki-=(a.team==='P'?masteryCost(sid):sk.cost);
   const mstAmt=(a.team==='P')?masteryTier(sid):0;
   const amt=a.stats.int+sk.healPow+mstAmt;
-  t.hp=Math.min(t.maxhp,t.hp+amt);
+  const before=t.hp;t.hp=Math.min(t.maxhp,t.hp+amt);
+  const meter=contribution(a);if(meter)meter.healing+=t.hp-before;
   fx(a.x,a.y,sk.name,'label'); SFX.play('skill');
   if(a.team==='P'){ const up=bumpMastery(sid); if(up){ fx(a.x,a.y-0.4,'숙련 상승!','label'); SFX.play('levelup'); log(`<b>${a.name}</b>의 ${sk.name} — 숙련 ${['','★','★★','★★★','極'][up]} 단계 도달!`,true); } }
   await aSleep(380);
@@ -996,9 +1065,16 @@ async function startPlayerPhase(first){
     return;
   }
   B.phase='P';
-  for(const u of B.units.filter(u=>u.alive)) u.acted=false;
+  for(const u of B.units.filter(u=>u.alive)){u.acted=false;u.movedThisTurn=0;}
   for(const p of players()){
     p.ki=Math.min(p.maxki,p.ki+4);
+    const ie=p.internal?.effects||{};
+    if(ie.turnKi)p.ki=Math.min(p.maxki,p.ki+ie.turnKi);
+    if(ie.turnHeal&&p.hp<p.maxhp){
+      const before=p.hp;p.hp=Math.min(p.maxhp,p.hp+ie.turnHeal);
+      const meter=contribution(p);if(meter)meter.healing+=p.hp-before;
+      fx(p.x,p.y,`+${p.hp-before}`,'heal');
+    }
     const t=TILE[tileChar(p.x,p.y)];
     if(t.heal&&p.hp<p.maxhp){
       const amt=Math.ceil(p.maxhp*t.heal);
@@ -1107,13 +1183,13 @@ function startBattle(){
     weather:pickWeather(),
     sceneSeed:strSeed(ctx.sceneKey),
     timeBase:pickBattleTime(),
-    enemyKills:0,guardBreaks:0,bondStrikes:0,subdues:0,damageTaken:0,
+    enemyKills:0,guardBreaks:0,bondStrikes:0,subdues:0,damageTaken:0,contributions:{},
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
   lineup.forEach((cid,i)=>{
     const [x,y]=ch.spawns[i];
-    B.units.push(mkPlayerUnit(cid,x,y));
+    const unit=mkPlayerUnit(cid,x,y);B.units.push(unit);contribution(unit);
   });
   B.treasures=deepClone(ch.treasures||[]);
   B.loot={gold:0,items:[]};
@@ -1125,6 +1201,8 @@ function startBattle(){
   startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${activeObjective().text||ch.win.text}`,true);
+  const innerLine=players().filter(u=>u.internal).map(u=>`${u.name}·${u.internal.name}`).join(' / ');
+  if(innerLine)log(`<b>심법 편성</b> — ${innerLine}`,true);
   if(B.reputationEffects.length) log(`<b>강호의 반향</b> — ${B.reputationEffects.join(' · ')}`,true);
   beginBattlePresentation();
 }
@@ -1479,6 +1557,7 @@ function ucardHTML(u){
     ${statRow('이동',u.stats.mov,u.eqBonus&&u.eqBonus.mov)}${statRow('사거리',u.range.join('·'))}<div></div>
   </div>
   ${(u.eqAtk||u.eqHit||u.eqCrit)?`<div class="uc-sub" style="color:#8fce6a;margin-top:2px">병기 보정: ${[u.eqAtk?`공격 +${u.eqAtk}`:'',u.eqHit?`명중 +${u.eqHit}`:'',u.eqCrit?`필살 +${u.eqCrit}`:''].filter(Boolean).join(' · ')}</div>`:''}
+  ${u.internal?`<div class="uc-internal"><b>${u.internal.kind} · ${u.internal.name}</b><span>${internalEffectText(u.internalId)}</span></div>`:''}
   ${bossPatternHTML(u)}
   ${u.team==='E'?`<div class="intent-line"><b>다음 의도</b><span>${intentText(u)}</span></div>`:''}
   ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;const mp=u.team==='P'?masteryProgress(sid):'';const me=u.team==='P'?masteryEffectText(sid):'';return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})${mp?`<br><span style="color:#c9a86a">${mp} · 실제 효과: ${me}</span>`:''}</div>`;}).join('')}
@@ -1752,11 +1831,12 @@ function renderDeploy(cap){
       return forcedIds.length?` · ★필수 출전: ${forcedIds.map(c=>CHARS[c].name).join('·')}`:'';
     })()} · 승리 조건: ${ch.win.text}</div>
     <div class="dep-grid">${deployPool(ch).map(cid=>{
-      const r=G.roster[cid], c=CHARS[cid], on=G.deploy.includes(cid), lock=cid===requiredLeader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
+      const r=G.roster[cid], c=CHARS[cid], inner=internalById(selectedInternal(cid)), on=G.deploy.includes(cid), lock=cid===requiredLeader||!!(ch.deploy&&ch.deploy.forced&&ch.deploy.forced.includes(cid));
       return `<button type="button" class="dep-card ${on?'on':'off'} ${lock?'lock':''}" aria-pressed="${on}" ${lock?'disabled aria-label="'+c.name+' 필수 출전"':''} onclick="toggleDeploy('${cid}',${cap})">
         <div class="pt">${ptSVG(cid)}</div>
         <div class="dep-name">${c.name}${lock?' ★':''}</div>
         <div class="dep-info">Lv.${r.lvl} · ${TYPE_NAME[c.type]}</div>
+        ${inner?`<div class="dep-inner">${inner.name}<small>${inner.role}</small></div>`:''}
       </button>`;}).join('')}</div>
     <div style="text-align:center">
       <button class="btn" onclick="startBattle()">출 전 !</button>
@@ -1777,7 +1857,10 @@ function toggleDeploy(cid,cap){
 function applyRoster(){
   for(const u of B.units.filter(u=>u.team==='P')){
     const r=G.roster[u.cid];
-    r.lvl=u.lvl; r.exp=u.exp; r.stats=deepClone(u.stats);
+    const clean=deepClone(u.stats);
+    for(const [key,value] of Object.entries(u.eqBonus||{}))clean[key]-=value||0;
+    for(const [key,value] of Object.entries(u.internalBonus||{}))clean[key]-=value||0;
+    r.lvl=u.lvl; r.exp=u.exp; r.stats=clean;
   }
 }
 /* 낙관(도장) 장식 */
@@ -1790,6 +1873,7 @@ function sealSVG(ch,color){
 function showVictory(){
   const ch=curCh();
   const outcome=SESSION.outcome();
+  const contribHtml=contributionHTML();
   applyRoster();
   SFX.play('victory'); startBGM('calm');
   recordBattleWin();
@@ -1826,6 +1910,7 @@ function showVictory(){
       ${journeyTrail('aftermath')}
       ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
       <p>${n.title} — 클리어!${learnMsg}${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${campaign.gold}냥</p>
+      ${contribHtml}
       <button class="btn" onclick="v2AfterBattle()">계속</button>
     </div>`;
     return;
@@ -1851,6 +1936,7 @@ function showVictory(){
       <h2 style="color:#ffd94a">제${w}파 격퇴!</h2>
       <p>영웅들은 호흡을 가다듬는다. 다음 파도는 더욱 거세진다…<br>
       역대 최고 기록: <b style="color:var(--gold2)">${bestWave()}파</b></p>
+      ${contribHtml}
       <button class="btn" onclick="nextWave(${w+1})">제${w+1}파, 온다!</button>
       <button class="btn danger" onclick="toTitle()">여기서 멈춘다 (기록 저장됨)</button>
     </div>`;
@@ -1872,6 +1958,7 @@ function showVictory(){
   app().innerHTML=`<div class="result-screen">
     ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
     <p>${ch.title} — 클리어!${learnMsg}<br>부상당한 동료들도 무사히 회복했습니다.</p>
+    ${contribHtml}
     <button class="btn" onclick="afterVictory(${next})">계속</button>
   </div>`;
 }
@@ -2277,16 +2364,16 @@ function advanceRoamNode(){
   SESSION.challengeState.pos++;saveRoam();showRoamMap();
 }
 function roamBattleWon(){
-  const run=normalizeRoam(SESSION.challengeState), wasBoss=run.nodes[run.pos]==='boss';
+  const contrib=contributionHTML(),run=normalizeRoam(SESSION.challengeState), wasBoss=run.nodes[run.pos]==='boss';
   const fallen=(B?.units||[]).filter(u=>u.team==='P'&&!u.alive).map(u=>u.cid);
   run.scars=[...new Set([...run.scars,...fallen])];run.coins+=wasBoss?6:3;run.victories++;run.ch=null;run.pos++;
   if(run.pos>=run.nodes.length){
     const roam=V3STORE.challenges.roam=V3STORE.challenges.roam||{};
     const legends=G.party.map(cid=>legendFor(cid,CHARS[cid],run));
     roam.best=Math.max(roam.best||0,run.nodes.length);roam.legends=[...legends,...(roam.legends||[])].slice(0,40);delete roam.current;V3STORE=writeV3(V3STORE);
-    app().innerHTML=`<div class="result-screen roam-finish">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${escHtml(run.seed)}</b>의 ${run.nodes.length}갈래 길을 완주했습니다.<br>네 협객의 별호와 여정이 강호전설에 기록되었습니다.</p><div class="legend-grid">${legends.map(x=>`<div class="legend-card"><b>${x.name}</b><strong>${x.title}</strong><span>${x.scar}</span></div>`).join('')}</div><button class="btn" onclick="showRoamLegends()">강호전설 보기</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
+    app().innerHTML=`<div class="result-screen roam-finish">${sealSVG('遊','#d9b36c')}<h2>강호에 이름을 남기다</h2><p>시드 <b>${escHtml(run.seed)}</b>의 ${run.nodes.length}갈래 길을 완주했습니다.<br>네 협객의 별호와 여정이 강호전설에 기록되었습니다.</p><div class="legend-grid">${legends.map(x=>`<div class="legend-card"><b>${x.name}</b><strong>${x.title}</strong><span>${x.scar}</span></div>`).join('')}</div>${contrib}<button class="btn" onclick="showRoamLegends()">강호전설 보기</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;return;
   }
-  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${run.pos}/${run.nodes.length} 노드를 통과했습니다.<br>전리품으로 엽전 ${wasBoss?6:3}을 얻었습니다.</p><button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
+  saveRoam();app().innerHTML=`<div class="result-screen">${sealSVG('勝','#c0392e')}<h2>길을 열었다</h2><p>원정 ${run.pos}/${run.nodes.length} 노드를 통과했습니다.<br>전리품으로 엽전 ${wasBoss?6:3}을 얻었습니다.</p>${contrib}<button class="btn" onclick="showRoamMap()">다음 길</button></div>`;
 }
 function showRoamLegends(){
   const old=document.getElementById('roam-modal');if(old)old.remove();
@@ -2297,6 +2384,7 @@ function showRoamLegends(){
 
 /* ── 천하논검: 4인 편성·8관 연전 ── */
 let LUNJIAN_PICK=['gj','yg','jmk','sb'];
+let LUNJIAN_INTERNALS={};
 function fixedChallengeRoster(ids,level){
   G.roster={};G.party=[];G.extraSkills={};G.deploy=null;
   const names=['hp','str','int','def','res','spd','skl'];
@@ -2320,11 +2408,20 @@ function saveLunjian(){
 function showLunjianStart(){
   const saved=lunjianStore().current;
   LUNJIAN_PICK=['gj','yg','jmk','sb'];
+  LUNJIAN_INTERNALS=Object.fromEntries(LUNJIAN_HEROES.map(cid=>[cid,defaultInternal(cid)]));
   app().innerHTML=`<div id="campsel" class="chronicle-screen trial-screen"><div class="chronicle-head"><div><div class="eyebrow">天下論劍</div><h2>천하논검</h2><p>네 협객을 골라 여덟 관주의 호신강기와 전용 초식을 연속으로 파훼하십시오. 관문 사이에는 하나의 심법을 택해 부대를 강화합니다.</p></div><button class="btn small danger" onclick="showChallengeSelect()">도전 목록</button></div>
     ${saved?`<div class="challenge-resume"><b>진행 중인 논검 · ${saved.round+1}/8관</b><button class="btn" onclick="resumeLunjian()">이어하기</button></div>`:''}
     <div class="trial-rule"><span>편성 <b id="lj-count">${LUNJIAN_PICK.length}/4</b></span><span>난이도 <b>${curDiff().name}</b></span><span>전투마다 체력·기력 회복</span></div>
-    <div class="lunjian-picks">${LUNJIAN_HEROES.map(cid=>`<button class="dep-card ${LUNJIAN_PICK.includes(cid)?'on':'off'}" aria-pressed="${LUNJIAN_PICK.includes(cid)}" onclick="toggleLunjianPick('${cid}')"><div class="pt">${ptSVG(cid)}</div><div class="dep-name">${CHARS[cid].name}</div><div class="dep-info">${TYPE_NAME[CHARS[cid].type]} · ${CHARS[cid].cls}</div></button>`).join('')}</div>
+    <div class="lunjian-picks">${LUNJIAN_HEROES.map(cid=>`<button data-cid="${cid}" class="dep-card ${LUNJIAN_PICK.includes(cid)?'on':'off'}" aria-pressed="${LUNJIAN_PICK.includes(cid)}" onclick="toggleLunjianPick('${cid}')"><div class="pt">${ptSVG(cid)}</div><div class="dep-name">${CHARS[cid].name}</div><div class="dep-info">${TYPE_NAME[CHARS[cid].type]} · ${CHARS[cid].cls}</div><div class="dep-inner">${internalById(LUNJIAN_INTERNALS[cid]).name}<small>${internalById(LUNJIAN_INTERNALS[cid]).role}</small></div></button>`).join('')}</div>
+    <div id="lj-internals" class="lunjian-internals">${lunjianInternalSelectors()}</div>
     <div class="btnrow"><button id="lj-start" class="btn" onclick="beginLunjian()">네 협객으로 시작</button></div></div>`;
+}
+function lunjianInternalSelectors(){
+  return LUNJIAN_PICK.map(cid=>`<label><b>${CHARS[cid].name}</b><select aria-label="${CHARS[cid].name} 내공·특성" onchange="setLunjianInternal('${cid}',this.value)">${internalOptions(cid).map(id=>`<option value="${id}" ${LUNJIAN_INTERNALS[cid]===id?'selected':''}>${INTERNALS[id].name} · ${INTERNALS[id].role}</option>`).join('')}</select><small>${internalEffectText(LUNJIAN_INTERNALS[cid])}</small></label>`).join('');
+}
+function setLunjianInternal(cid,id){
+  LUNJIAN_INTERNALS[cid]=validInternal(cid,id);const host=document.getElementById('lj-internals');if(host)host.innerHTML=lunjianInternalSelectors();
+  const item=internalById(LUNJIAN_INTERNALS[cid]),card=document.querySelector(`.lunjian-picks [data-cid="${cid}"] .dep-inner`);if(card&&item)card.innerHTML=`${item.name}<small>${item.role}</small>`;
 }
 function toggleLunjianPick(cid){
   const i=LUNJIAN_PICK.indexOf(cid);
@@ -2332,11 +2429,12 @@ function toggleLunjianPick(cid){
   document.querySelectorAll('.lunjian-picks .dep-card').forEach((card,index)=>{const on=LUNJIAN_PICK.includes(LUNJIAN_HEROES[index]);card.classList.toggle('on',on);card.classList.toggle('off',!on);card.setAttribute('aria-pressed',String(on));});
   const count=document.getElementById('lj-count');if(count)count.textContent=`${LUNJIAN_PICK.length}/4`;
   const start=document.getElementById('lj-start');if(start)start.disabled=LUNJIAN_PICK.length!==4;
+  const host=document.getElementById('lj-internals');if(host)host.innerHTML=lunjianInternalSelectors();
 }
 function beginLunjian(){
   if(LUNJIAN_PICK.length!==4)return;
   B=null;fixedChallengeRoster(LUNJIAN_PICK,12);
-  SESSION.activateChallenge({mode:'lunjian',round:0,totalTurns:0,blessings:[],diff:SETTINGS.diff,ch:null});
+  SESSION.activateChallenge({mode:'lunjian',round:0,totalTurns:0,blessings:[],internals:Object.fromEntries(LUNJIAN_PICK.map(cid=>[cid,validInternal(cid,LUNJIAN_INTERNALS[cid])])),diff:SETTINGS.diff,ch:null});
   saveLunjian();showLunjianMap();
 }
 function resumeLunjian(){
@@ -2350,26 +2448,26 @@ function showLunjianMap(){
   const run=SESSION.challenge(),store=lunjianStore();if(!run||run.mode!=='lunjian')return showLunjianStart();
   const nodes=LUNJIAN_ROUNDS.map((round,i)=>`<div class="gauntlet-node ${i<run.round?'done':i===run.round?'cur':'lock'}"><i>${i<run.round?'✓':i+1}</i><b>${CHARS[round.boss].name}</b><small>${round.title}</small></div>`).join('');
   const blessings=(run.blessings||[]).map(id=>LUNJIAN_BLESSINGS[id]?.name).filter(Boolean).join(' · ')||'아직 얻은 심법 없음';
-  app().innerHTML=`<div class="result-screen gauntlet-screen"><div class="eyebrow">BEST ${store.bestRound||0}/8</div><h2>天下論劍 천하논검</h2><div class="gauntlet-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}</span>`).join('')}</div><div class="gauntlet-path">${nodes}</div><p class="gauntlet-bless"><b>누적 심법</b> ${blessings}</p><button class="btn" onclick="enterLunjianRound()">${run.round+1}관 출전 준비</button><button class="btn danger" onclick="saveLunjian();toTitle()">잠시 멈춤</button></div>`;
+  app().innerHTML=`<div class="result-screen gauntlet-screen"><div class="eyebrow">BEST ${store.bestRound||0}/8</div><h2>天下論劍 천하논검</h2><div class="gauntlet-party">${G.party.map(cid=>`<span>${CHARS[cid].name} Lv.${G.roster[cid].lvl}<small>${internalById(validInternal(cid,run.internals?.[cid]))?.name||''}</small></span>`).join('')}</div><div class="gauntlet-path">${nodes}</div><p class="gauntlet-bless"><b>누적 심법</b> ${blessings}</p><button class="btn" onclick="enterLunjianRound()">${run.round+1}관 출전 준비</button><button class="btn danger" onclick="saveLunjian();toTitle()">잠시 멈춤</button></div>`;
 }
 function enterLunjianRound(){
   const run=SESSION.challenge();if(!run||run.mode!=='lunjian')return;
   run.ch=makeLunjianBattle(run.round,CHAPTERS);G.deploy=[...G.party];saveLunjian();showDeploy();
 }
 function lunjianBattleWon(){
-  const run=SESSION.challenge(),store=lunjianStore();
+  const contrib=contributionHTML(),run=SESSION.challenge(),store=lunjianStore();
   run.totalTurns=(run.totalTurns||0)+B.turn;run.round++;run.ch=null;store.bestRound=Math.max(store.bestRound||0,run.round);
   if(run.round>=LUNJIAN_ROUNDS.length){
     store.clears=(store.clears||0)+1;
-    const record={party:[...G.party],diff:run.diff,blessings:[...(run.blessings||[])],turns:run.totalTurns,at:Date.now()};
+    const record={party:[...G.party],diff:run.diff,blessings:[...(run.blessings||[])],internals:{...(run.internals||{})},turns:run.totalTurns,at:Date.now()};
     const diffRank={story:1,std:2,hero:3};
     store.records=[record,...(store.records||[])].sort((a,b)=>(diffRank[b.diff]||0)-(diffRank[a.diff]||0)||(a.turns||999)-(b.turns||999)).slice(0,12);
     delete store.current;V3STORE=writeV3(V3STORE);unlockAchv('lunjian_clear');
-    app().innerHTML=`<div class="result-screen">${sealSVG('魁','#c0392e')}<h2>천하논검 제패</h2><p>여덟 관주의 초식을 모두 꿰뚫었습니다.<br>${G.party.map(cid=>CHARS[cid].name).join(' · ')}의 이름이 논검록에 남았습니다.</p><button class="btn" onclick="showLunjianRecords()">논검록</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;
+    app().innerHTML=`<div class="result-screen">${sealSVG('魁','#c0392e')}<h2>천하논검 제패</h2><p>여덟 관주의 초식을 모두 꿰뚫었습니다.<br>${G.party.map(cid=>CHARS[cid].name).join(' · ')}의 이름이 논검록에 남았습니다.</p>${contrib}<button class="btn" onclick="showLunjianRecords()">논검록</button><button class="btn" onclick="showChallengeSelect()">도전 목록</button></div>`;
     return;
   }
   saveLunjian();
-  app().innerHTML=`<div class="result-screen blessing-screen">${sealSVG('破','#c0392e')}<h2>${run.round}관 돌파</h2><p>다음 관문을 앞두고 하나의 심법을 새깁니다.</p><div class="blessing-grid">${Object.entries(LUNJIAN_BLESSINGS).map(([id,item])=>`<button class="btn blessing" onclick="lunjianChoose('${id}')"><b>${item.name}</b><span>${item.desc}</span></button>`).join('')}</div></div>`;
+  app().innerHTML=`<div class="result-screen blessing-screen">${sealSVG('破','#c0392e')}<h2>${run.round}관 돌파</h2><p>다음 관문을 앞두고 하나의 심법을 새깁니다.</p>${contrib}<div class="blessing-grid">${Object.entries(LUNJIAN_BLESSINGS).map(([id,item])=>`<button class="btn blessing" onclick="lunjianChoose('${id}')"><b>${item.name}</b><span>${item.desc}</span></button>`).join('')}</div></div>`;
 }
 function lunjianChoose(id){
   const run=SESSION.challenge(),blessing=LUNJIAN_BLESSINGS[id];if(!run||!blessing)return;
@@ -2378,7 +2476,7 @@ function lunjianChoose(id){
 }
 function showLunjianRecords(){
   const records=lunjianStore().records||[];
-  const rows=records.map((record,i)=>`<div class="legend-row"><b>#${i+1} ${record.party.map(cid=>CHARS[cid]?.name||cid).join('·')}</b><span>${DIFFS[record.diff]?.name||record.diff} · 총 ${record.turns}턴</span><small>${(record.blessings||[]).map(id=>LUNJIAN_BLESSINGS[id]?.name).filter(Boolean).join(' · ')||'무심법'} · ${new Date(record.at).toLocaleDateString('ko-KR')}</small></div>`).join('');
+  const rows=records.map((record,i)=>`<div class="legend-row"><b>#${i+1} ${record.party.map(cid=>CHARS[cid]?.name||cid).join('·')}</b><span>${DIFFS[record.diff]?.name||record.diff} · 총 ${record.turns}턴</span><small>${record.party.map(cid=>internalById(record.internals?.[cid])?.name).filter(Boolean).join(' · ')||'기본 심법'}<br>${(record.blessings||[]).map(id=>LUNJIAN_BLESSINGS[id]?.name).filter(Boolean).join(' · ')||'무심법'} · ${new Date(record.at).toLocaleDateString('ko-KR')}</small></div>`).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="lunjian-records"><div class="modal"><h3>천하 논검록</h3><div class="legend-list">${rows||'<p>아직 완주 기록이 없습니다.</p>'}</div><div class="btnrow"><button class="btn" onclick="document.getElementById('lunjian-records').remove()">닫기</button></div></div></div>`);
 }
 
@@ -2401,11 +2499,11 @@ function startTrial(id){
 }
 function trialMetrics(){return {turn:B.turn,allyLost:!!B.allyLost,damageTaken:B.damageTaken||0,guardBreaks:B.guardBreaks||0,bondStrikes:B.bondStrikes||0,enemyKills:B.enemyKills||0,subdues:B.subdues||0};}
 function trialBattleWon(){
-  const run=SESSION.challenge(),trial=trialById(run.id),metrics=trialMetrics(),medal=evaluateTrial(trial,metrics),store=trialStore();
+  const contrib=contributionHTML(),run=SESSION.challenge(),trial=trialById(run.id),metrics=trialMetrics(),medal=evaluateTrial(trial,metrics),store=trialStore();
   store.medals[trial.id]=betterMedal(store.medals[trial.id],medal);V3STORE=writeV3(V3STORE);unlockAchv('trial_first');
   if(TRIALS.every(item=>store.medals[item.id]==='gold'))unlockAchv('trial_gold_all');
   const next=TRIALS[TRIALS.findIndex(item=>item.id===trial.id)+1];
-  app().innerHTML=`<div class="result-screen trial-result">${sealSVG(medal==='gold'?'金':medal==='silver'?'銀':'銅',medal==='gold'?'#d9b36c':medal==='silver'?'#aab3bd':'#a96b45')}<h2>${MEDAL_ICON[medal]} ${trial.title}</h2><p>${medal==='gold'?'완전한 해법입니다.':medal==='silver'?'빈틈을 줄이면 금의 해법에 닿습니다.':'해결했습니다. 이제 더 날카로운 해법에 도전할 수 있습니다.'}<br>완료 ${metrics.turn}턴 · 받은 피해 ${metrics.damageTaken} · 파훼 ${metrics.guardBreaks}회 · 협공 ${metrics.bondStrikes}회</p><button class="btn" onclick="startTrial('${trial.id}')">다시 풀기</button>${next?`<button class="btn" onclick="showTrialBrief('${next.id}')">다음 수수께끼</button>`:''}<button class="btn danger" onclick="showTrialSelect()">목록</button></div>`;
+  app().innerHTML=`<div class="result-screen trial-result">${sealSVG(medal==='gold'?'金':medal==='silver'?'銀':'銅',medal==='gold'?'#d9b36c':medal==='silver'?'#aab3bd':'#a96b45')}<h2>${MEDAL_ICON[medal]} ${trial.title}</h2><p>${medal==='gold'?'완전한 해법입니다.':medal==='silver'?'빈틈을 줄이면 금의 해법에 닿습니다.':'해결했습니다. 이제 더 날카로운 해법에 도전할 수 있습니다.'}<br>완료 ${metrics.turn}턴 · 받은 피해 ${metrics.damageTaken} · 파훼 ${metrics.guardBreaks}회 · 협공 ${metrics.bondStrikes}회</p>${contrib}<button class="btn" onclick="startTrial('${trial.id}')">다시 풀기</button>${next?`<button class="btn" onclick="showTrialBrief('${next.id}')">다음 수수께끼</button>`:''}<button class="btn danger" onclick="showTrialSelect()">목록</button></div>`;
 }
 
 /* ── 타이틀 ── */
@@ -2534,6 +2632,7 @@ function showHelp(){
       ◆ <b style="color:#d9b45b">호신강기·파훼</b>: 강적의 금색 강기 게이지를 상성·필살·연계로 깎으면 방어가 무너집니다. 보스는 체력 구간마다 초식과 능력이 바뀝니다<br>
       ◆ <b style="color:#8fd6c2">전투 목표</b>: 섬멸 외에도 방어·점거·탈출·비살상 제압이 있습니다. 현재 목표와 진행도는 상단과 정보창에서 확인합니다<br>
       ◆ <b style="color:#d8b5ef">무공 편성·연계</b>: 거점에서 협객당 무공 3개를 고릅니다. 서로 다른 초식을 연속 사용하면 연계가, A급 인연 협객이 인접하면 합동 오의가 발동할 수 있습니다<br>
+      ◆ <b style="color:#9fd4c8">내공·특성 편성</b>: 핵심 협객은 원작에서 실제로 익힌 심법이나 확인된 전투 성향 하나를 고릅니다. ‘특성’ 표기는 가공 내공명이 아닙니다<br>
       ◆ <b style="color:#d9b36c">수묵 전장</b>: 전경·중경·원경이 카메라에 따라 움직이고 세 턴마다 시간대가 흐릅니다. 무공·합동 오의·보스 전환에는 전용 초상 컷인과 먹선 궤적이 표시됩니다<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
@@ -2636,6 +2735,14 @@ function exportSave(){
   a.href=url; a.download=`강호의별_백업_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
+function exportBattleReports(){
+  SFX.play('ui');
+  const payload={app:'강호의 별',format:'battle-report-v1',createdAt:new Date().toISOString(),reports:BATTLE_REPORTS};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  const d=new Date(),pad=n=>String(n).padStart(2,'0');
+  a.href=url;a.download=`강호의별_전투기록_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
 function triggerImport(){
   let inp=document.getElementById('save-import-file');
   if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.id='save-import-file'; inp.style.display='none';
@@ -2680,7 +2787,7 @@ function v2New(campId){
   const C = CAMPAIGNS[campId];
   return { camp:campId, stageId:C.start, flags:{}, gold:C.gold||0, inv:{}, equips:{}, promoted:{},
            cleared:[], attempted:{}, roster:{}, party:[], extraSkills:{}, deploy:null,
-           supports:{}, supportLock:{}, skillLoadouts:{}, history:[], reputation:{hyeop:0,jeong:0,se:0}, factions:{}, trusts:{}, choiceMemory:{}, diff:SETTINGS.diff };
+           supports:{}, supportLock:{}, skillLoadouts:{}, internalLoadouts:{}, history:[], reputation:{hyeop:0,jeong:0,se:0}, factions:{}, trusts:{}, choiceMemory:{}, diff:SETTINGS.diff };
 }
 function importClassicAsChronicle(){
   if(v2LoadSave('chronicle')||!V3STORE.legacy.classicV1) return;
@@ -2736,7 +2843,7 @@ function startCampaignV2(campId, useSave, ngBonus){
   SESSION.activateCampaign(loaded||v2New(campId));
   SESSION.campaignState.attempted=SESSION.campaignState.attempted||{};
   SESSION.campaignState.supports=SESSION.campaignState.supports||{}; SESSION.campaignState.supportLock=SESSION.campaignState.supportLock||{}; /* 구 세이브 호환 */
-  SESSION.campaignState.skillLoadouts=SESSION.campaignState.skillLoadouts||{}; SESSION.campaignState.history=SESSION.campaignState.history||[];
+  SESSION.campaignState.skillLoadouts=SESSION.campaignState.skillLoadouts||{}; SESSION.campaignState.internalLoadouts=SESSION.campaignState.internalLoadouts||{}; SESSION.campaignState.history=SESSION.campaignState.history||[];
   SESSION.campaignState.reputation=SESSION.campaignState.reputation||{hyeop:0,jeong:0,se:0}; SESSION.campaignState.factions=SESSION.campaignState.factions||{};
   SESSION.campaignState.trusts=SESSION.campaignState.trusts||{}; SESSION.campaignState.choiceMemory=SESSION.campaignState.choiceMemory||{};
   if(!loaded&&C.inherit){ /* 전권 세이브에서 플래그·보너스 계승 */
@@ -2980,7 +3087,7 @@ function v2Depart(){
   v2Advance(n);
 }
 function campUnitHTML(){
-  return `<table class="camptable"><tr><th>협객</th><th>Lv</th><th>병기</th><th>보구</th><th>무공</th><th>승급</th></tr>`+
+  return `<table class="camptable"><tr><th>협객</th><th>Lv</th><th>병기</th><th>보구</th><th>무공</th><th>내공·특성</th><th>승급</th></tr>`+
   SESSION.campaignState.party.map(cid=>{
     const r=SESSION.campaignState.roster[cid], c=CHARS[cid];
     const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
@@ -3002,11 +3109,13 @@ function campUnitHTML(){
       pcell=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button>
         <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}<br>${promotionEffectText(promo)}</div>`;
     }
+    const inner=internalById(selectedInternal(cid)),hasInnerOptions=internalOptions(cid).length>0;
     return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${SESSION.campaignState.promoted[cid]||c.cls}</div></td>
       <td>${r.lvl}</td>
       <td><select onchange="v2Equip('${cid}','w',this.value)">${opts('w')}</select></td>
       <td><select onchange="v2Equip('${cid}','a',this.value)">${opts('a')}</select></td>
       <td><button class="btn small" onclick="openSkillLoadout('${cid}')">편성</button><div style="font-size:11px;color:var(--dim)">${((SESSION.campaignState.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(SESSION.campaignState.extraSkills[cid]||[]).length))}/3</div></td>
+      <td>${inner?`<button class="btn small" onclick="openInternalLoadout('${cid}')">${inner.name}</button><div style="font-size:11px;color:var(--dim)">${inner.kind} · ${inner.role}</div>`:(hasInnerOptions?`<button class="btn small" onclick="openInternalLoadout('${cid}')">미해금</button>`:'—')}</td>
       <td>${pcell}</td></tr>`;
   }).join('')+`</table>`;
 }
@@ -3182,6 +3291,20 @@ function openSkillLoadout(cid){
   const rows=all.map(sid=>{const sk=SKILLS[sid], on=selected.includes(sid);return `<label class="skill-pick ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="toggleSkillLoadout('${cid}','${sid}',this.checked)"><span><b>${sk.name}</b><small>${sk.desc} · 기 ${masteryCost(sid)}<br>${masteryProgress(sid)} · 실제 효과: ${masteryEffectText(sid)}</small></span></label>`;}).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="skill-modal"><div class="modal"><h3>무공 편성 — ${c.name}</h3><p class="modal-note">출전 무공은 최대 3개입니다. 서로 다른 초식을 잇으면 연계 피해가 상승합니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeSkillLoadout()">완료</button></div></div></div>`);
 }
+function openInternalLoadout(cid){
+  const c=CHARS[cid],options=internalOptions(cid);if(!options.length)return;
+  const available=availableInternalOptions(cid),selected=selectedInternal(cid);
+  if(selected)SESSION.campaignState.internalLoadouts[cid]=selected;
+  const level=SESSION.campaignState.roster[cid]?.lvl||1;
+  const rows=options.map(id=>{const item=INTERNALS[id],on=id===selected,locked=!available.includes(id);return `<label class="skill-pick internal-pick ${on?'on':''} ${locked?'locked':''}"><input type="radio" name="inner-${cid}" ${on?'checked':''} ${locked?'disabled':''} onchange="setInternalLoadout('${cid}','${id}')"><span><b>${item.kind} · ${item.name}</b><em>${locked?`Lv.${item.unlockLevel} 해금`:item.role}</em><small>${item.desc}<br><strong>실제 효과: ${internalEffectText(id)}</strong><br>원작 근거: ${item.source}</small></span></label>`;}).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="internal-modal"><div class="modal internal-modal"><h3>내공·특성 편성 — ${c.name}</h3><p class="modal-note">현재 Lv.${level}. 원작에서 실제로 익힌 심법 또는 명확히 보여 준 전투 성향 중 하나를 운용합니다. ‘특성’은 가공 내공명이 아닙니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeInternalLoadout()">완료</button></div></div></div>`);
+}
+function setInternalLoadout(cid,id){
+  if(!availableInternalOptions(cid).includes(id))return;
+  SESSION.campaignState.internalLoadouts[cid]=id;v2Save();
+  const m=document.getElementById('internal-modal');if(m)m.remove();openInternalLoadout(cid);
+}
+function closeInternalLoadout(){const m=document.getElementById('internal-modal');if(m)m.remove();v2Save();renderCamp();}
 function toggleSkillLoadout(cid,sid,on){
   const list=SESSION.campaignState.skillLoadouts[cid]=SESSION.campaignState.skillLoadouts[cid]||[];
   if(on&&!list.includes(sid)){ if(list.length>=3){ SFX.play('miss'); openSkillLoadoutRefresh(cid); return; } list.push(sid); }
@@ -3233,6 +3356,7 @@ function showAchievements(){
   }).join('');
   const campRows=Object.keys(CAMPAIGNS).filter(c=>STATS.camps[c]&&STATS.camps[c].cleared)
     .map(c=>CAMPAIGNS[c].name).join(' · ')||'아직 완주한 캠페인이 없습니다';
+  const reportRows=BATTLE_REPORTS.slice(0,6).map(report=>{const ace=report.members?.[0];return `<div class="battle-report-row"><b>${escHtml(report.title)}</b><span>${report.turn}턴 · ${ace?`최고 기여 ${ace.name} ${ace.score}`:'기록 없음'}</span><small>${new Date(report.at).toLocaleString('ko-KR')}</small></div>`;}).join('');
   app().innerHTML=`<div id="achv-screen">
     <h2>기록 · 업적 <span style="font-size:14px;color:var(--gold2)">${done}/${ACHV.length}</span></h2>
     <div class="stat-box">
@@ -3243,6 +3367,7 @@ function showAchievements(){
       <div class="stat-tile"><b>${bestWave()}</b><span>무한 최고파</span></div>
     </div>
     <p style="color:var(--dim);font-size:12.5px;margin:6px 0 12px">완주 캠페인: <span style="color:var(--gold2)">${campRows}</span></p>
+    <section class="battle-report-box"><div><h3>최근 전투 분석</h3><p>피해·강기 파훼·회복 기여도를 최근 30전까지 기기에 저장합니다.</p></div><button class="btn small" onclick="exportBattleReports()" ${BATTLE_REPORTS.length?'':'disabled'}>JSON 내보내기</button><div class="battle-report-list">${reportRows||'<p>아직 완료한 전투 기록이 없습니다.</p>'}</div></section>
     <div class="achv-grid">${rows}</div>
     <div style="text-align:center;margin-top:14px"><button class="btn small" onclick="toTitle()">돌아가기</button></div>
   </div>`;
@@ -3391,6 +3516,8 @@ export const DEBUG = {
   }; },
   relationshipProbe(score=2,cid='gj'){ return {faction:factionRelationTier(score),trust:characterTrustTier(score),effects:characterTrustEffects({[cid]:score},cid)}; },
   masteryProbe(sid='seoncheon',uses=0){ return masteryInfo(sid,uses); },
+  internalProbe(cid='gj',id=null){const selected=validInternal(cid,id);return {selected,item:internalById(selected),options:internalOptions(cid),effectText:internalEffectText(selected)};},
+  battleReports(){return deepClone(BATTLE_REPORTS);},
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },
   backupProbe(){ return createBackupPayload(localStorage); },
@@ -3403,7 +3530,7 @@ export const DEBUG = {
   openCurrentDeploy(){ const node=curNode(); if(node?.kind==='battle') v2Deploy(node); },
   forceDefeat(){ if(B){ B.over=true; showDefeat(); } },
   previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
-  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, CAMPAIGNS, DISCOVERED_CAMPAIGN_IDS,
+  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, INTERNALS, HERO_INTERNALS, CAMPAIGNS, DISCOVERED_CAMPAIGN_IDS,
 };
 
 export const GLOBALS = {
@@ -3412,16 +3539,16 @@ export const GLOBALS = {
   showChapterSelect, jumpChapter, startEndless, nextWave, toTitle, retryChapter, afterVictory,
   showRoamStart, startRoamFromInput, resumeRoam, showRoamMap, enterRoamNode, roamChoice,
   showRoamShop, roamBuyRelic, showRoamFaction, roamFactionChoice, advanceRoamNode, showRoamLegends,
-  showLunjianStart, toggleLunjianPick, beginLunjian, resumeLunjian, showLunjianMap, enterLunjianRound, saveLunjian, lunjianChoose, showLunjianRecords,
+  showLunjianStart, toggleLunjianPick, setLunjianInternal, beginLunjian, resumeLunjian, showLunjianMap, enterLunjianRound, saveLunjian, lunjianChoose, showLunjianRecords,
   showTrialSelect, showTrialBrief, startTrial,
   showCampaignSelect, showChallengeSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
-  openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, showRewindHistory, rewindHistory,
+  openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, openInternalLoadout, setInternalLoadout, closeInternalLoadout, showRewindHistory, rewindHistory,
   showRelationshipLedger,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
   toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, showSaveHealth, restoreCampaignCheckpoint, viewSupport,
   showSettings, setDiff, setSpeed, toggleFastEnemy, toggleReducedFx,
   showAchievements, chooseNgPlus, ngStart,
-  exportSave, triggerImport,
+  exportSave, exportBattleReports, triggerImport,
 };

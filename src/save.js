@@ -26,6 +26,7 @@ export function emptyV3Save(){
       mastery: {},
       codex: {},
       reputation: {侠:0,情:0,势:0},
+      battleReports: [],
     },
     campaigns: {},
     challenges: {endless:{bestWave:0},roam:{},lunjian:{bestRound:0,clears:0,records:[]},trials:{medals:{}}},
@@ -61,6 +62,8 @@ export function normalizeV3(raw){
   for(const key of ['settings','achievements','stats','mastery','codex','reputation']){
     base.profile[key]={...base.profile[key],...recordOr(base,`profile.${key}`,profile[key],{})};
   }
+  if(Array.isArray(profile.battleReports)) base.profile.battleReports=clone(profile.battleReports).slice(0,30);
+  else if(profile.battleReports!==undefined) isolate(base,'profile.battleReports',profile.battleReports,'array expected');
   base.profile.stats.camps=recordOr(base,'profile.stats.camps',base.profile.stats.camps,{});
 
   const campaigns=recordOr(base,'campaigns',raw.campaigns,{});

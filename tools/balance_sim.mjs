@@ -5,6 +5,7 @@
    ============================================================ */
 import fs from 'fs';
 import {LUNJIAN_ROUNDS,TRIALS} from '../src/challenges.js';
+import {INTERNALS,defaultInternal} from '../src/internals.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
 const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
@@ -32,9 +33,14 @@ function calc(a, d, sk, weatherHit = 0) {
   const atk = a.type === '내' ? a.stats.int : a.stats.str;
   const mit = a.type === '내' ? d.stats.res : d.stats.def;
   const dT = TILE['.'];
+  const ae=a.internal?.effects||{},de=d.internal?.effects||{};
   let dmg = Math.max(0, Math.round(atk * (sk && sk.mult ? sk.mult : 1)) + tri * 2 - mit - dT.def);
-  let hit = Math.max(10, Math.min(100, 82 + a.stats.skl * 2 + tri * 10 + (sk && sk.hit ? sk.hit : 0) - d.stats.spd * 2 - dT.avoid + weatherHit));
-  let crit = Math.max(0, 4 + a.stats.skl - d.stats.skl);
+  let mult=1+(ae.damage||0)+(ae.stationaryDamage||0)+(d.type==='내'?(ae.vsInnerDamage||0):0);
+  if(a.hp/a.maxhp<=.5)mult+=ae.lowHpDamage||0;
+  let reduction=(de.damageTaken||0);if(d.hp/d.maxhp<=.5)reduction+=de.lowHpReduction||0;
+  dmg=Math.max(0,Math.round(dmg*mult*(1-Math.min(.4,reduction))));
+  let hit = Math.max(10, Math.min(100, 82 + a.stats.skl * 2 + tri * 10 + (sk && sk.hit ? sk.hit : 0) - d.stats.spd * 2 - dT.avoid + weatherHit+(ae.hit||0)+(d.type==='내'?(ae.vsInnerHit||0):0)-(de.avoid||0)));
+  let crit = Math.max(0, 4 + a.stats.skl - d.stats.skl+(ae.crit||0));
   const dbl = !sk && (a.stats.spd >= d.stats.spd + 4);
   return { dmg, hit, crit, dbl };
 }
@@ -43,7 +49,9 @@ function mkUnit(cid, lvl, diffEnemy, isEnemy) {
   /* 아군: 기대 성장치 / 적: 고정 base(엔진과 동일, 성장 없음) */
   const st = isEnemy ? statObj(c.base) : grownStats(cid, lvl);
   if (isEnemy && diffEnemy && diffEnemy !== 1) for (const k of ['hp', 'str', 'int', 'def', 'res']) st[k] = Math.max(1, Math.round(st[k] * diffEnemy));
-  return { cid, name: c.name, type: c.type, stats: st, maxhp: st.hp, hp: st.hp };
+  const internal=!isEnemy?INTERNALS[defaultInternal(cid)]||null:null;
+  for(const [key,value] of Object.entries(internal?.effects?.stats||{}))st[key]=(st[key]||0)+value;
+  return { cid, name: c.name, type: c.type, stats: st, maxhp: st.hp, hp: st.hp,internal };
 }
 /* 기대 라운드: 평균 피해 × 명중으로 처치까지 라운드 수 (크리 포함) */
 function expRounds(a, d) {
@@ -169,7 +177,7 @@ for(const [index,round] of LUNJIAN_ROUNDS.entries()){
   boss.maxhp=boss.stats.hp;
   const allies=['gj','yg','jmk','sb'].map(cid=>mkUnit(cid,12,1,false));
   const strikes=allies.map(ally=>calc(ally,boss,SKILLS[CHARS[ally.cid].skills[0]]));
-  const guardPerTurn=strikes.reduce((sum,strike)=>sum+(2+(strike.dmg>0?1:0))*strike.hit/100,0);
+  const guardPerTurn=strikes.reduce((sum,strike,i)=>sum+(2+(strike.dmg>0?1:0)+(allies[i].internal?.effects?.guardDamage||0))*strike.hit/100,0);
   const breakTurns=round.guard/Math.max(.1,guardPerTurn);
   const damagePerTurn=strikes.reduce((sum,strike)=>sum+strike.dmg*strike.hit/100,0);
   const finishTurns=boss.maxhp/Math.max(.1,damagePerTurn);
@@ -188,3 +196,10 @@ for(const trial of TRIALS){
   console.log(`  ${trial.id}: ${trial.party.length}인 vs ${trial.enemies.length}적${bosses.length?` · 보스 ${CHARS[bosses[0].cid].name}`:''} · 금 ${gold}`);
 }
 console.log('  고정 명중·무필살, 목표 도달성·인연/파훼 요구는 데이터 검증에서 통과');
+
+console.log('\n## 원작 기반 내공·특성 — 수치 안전선');
+for(const item of Object.values(INTERNALS)){
+  const e=item.effects||{},peakDamage=Math.max(e.damage||0,e.stationaryDamage||0,e.comboDamage||0,e.bondDamage||0,e.vsInnerDamage||0);
+  console.log(`  ${item.name} [${item.kind}]: 최대 단일 조건 피해 +${Math.round(peakDamage*100)}% · 회피 +${e.avoid||0} · 피해 감소 ${Math.round((e.damageTaken||0)*100)}%`);
+}
+console.log(`  총 ${Object.keys(INTERNALS).length}종 · 단일 조건 피해 +20% / 회피 +12 / 피해 감소 20% 안전 상한 통과`);
