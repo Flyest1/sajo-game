@@ -5,6 +5,8 @@
 import fs from 'fs';
 import {LUNJIAN_HEROES,LUNJIAN_ROUNDS,TRIALS,makeLunjianBattle} from '../src/challenges.js';
 import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal} from '../src/internals.js';
+import {ENEMY_MARTIALS,enemyMartialEffectText} from '../src/enemy-martials.js';
+import {enemyMartialCounter} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -363,11 +365,35 @@ const SUPPORTS = J('supports.json');
   }
   if(INTERNALS[HERO_INTERNALS.gj?.[0]]?.name!=='구음진경')errs.push('internal/gj: canonical default must be 구음진경');
   if((HERO_INTERNALS.gj||[]).some(id=>INTERNALS[id]?.name.includes('구양')))errs.push('internal/gj: 구양신공 must not be assigned to 곽정');
+  for(const [id,item] of Object.entries(INTERNALS)){
+    if(!item.unlock)continue;
+    const camp=campaignById(item.unlock.campaign);
+    if(!camp){errs.push(`internal/${id}: unlock campaign missing ${item.unlock.campaign}`);continue;}
+    for(const stageId of [...(item.unlock.clearedAny||[]),...(item.unlock.reachedAny||[])])if(!camp.stages[stageId])errs.push(`internal/${id}: unlock stage missing ${item.unlock.campaign}/${stageId}`);
+  }
+}
+
+/* ── R19 주요 적 무학·파훼 검증 ── */
+{
+  if(Object.keys(ENEMY_MARTIALS).length!==12)errs.push(`enemy martials ${Object.keys(ENEMY_MARTIALS).length} != 12`);
+  for(const [cid,style] of Object.entries(ENEMY_MARTIALS)){
+    if(!CHARS[cid])errs.push(`enemy martial: unknown character ${cid}`);
+    if(!style.name||!style.kind||!style.role||!style.source||!style.tell||!style.counter?.text)errs.push(`enemy martial/${cid}: documentation incomplete`);
+    if(!enemyMartialEffectText(style))errs.push(`enemy martial/${cid}: effect text missing`);
+    if(!Array.isArray(style.phases)||style.phases.length!==2)errs.push(`enemy martial/${cid}: two phases required`);
+    if((style.effects?.damage||0)>.15||(style.effects?.skillDamage||0)>.1||(style.effects?.reflect||0)>.15||(style.effects?.avoid||0)>10)errs.push(`enemy martial/${cid}: effect exceeds safety cap`);
+    const routes=[...(style.counter.types||[]),style.counter.minAllies?'allies':null,style.counter.combo?'combo':null].filter(Boolean);
+    if(!routes.length)errs.push(`enemy martial/${cid}: counter route missing`);
+    const probe=enemyMartialCounter(style,{attackerType:style.counter.types?.[0],adjacentAllies:style.counter.minAllies||0,comboStep:style.counter.combo?1:0});
+    if(!probe.active||probe.guardDamage<1)errs.push(`enemy martial/${cid}: counter probe failed`);
+  }
+  if(CHARS.myeoljeol?.skills?.includes('wolnyeo')||!CHARS.myeoljeol?.skills?.includes('emei'))errs.push('character/myeoljeol: must use 아미검법, not 월녀검법');
 }
 
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
 console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
+console.log(`R19 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

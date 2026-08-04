@@ -6,6 +6,8 @@
 import fs from 'fs';
 import {LUNJIAN_ROUNDS,TRIALS} from '../src/challenges.js';
 import {INTERNALS,defaultInternal} from '../src/internals.js';
+import {ENEMY_MARTIALS,enemyMartialByCid} from '../src/enemy-martials.js';
+import {martialModifiers} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
 const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
@@ -33,14 +35,12 @@ function calc(a, d, sk, weatherHit = 0) {
   const atk = a.type === '내' ? a.stats.int : a.stats.str;
   const mit = a.type === '내' ? d.stats.res : d.stats.def;
   const dT = TILE['.'];
-  const ae=a.internal?.effects||{},de=d.internal?.effects||{};
+  const ae=(a.internal||a.martial)?.effects||{},de=(d.internal||d.martial)?.effects||{};
   let dmg = Math.max(0, Math.round(atk * (sk && sk.mult ? sk.mult : 1)) + tri * 2 - mit - dT.def);
-  let mult=1+(ae.damage||0)+(ae.stationaryDamage||0)+(d.type==='내'?(ae.vsInnerDamage||0):0);
-  if(a.hp/a.maxhp<=.5)mult+=ae.lowHpDamage||0;
-  let reduction=(de.damageTaken||0);if(d.hp/d.maxhp<=.5)reduction+=de.lowHpReduction||0;
-  dmg=Math.max(0,Math.round(dmg*mult*(1-Math.min(.4,reduction))));
-  let hit = Math.max(10, Math.min(100, 82 + a.stats.skl * 2 + tri * 10 + (sk && sk.hit ? sk.hit : 0) - d.stats.spd * 2 - dT.avoid + weatherHit+(ae.hit||0)+(d.type==='내'?(ae.vsInnerHit||0):0)-(de.avoid||0)));
-  let crit = Math.max(0, 4 + a.stats.skl - d.stats.skl+(ae.crit||0));
+  const mm=martialModifiers({attackerEffects:ae,defenderEffects:de,attackerMoved:0,attackerHpRatio:a.hp/a.maxhp,defenderHpRatio:d.hp/d.maxhp,defenderKiRatio:1,defenderType:d.type,hasSkill:!!sk});
+  dmg=Math.max(0,Math.round(dmg*mm.attackMultiplier*(1-mm.reduction)));
+  let hit = Math.max(10, Math.min(100, 82 + a.stats.skl * 2 + tri * 10 + (sk && sk.hit ? sk.hit : 0) - d.stats.spd * 2 - dT.avoid + weatherHit+mm.hit));
+  let crit = Math.max(0, 4 + a.stats.skl - d.stats.skl+mm.crit);
   const dbl = !sk && (a.stats.spd >= d.stats.spd + 4);
   return { dmg, hit, crit, dbl };
 }
@@ -49,9 +49,9 @@ function mkUnit(cid, lvl, diffEnemy, isEnemy) {
   /* 아군: 기대 성장치 / 적: 고정 base(엔진과 동일, 성장 없음) */
   const st = isEnemy ? statObj(c.base) : grownStats(cid, lvl);
   if (isEnemy && diffEnemy && diffEnemy !== 1) for (const k of ['hp', 'str', 'int', 'def', 'res']) st[k] = Math.max(1, Math.round(st[k] * diffEnemy));
-  const internal=!isEnemy?INTERNALS[defaultInternal(cid)]||null:null;
+  const internal=!isEnemy?INTERNALS[defaultInternal(cid)]||null:null,martial=isEnemy?enemyMartialByCid(cid):null;
   for(const [key,value] of Object.entries(internal?.effects?.stats||{}))st[key]=(st[key]||0)+value;
-  return { cid, name: c.name, type: c.type, stats: st, maxhp: st.hp, hp: st.hp,internal };
+  return { cid, name: c.name, type: c.type, stats: st, maxhp: st.hp, hp: st.hp,internal,martial };
 }
 /* 기대 라운드: 평균 피해 × 명중으로 처치까지 라운드 수 (크리 포함) */
 function expRounds(a, d) {
@@ -203,3 +203,10 @@ for(const item of Object.values(INTERNALS)){
   console.log(`  ${item.name} [${item.kind}]: 최대 단일 조건 피해 +${Math.round(peakDamage*100)}% · 회피 +${e.avoid||0} · 피해 감소 ${Math.round((e.damageTaken||0)*100)}%`);
 }
 console.log(`  총 ${Object.keys(INTERNALS).length}종 · 단일 조건 피해 +20% / 회피 +12 / 피해 감소 20% 안전 상한 통과`);
+
+console.log('\n## R19 주요 적 무학 — 압력 안전선');
+for(const [cid,item] of Object.entries(ENEMY_MARTIALS)){
+  const e=item.effects||{},peak=(e.damage||0)+(e.skillDamage||0)+Math.max(e.stationaryDamage||0,e.lowHpDamage||0,e.vsLowHpDamage||0,e.vsLowKiDamage||0);
+  console.log(`  ${CHARS[cid].name} · ${item.name}: 조건 최대 +${Math.round(peak*100)}% · 회피 ${e.avoid||0} · 반사 ${Math.round((e.reflect||0)*100)}%`);
+}
+console.log(`  총 ${Object.keys(ENEMY_MARTIALS).length}종 · 합산 조건 피해 +30% / 회피 +10 / 반사 15% 안전 상한 통과`);
