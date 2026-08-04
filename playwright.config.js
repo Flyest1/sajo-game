@@ -1,12 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const testPort=Number(process.env.PLAYWRIGHT_PORT||4174);
+const testBase=`http://127.0.0.1:${testPort}/sajo-game/`;
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4174/sajo-game/',
+    baseURL: testBase,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -15,8 +18,8 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['Pixel 5'] } },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4174',
-    url: 'http://127.0.0.1:4174/sajo-game/',
+    command: `npm run dev -- --host 127.0.0.1 --port ${testPort}`,
+    url: testBase,
     reuseExistingServer: !process.env.CI,
   },
 });

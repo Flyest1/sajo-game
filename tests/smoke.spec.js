@@ -570,9 +570,9 @@ test('canonical internal styles are selectable and battle contribution reports p
   expect(canonical.guo.names).not.toContain('구양신공');
   expect(canonical.wuji.names).toContain('구양신공');
 
-  await page.evaluate(() => { window.startCampaignV2('sajo',false); window.openInternalLoadout('gj'); });
+  await page.evaluate(() => { window.startCampaignV2('sajo',false); window.__dbg.campaignState.stageId='s3'; window.openInternalLoadout('gj'); });
   await expect(page.locator('.internal-pick.locked')).toContainText('구음진경');
-  await expect(page.locator('.internal-pick.locked')).toContainText('Lv.8 해금');
+  await expect(page.locator('.internal-pick.locked')).toContainText('사건 해금');
   await expect(page.locator('.internal-pick:not(.locked)')).toContainText('전진현문내공');
   await page.evaluate(() => { document.getElementById('internal-modal')?.remove(); localStorage.clear(); });
   await page.reload();
@@ -602,6 +602,78 @@ test('canonical internal styles are selectable and battle contribution reports p
   expect(reports[0].members[0]).toMatchObject({cid:'gj',damage:17,guard:4,internalId:'gj_quanzhen'});
   const persisted=await page.evaluate(() => JSON.parse(localStorage.getItem('kimyong_save_v3')).profile.battleReports);
   expect(persisted).toHaveLength(1);
+});
+
+test('R19 enemy martial counters are original-based, readable, and attached to battle units', async ({ page }, testInfo) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  const rules=await page.evaluate(() => ({
+    count:Object.keys(window.__dbg.ENEMY_MARTIALS).length,
+    toad:window.__dbg.enemyMartialProbe('oyb',{attackerType:'경',adjacentAllies:0,comboStep:0}),
+    toadMiss:window.__dbg.enemyMartialProbe('oyb',{attackerType:'외',adjacentAllies:0,comboStep:0}),
+    reflect:window.__dbg.enemyMartialProbe('myb',{attackerType:'내',adjacentAllies:1,comboStep:0}),
+    before:window.__dbg.internalUnlockProbe('gj_jiuyin',{camp:'sajo',stageId:'s7',cleared:['s3']}),
+    after:window.__dbg.internalUnlockProbe('gj_jiuyin',{camp:'sajo',stageId:'c7',cleared:['s3','s7']}),
+    miejue:window.__dbg.CHARS.myeoljeol.skills,
+  }));
+  expect(rules.count).toBe(12);
+  expect(rules.toad.style.name).toBe('합마공·역구음');
+  expect(rules.toad.counter.active).toBe(true);
+  expect(rules.toadMiss.counter.active).toBe(false);
+  expect(rules.reflect.counter.active).toBe(true);
+  expect(rules.before).toMatchObject({unlocked:false});
+  expect(rules.after).toMatchObject({unlocked:true});
+  expect(rules.miejue).toContain('emei');
+  expect(rules.miejue).not.toContain('wolnyeo');
+
+  await page.evaluate(() => {
+    window.startCampaignV2('sajo',false);
+    window.__dbg.campaignState.stageId='s2';
+    window.__dbg.openCurrentDeploy();
+  });
+  await page.getByRole('button',{name:/출 전/}).click();
+  const battle=await page.evaluate(() => {
+    const boss=window.__dbg.B.units.find(unit=>unit.cid==='mcp');
+    const ally=window.__dbg.B.units.find(unit=>unit.team==='P'&&unit.type==='외');
+    const strike=window.__dbg.calc(ally,boss,ally.skills[0]);
+    return {uid:boss.uid,name:boss.martial.name,tell:boss.martial.tell,counter:strike.martialCounter,guardDmg:strike.guardDmg};
+  });
+  expect(battle.name).toBe('구음백골조');
+  expect(battle.tell).toContain('급습');
+  expect(battle.counter.active).toBe(true);
+  expect(battle.guardDmg).toBeGreaterThanOrEqual(3);
+  await page.evaluate(() => window.__dbg.inspectUnit('mcp'));
+  await expect(page.locator('.enemy-martial')).toContainText('구음백골조');
+  await expect(page.locator('.enemy-martial')).toContainText('파훼:');
+  if(process.env.R19_VISUAL){await page.waitForTimeout(1300);await page.evaluate(() => window.__dbg.inspectUnit('mcp'));await page.screenshot({path:`test-results/r19-enemy-${testInfo.project.name}.png`,fullPage:true});}
+});
+
+test('event unlocks and unified formation cards work on desktop and mobile', async ({ page }, testInfo) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.evaluate(() => {
+    window.startCampaignV2('sajo',false);
+    const state=window.__dbg.campaignState,c=window.__dbg.CHARS.gj,keys=['hp','str','int','def','res','spd','skl','mov','ki'];
+    state.party=['gj'];
+    state.roster.gj={cid:'gj',lvl:8,exp:0,stats:Object.fromEntries(keys.map((key,index)=>[key,c.base[index]]))};
+    state.cleared=['s3'];
+    window.campFromRoute();
+  });
+  const card=page.locator('.formation-card[data-cid="gj"]');
+  await expect(card).toBeVisible();
+  await expect(card.getByText('전진현문내공')).toBeVisible();
+  await expect(card.locator('.formation-stats')).toContainText('→');
+  await card.getByRole('button',{name:'전진현문내공'}).click();
+  await expect(page.locator('.internal-pick.locked')).toContainText('구음진경');
+  await expect(page.locator('.internal-pick.locked')).toContainText('도화도에서 주백통');
+  await page.getByRole('button',{name:'완료'}).click();
+  await page.evaluate(() => { window.__dbg.campaignState.cleared.push('s7'); window.campFromRoute(); });
+  await card.getByRole('button',{name:/전진현문내공|구음진경/}).click();
+  await expect(page.locator('.internal-pick.locked')).toHaveCount(0);
+  await page.getByRole('button',{name:'완료'}).click();
+  await card.getByRole('button',{name:'파훼'}).click();
+  await expect(card.getByRole('button',{name:'구음진경'})).toBeVisible();
+  if(process.env.R19_VISUAL)await page.screenshot({path:`test-results/r19-formation-${testInfo.project.name}.png`,fullPage:true});
 });
 
 test('combat riddles expose ten deterministic trials and save the best medal', async ({ page }, testInfo) => {

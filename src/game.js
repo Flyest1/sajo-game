@@ -15,7 +15,10 @@ import {
 } from './challenges.js';
 import {
   INTERNALS, HERO_INTERNALS, internalOptions, defaultInternal, internalById, validInternal, internalEffectText,
+  internalUnlockState, internalUnlocked,
 } from './internals.js';
+import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
+import { ENEMY_MARTIALS, enemyMartialByCid, enemyMartialEffectText } from './enemy-martials.js';
 import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
@@ -238,11 +241,11 @@ function bgmTheme(){
 }
 function contributionRows(){
   if(!B)return [];
-  return Object.values(B.contributions||{}).map(item=>({...item,name:CHARS[item.cid]?.name||item.cid,internalId:B.units.find(u=>u.team==='P'&&u.cid===item.cid)?.internalId||null,score:Math.round(item.damage+item.guard*2+item.healing+item.kills*12+item.bond*3)})).sort((a,b)=>b.score-a.score);
+  return Object.values(B.contributions||{}).map(item=>({...item,name:CHARS[item.cid]?.name||item.cid,internalId:B.units.find(u=>u.team==='P'&&u.cid===item.cid)?.internalId||null,score:Math.round(item.damage+item.guard*2+item.healing+item.kills*12+item.bond*3+(item.counters||0)*4)})).sort((a,b)=>b.score-a.score);
 }
 function contributionHTML(){
   const rows=contributionRows();if(!rows.length)return '';
-  return `<div class="contribution-box"><h3>전투 기여도</h3><div class="contribution-grid">${rows.map((item,i)=>`<div class="contribution-row ${i===0?'top':''}"><b>${i===0?'★ ':''}${item.name} <em>${item.score}</em></b><span>피해 ${item.damage} · 파훼 ${item.guard} · 회복 ${item.healing} · 격파 ${item.kills} · 협공 ${item.bond}</span><small>${internalById(item.internalId)?.name||'고유 심법 없음'}</small></div>`).join('')}</div></div>`;
+  return `<div class="contribution-box"><h3>전투 기여도</h3><div class="contribution-grid">${rows.map((item,i)=>`<div class="contribution-row ${i===0?'top':''}"><b>${i===0?'★ ':''}${item.name} <em>${item.score}</em></b><span>피해 ${item.damage} · 파훼 ${item.guard} · 간파 ${item.counters||0} · 회복 ${item.healing} · 격파 ${item.kills} · 협공 ${item.bond}</span><small>${internalById(item.internalId)?.name||'고유 심법 없음'}</small></div>`).join('')}</div></div>`;
 }
 function recordBattleReport(){
   if(!B)return;
@@ -287,8 +290,7 @@ function statObj(base){
 }
 function availableInternalOptions(cid){
   const options=internalOptions(cid),campaign=SESSION.campaign();if(!campaign)return options;
-  const level=campaign.roster?.[cid]?.lvl||1;
-  return options.filter(id=>level>=(INTERNALS[id]?.unlockLevel||1));
+  return options.filter(id=>internalUnlocked(id,campaign));
 }
 function selectedInternal(cid){
   const campaign=SESSION.campaign(),challenge=SESSION.challenge();
@@ -343,11 +345,12 @@ function mkEnemyUnit(def){
   if(def.boost) for(const k in st) st[k]=Math.round(st[k]*def.boost);
   if(dm!==1) for(const k of ['hp','str','int','def','res']) st[k]=Math.max(1,Math.round(st[k]*dm));
   const guardMax=def.guard||(def.boss?Math.max(8,Math.round(st.hp*.28)):0);
+  const martial=enemyMartialByCid(def.cid);
   return {uid:'u'+(uidSeq++), cid:def.cid, name:c.name, cls:c.cls, type:c.type, range:c.range,
     skills:c.skills, healer:false, leader:false, team:'E',
     x:def.x, y:def.y, stats:st, maxhp:st.hp, hp:st.hp, maxki:st.ki, ki:st.ki,
     lvl:curCh().no*3, exp:0, acted:false, alive:true,
-    boss:!!def.boss, wait:def.wait||0, poison:0,
+    boss:!!def.boss, wait:def.wait||0, poison:0, martial,
     guardMax, guard:guardMax, broken:false, phaseIndex:0};
 }
 
@@ -403,34 +406,28 @@ function calcStrike(a,d,skillId){
   const mst=(sk&&a.team==='P')?masteryTier(skillId):0;
   const mMult=(sk&&a.team==='P')?masteryMultBonus(skillId):0;
   const mHit=(sk&&a.team==='P')?masteryHitBonus(skillId):0;
-  const ae=a.internal?.effects||{},de=d.internal?.effects||{};
+  const ae=(a.internal||a.martial)?.effects||{},de=(d.internal||d.martial)?.effects||{};
+  const comboStep=sk&&a.comboLast&&a.comboLast!==skillId?Math.min(3,(a.comboCount||0)+1):0;
   let dmg=Math.max(0, Math.round(atk*((sk&&sk.mult?sk.mult:1)+mMult)) + tri*2 + supA + bA + (a.eqAtk||0) + (a.repAtk||0) + (a.trustAtk||0) - mit - dT.def - (d.repDef||0) - (d.trustDef||0));
-  let internalMult=1+(ae.damage||0)+(supA*(ae.adjacentDamage||0));
-  if((a.movedThisTurn||0)===0)internalMult+=ae.stationaryDamage||0;
-  if(bA>0)internalMult+=ae.bondDamage||0;
-  if(a.hp/a.maxhp<=.5)internalMult+=ae.lowHpDamage||0;
-  if(d.type==='내')internalMult+=ae.vsInnerDamage||0;
-  internalMult+=adjEnemies(a)*(ae.surroundedDamage||0);
-  if(sk&&a.comboLast&&a.comboLast!==skillId)internalMult+=ae.comboDamage||0;
-  let reduction=(de.damageTaken||0)+(supD*(de.adjacentReduction||0));
-  if(d.hp/d.maxhp<=.5)reduction+=de.lowHpReduction||0;
-  dmg=Math.max(0,Math.round(dmg*internalMult*(1-Math.min(.4,reduction))));
+  const mm=martialModifiers({attackerEffects:ae,defenderEffects:de,adjacentAttackers:supA,adjacentDefenders:supD,adjacentEnemies:adjEnemies(a),attackerMoved:a.movedThisTurn||0,attackerHpRatio:a.hp/a.maxhp,defenderHpRatio:d.hp/d.maxhp,defenderKiRatio:d.ki/d.maxki,defenderType:d.type,hasBond:bA>0,hasSkill:!!sk,comboStep});
+  let internalMult=mm.attackMultiplier,reduction=mm.reduction;
+  const martialCounter=d.team==='E'&&a.team==='P'?enemyMartialCounter(d.martial,{attackerType:a.type,adjacentAllies:supA,comboStep,defenderBroken:d.broken}):{active:false,reasons:[],mult:0,hit:0,guardDamage:0};
+  dmg=Math.max(0,Math.round(dmg*internalMult*(1-reduction)*(1+(martialCounter.mult||0))));
   const guarded=d.guardMax>0&&d.guard>0;
   if(guarded) dmg=Math.max(1,Math.round(dmg*.65));
   else if(d.broken) dmg=Math.round(dmg*1.35);
-  const comboStep=sk&&a.comboLast&&a.comboLast!==skillId?Math.min(3,(a.comboCount||0)+1):0;
   if(comboStep) dmg=Math.round(dmg*(1+comboStep*.08));
-  const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)+(ae.guardDamage||0)):0;
+  const guardDmg=guarded?Math.max(1,1+(tri>0?2:0)+(sk?1:0)+Math.min(2,supA)+mm.guardDamage+(martialCounter.guardDamage||0)):0;
   const wHit=(B&&B.weather)?(WEATHER_HIT[B.weather]||0):0;
   let hit=Math.max(10,Math.min(100,
     82+a.stats.skl*2+tri*10+(sk&&sk.hit?sk.hit:0)+mHit+supA*4+bA*4-supD*3-bD*3+
     (a.eqHit||0)+(a.repHit||0)+(a.trustHit||0)-d.stats.spd*2-dT.avoid+wHit+
-    (ae.hit||0)+supA*(ae.adjacentHit||0)+(d.type==='내'?(ae.vsInnerHit||0):0)-(de.avoid||0)
+    mm.hit+(martialCounter.hit||0)
   ));
-  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0) + (ae.crit||0));
+  let crit=Math.max(0, 4 + a.stats.skl - d.stats.skl + bA*2 + (a.eqCrit||0) + mm.crit);
   if(SESSION.isChallenge('trial')){ hit=100; crit=0; }
   const dbl=!sk && (a.stats.spd>=d.stats.spd+4);
-  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep,internalMult,reduction};
+  return {dmg,hit,crit,dbl,tri,supA,supD,bA,bD,mst,guarded,guardDmg,comboStep,internalMult,reduction,martialCounter};
 }
 function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 
@@ -553,7 +550,7 @@ function log(msg,imp){
 function contribution(u){
   if(!B||!u||u.team!=='P')return null;
   B.contributions=B.contributions||{};
-  return B.contributions[u.cid]||(B.contributions[u.cid]={cid:u.cid,damage:0,guard:0,healing:0,taken:0,kills:0,bond:0});
+  return B.contributions[u.cid]||(B.contributions[u.cid]={cid:u.cid,damage:0,guard:0,healing:0,taken:0,kills:0,bond:0,counters:0});
 }
 
 /* ── 경험치/레벨 ── */
@@ -620,8 +617,10 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
       if(d.guard===0){
         if(a.team==='P'&&d.team==='E') B.guardBreaks=(B.guardBreaks||0)+1;
         if(a.team==='P'&&a.internal?.effects?.kiOnBreak)a.ki=Math.min(a.maxki,a.ki+a.internal.effects.kiOnBreak);
+        const reward=c.martialCounter?.active?d.martial?.counter?.reward:null;
+        if(a.team==='P'&&reward?.ki){a.ki=Math.min(a.maxki,a.ki+reward.ki);fx(a.x,a.y,`기+${reward.ki}`,'label');}
         d.broken=true; fx(d.x,d.y,'破 파훼!','break'); SFX.play('crit'); shakeMap(true);
-        log(`<b>${d.name}의 호신강기가 무너졌다!</b> 남은 협객의 공격이 강해진다.`,true);
+        log(`<b>${d.name}의 호신강기가 무너졌다!</b>${reward?.ki?` ${a.name} 기력 +${reward.ki}.`:''} 남은 협객의 공격이 강해진다.`,true);
       }
     }
     const obj=activeObjective();
@@ -632,6 +631,17 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     const actualDamage=Math.max(0,hpBefore-d.hp),attackMeter=contribution(a),defendMeter=contribution(d);
     if(attackMeter){attackMeter.damage+=actualDamage;if(c.bA>0)attackMeter.bond++;}
     if(defendMeter)defendMeter.taken+=actualDamage;
+    if(c.martialCounter?.active&&a.team==='P'){
+      B.martialCounters=(B.martialCounters||0)+1;if(attackMeter)attackMeter.counters=(attackMeter.counters||0)+1;fx(d.x,d.y,'간파!','break');
+      log(`<b>${a.name} — ${d.martial.name} 간파!</b> ${c.martialCounter.reasons.join('·')}`,true);
+    }
+    const attackStyle=a.martial?.effects||{};
+    if(a.team==='E'&&d.team==='P'&&attackStyle.kiDrain){const drained=Math.min(d.ki,attackStyle.kiDrain);d.ki-=drained;if(drained)fx(d.x,d.y,`기-${drained}`,'miss');}
+    if(a.team==='E'&&d.team==='P'&&attackStyle.poisonOnSkill&&sk&&!d.poison){d.poison=3;fx(d.x,d.y,'중독!','label');log(`${a.name}의 ${a.martial.name}이(가) ${d.name}에게 독기를 남겼다.`,true);}
+    if(a.team==='P'&&d.team==='E'&&d.hp>0&&d.martial?.effects?.reflect&&!c.martialCounter?.active&&!d.broken){
+      const reflected=Math.min(Math.max(0,a.hp-1),Math.max(1,Math.round(actualDamage*d.martial.effects.reflect)));
+      if(reflected){a.hp-=reflected;const meter=contribution(a);if(meter)meter.taken+=reflected;B.damageTaken=(B.damageTaken||0)+reflected;fx(a.x,a.y,`반사 ${reflected}`,'miss');log(`${d.name}의 <b>${d.martial.name}</b> — ${a.name}에게 ${reflected} 반사 피해`,true);}
+    }
     if(d.team==='P') B.damageTaken=(B.damageTaken||0)+Math.max(0,hpBefore-d.hp);
     if(a.team==='P'&&c.bA>0) B.bondStrikes=(B.bondStrikes||0)+1;
     if(a.team==='P'&&a.internal?.effects?.kiOnHit)a.ki=Math.min(a.maxki,a.ki+a.internal.effects.kiOnHit);
@@ -685,7 +695,9 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
 }
 
 function bossPhaseDefs(u){
-  return resolveBossPhaseDefs(u,curCh().bossPhases);
+  const stageDefs=curCh().bossPhases;
+  const hasStage=Array.isArray(stageDefs)&&stageDefs.some(phase=>!phase.target||phase.target===u.cid);
+  return resolveBossPhaseDefs(u,hasStage?stageDefs:u.martial?.phases);
 }
 async function applyBossPhase(u){
   if(!u||!u.alive||!u.boss) return;
@@ -880,8 +892,9 @@ function intentText(u){
   const it=enemyIntent(u); if(!it) return '의도 미확인';
   const target=B.units.find(x=>x.uid===it.targetUid);
   const tactic=u.tactic?`${{hunter:'약자 추격',leader:'대장 압박',execute:'마무리 공세'}[u.tactic]||u.tactic} · `:'';
-  if(it.kind==='attack') return `${tactic}${it.sid?SKILLS[it.sid].name:'일반 공격'} → ${target?target.name:'목표'}${it.x!==u.x||it.y!==u.y?' · 이동 후':''}`;
-  if(it.kind==='move') return `${target?target.name:'아군'}에게 접근`;
+  const martial=u.martial?`${u.martial.name} · `:'';
+  if(it.kind==='attack') return `${martial}${tactic}${it.sid?SKILLS[it.sid].name:'일반 공격'} → ${target?target.name:'목표'}${it.x!==u.x||it.y!==u.y?' · 이동 후':''}`;
+  if(it.kind==='move') return `${martial}${target?target.name:'아군'}에게 접근`;
   return '대기';
 }
 function enemyThreatTiles(){
@@ -1023,7 +1036,7 @@ function openForecast(a,d,skillId){
       <div class="fc-grid">
         <div class="hd">${a.name}${my.supA?` <span style="font-size:11px;color:#8fce6a">협공+${my.supA}</span>`:''}${my.bA?` <span style="font-size:11px;color:#e8a0c0">인연 ${RANK_NAME[my.bA]}</span>`:''}</div><div class="lbl">상성 ${triTxt}</div><div class="hd">${d.name}${my.supD?` <span style="font-size:11px;color:#8fce6a">협공+${my.supD}</span>`:''}${my.bD?` <span style="font-size:11px;color:#e8a0c0">인연 ${RANK_NAME[my.bD]}</span>`:''}</div>
         <div class="val">${a.hp} / ${a.maxhp}</div><div class="lbl">HP</div><div class="val">${d.hp} / ${d.maxhp}</div>
-        <div class="val">${my.dmg}${my.dbl?' ×2':''}${my.guardDmg?` <small>· 강기 -${my.guardDmg}</small>`:''}</div><div class="lbl">위력</div><div class="val">${counter?`${counter.dmg}${counter.dbl?' ×2':''}`:'반격 불가'}</div>
+        <div class="val">${my.dmg}${my.dbl?' ×2':''}${my.guardDmg?` <small>· 강기 -${my.guardDmg}</small>`:''}${my.martialCounter?.active?` <small class="counter-preview">· 간파 ${my.martialCounter.reasons.join('·')}</small>`:''}</div><div class="lbl">위력</div><div class="val">${counter?`${counter.dmg}${counter.dbl?' ×2':''}`:'반격 불가'}</div>
         <div class="val">${my.hit}%</div><div class="lbl">명중</div><div class="val">${counter?counter.hit+'%':'—'}</div>
         <div class="val">${my.crit}%</div><div class="lbl">필살</div><div class="val">${counter?counter.crit+'%':'—'}</div>
       </div>
@@ -1183,7 +1196,7 @@ function startBattle(){
     weather:pickWeather(),
     sceneSeed:strSeed(ctx.sceneKey),
     timeBase:pickBattleTime(),
-    enemyKills:0,guardBreaks:0,bondStrikes:0,subdues:0,damageTaken:0,contributions:{},
+    enemyKills:0,guardBreaks:0,bondStrikes:0,martialCounters:0,subdues:0,damageTaken:0,contributions:{},
   };
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
@@ -1203,6 +1216,8 @@ function startBattle(){
   log(`<b>${ch.title}</b> — 승리 조건: ${activeObjective().text||ch.win.text}`,true);
   const innerLine=players().filter(u=>u.internal).map(u=>`${u.name}·${u.internal.name}`).join(' / ');
   if(innerLine)log(`<b>심법 편성</b> — ${innerLine}`,true);
+  const enemyStyles=foes().filter(u=>u.martial).map(u=>`${u.name}·${u.martial.name}`).filter((v,i,a)=>a.indexOf(v)===i).join(' / ');
+  if(enemyStyles)log(`<b>적 무학 간파</b> — ${enemyStyles}`,true);
   if(B.reputationEffects.length) log(`<b>강호의 반향</b> — ${B.reputationEffects.join(' · ')}`,true);
   beginBattlePresentation();
 }
@@ -1558,6 +1573,7 @@ function ucardHTML(u){
   </div>
   ${(u.eqAtk||u.eqHit||u.eqCrit)?`<div class="uc-sub" style="color:#8fce6a;margin-top:2px">병기 보정: ${[u.eqAtk?`공격 +${u.eqAtk}`:'',u.eqHit?`명중 +${u.eqHit}`:'',u.eqCrit?`필살 +${u.eqCrit}`:''].filter(Boolean).join(' · ')}</div>`:''}
   ${u.internal?`<div class="uc-internal"><b>${u.internal.kind} · ${u.internal.name}</b><span>${internalEffectText(u.internalId)}</span></div>`:''}
+  ${u.martial?`<div class="uc-internal enemy-martial"><b>${u.martial.kind} · ${u.martial.name}</b><span>${enemyMartialEffectText(u.martial)}</span><small>행동: ${u.martial.tell}<br>파훼: ${u.martial.counter.text}</small></div>`:''}
   ${bossPatternHTML(u)}
   ${u.team==='E'?`<div class="intent-line"><b>다음 의도</b><span>${intentText(u)}</span></div>`:''}
   ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;const mp=u.team==='P'?masteryProgress(sid):'';const me=u.team==='P'?masteryEffectText(sid):'';return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})${mp?`<br><span style="color:#c9a86a">${mp} · 실제 효과: ${me}</span>`:''}</div>`;}).join('')}
@@ -2630,9 +2646,10 @@ function showHelp(){
       ◆ <b style="color:#e8a0c0">인연</b>: 신규 캠페인의 거점 <b style="color:var(--text)">지원 대화</b>로 두 협객의 인연을 C→B→A로 키우면, 전장에서 두 사람이 인접할 때 피해·명중·필살·회피가 랭크만큼 강해집니다 (★표시 인연은 최고 랭크에서 합격 각성)<br>
       ◆ <b style="color:#e07070">적 의도·위험</b>: 적 머리 위 문양은 다음 행동, 상단 위험 버튼은 다음 턴 공격 가능 범위를 표시합니다<br>
       ◆ <b style="color:#d9b45b">호신강기·파훼</b>: 강적의 금색 강기 게이지를 상성·필살·연계로 깎으면 방어가 무너집니다. 보스는 체력 구간마다 초식과 능력이 바뀝니다<br>
+      ◆ <b style="color:#8fd8b9">적 초식·간파</b>: 주요 강적 정보창의 행동 예고와 파훼 조건을 읽고 알맞은 무공 유형·협공·연계를 쓰면 추가 명중·피해·강기 파괴가 적용됩니다. 간파 횟수는 전투 기여도에 기록됩니다<br>
       ◆ <b style="color:#8fd6c2">전투 목표</b>: 섬멸 외에도 방어·점거·탈출·비살상 제압이 있습니다. 현재 목표와 진행도는 상단과 정보창에서 확인합니다<br>
       ◆ <b style="color:#d8b5ef">무공 편성·연계</b>: 거점에서 협객당 무공 3개를 고릅니다. 서로 다른 초식을 연속 사용하면 연계가, A급 인연 협객이 인접하면 합동 오의가 발동할 수 있습니다<br>
-      ◆ <b style="color:#9fd4c8">내공·특성 편성</b>: 핵심 협객은 원작에서 실제로 익힌 심법이나 확인된 전투 성향 하나를 고릅니다. ‘특성’ 표기는 가공 내공명이 아닙니다<br>
+      ◆ <b style="color:#9fd4c8">내공·특성 편성</b>: 핵심 협객은 원작에서 실제로 익힌 심법이나 확인된 전투 성향 하나를 고릅니다. 원작 사건을 지난 뒤 새 심법이 해금되며, ‘특성’ 표기는 가공 내공명이 아닙니다<br>
       ◆ <b style="color:#d9b36c">수묵 전장</b>: 전경·중경·원경이 카메라에 따라 움직이고 세 턴마다 시간대가 흐릅니다. 무공·합동 오의·보스 전환에는 전용 초상 컷인과 먹선 궤적이 표시됩니다<br>
       ◆ 일부 전장에는 <b style="color:var(--text)">적 증원군</b>이 나타나고, <b style="color:var(--text)">방어전</b>은 규정 턴을 버티면 승리<br>
       ◆ 2장부터는 전투 전 <b style="color:var(--text)">출전 멤버</b>를 선택합니다<br>
@@ -3086,38 +3103,48 @@ function v2Depart(){
   if(!SESSION.campaignState.cleared.includes(SESSION.campaignState.stageId)) SESSION.campaignState.cleared.push(SESSION.campaignState.stageId);
   v2Advance(n);
 }
+function campEquipOptions(cid,slot){
+  const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null},kind=slot==='w'?'weapon':'acc';
+  let html='<option value="">— 없음 —</option>';
+  for(const id in ITEMS){
+    if(ITEMS[id].kind!==kind)continue;
+    if(eq[slot]===id)html+=`<option value="${id}" selected>${ITEMS[id].name} (장착)</option>`;
+    else if(ownedCount(id)>0)html+=`<option value="${id}">${ITEMS[id].name} ×${ownedCount(id)}</option>`;
+  }
+  return html;
+}
+function campLoadoutStats(cid){
+  const r=SESSION.campaignState.roster[cid],c=CHARS[cid],after={...r.stats},eq=SESSION.campaignState.equips[cid]||{};
+  let attackBonus=0;
+  for(const slot of ['w','a']){const item=ITEMS[eq[slot]];if(!item)continue;attackBonus+=item.atk||0;for(const key of ['hp','def','res','mov'])after[key]=(after[key]||0)+(item[key]||0);}
+  const inner=internalById(selectedInternal(cid));for(const [key,value] of Object.entries(inner?.effects?.stats||{}))after[key]=(after[key]||0)+value;
+  const attackKey=c.type==='내'?'int':'str';after.attack=(after[attackKey]||0)+attackBonus;
+  return {before:{hp:r.stats.hp,attack:r.stats[attackKey],def:r.stats.def,res:r.stats.res,mov:r.stats.mov},after,inner};
+}
+function loadoutDelta(label,before,after){return `<span>${label} <b>${before}</b>${after!==before?`<i>→ ${after}</i>`:''}</span>`;}
+function autoCampLoadout(cid,role){
+  const c=CHARS[cid],campaign=SESSION.campaignState,all=[...new Set([...c.skills,...(campaign.extraSkills[cid]||[])])];
+  const skillScore=sid=>{const sk=SKILLS[sid];if(role==='attack')return (sk.mult||0)*20+(sk.poison?5:0)-(sk.heal?20:0);if(role==='defense')return (sk.heal?40:0)+(sk.hit||0)*.2;return (sk.hit||0)+(sk.mult||0)*8+(sk.poison?4:0);};
+  campaign.skillLoadouts[cid]=all.sort((a,b)=>skillScore(b)-skillScore(a)).slice(0,3);
+  const innerScore=id=>{const e=INTERNALS[id].effects||{};if(role==='attack')return (e.damage||0)+(e.stationaryDamage||0)+(e.comboDamage||0)+(e.crit||0)/100;if(role==='defense')return (e.damageTaken||0)+(e.lowHpReduction||0)+(e.avoid||0)/100+(e.stats?.def||0)/10;return (e.guardDamage||0)+(e.hit||0)/10+(e.vsInnerHit||0)/10;};
+  const options=[...availableInternalOptions(cid)].sort((a,b)=>innerScore(b)-innerScore(a));if(options.length)campaign.internalLoadouts[cid]=options[0];
+  SFX.play('equip');v2Save();renderCamp();
+}
 function campUnitHTML(){
-  return `<table class="camptable"><tr><th>협객</th><th>Lv</th><th>병기</th><th>보구</th><th>무공</th><th>내공·특성</th><th>승급</th></tr>`+
+  return `<div class="formation-intro"><div><b>통합 출전 편성</b><span>장비·무공·내공을 한 카드에서 비교합니다.</span></div><small>자동 편성은 보유 무공과 해금된 심법만 변경하며 장비는 이동시키지 않습니다.</small></div><div class="formation-grid">`+
   SESSION.campaignState.party.map(cid=>{
-    const r=SESSION.campaignState.roster[cid], c=CHARS[cid];
-    const eq=SESSION.campaignState.equips[cid]=SESSION.campaignState.equips[cid]||{w:null,a:null};
-    const opts=k=>{
-      const kind=k==='w'?'weapon':'acc';
-      let o=`<option value="">—</option>`;
-      for(const id in ITEMS){
-        if(ITEMS[id].kind!==kind) continue;
-        if(eq[k]===id) o+=`<option value="${id}" selected>${ITEMS[id].name} (장착)</option>`;
-        else if(ownedCount(id)>0) o+=`<option value="${id}">${ITEMS[id].name} ×${ownedCount(id)}</option>`;
-      }
-      return o;
-    };
-    const promo=c.promo;
-    let pcell='—';
-    if(SESSION.campaignState.promoted[cid]) pcell=`<span style="color:var(--gold2)">${SESSION.campaignState.promoted[cid]}</span>`;
-    else if(promo){
-      const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;
-      pcell=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button>
-        <div style="font-size:11px;color:var(--dim)">Lv${promo.lvl} + ${ITEMS[promo.item].name}<br>${promotionEffectText(promo)}</div>`;
-    }
-    const inner=internalById(selectedInternal(cid)),hasInnerOptions=internalOptions(cid).length>0;
-    return `<tr><td style="text-align:left"><b style="color:var(--gold2)">${c.name}</b><div style="font-size:11px;color:var(--dim)">${SESSION.campaignState.promoted[cid]||c.cls}</div></td>
-      <td>${r.lvl}</td>
-      <td><select onchange="v2Equip('${cid}','w',this.value)">${opts('w')}</select></td>
-      <td><select onchange="v2Equip('${cid}','a',this.value)">${opts('a')}</select></td>
-      <td><button class="btn small" onclick="openSkillLoadout('${cid}')">편성</button><div style="font-size:11px;color:var(--dim)">${((SESSION.campaignState.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(SESSION.campaignState.extraSkills[cid]||[]).length))}/3</div></td>
-      <td>${inner?`<button class="btn small" onclick="openInternalLoadout('${cid}')">${inner.name}</button><div style="font-size:11px;color:var(--dim)">${inner.kind} · ${inner.role}</div>`:(hasInnerOptions?`<button class="btn small" onclick="openInternalLoadout('${cid}')">미해금</button>`:'—')}</td>
-      <td>${pcell}</td></tr>`;
-  }).join('')+`</table>`;
+    const r=SESSION.campaignState.roster[cid],c=CHARS[cid],promo=c.promo,stats=campLoadoutStats(cid),inner=stats.inner,skills=(SESSION.campaignState.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(SESSION.campaignState.extraSkills[cid]||[]).length);
+    let promotion=`<span class="formation-muted">승급 정보 없음</span>`;
+    if(SESSION.campaignState.promoted[cid])promotion=`<span class="promoted">${SESSION.campaignState.promoted[cid]} 승급 완료</span>`;
+    else if(promo){const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;promotion=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button><small>Lv${promo.lvl} + ${ITEMS[promo.item].name} · ${promotionEffectText(promo)}</small>`;}
+    return `<article class="formation-card" data-cid="${cid}"><header><div class="formation-portrait">${ptSVG(cid)}</div><div><h3>${c.name}</h3><p>Lv.${r.lvl} · ${SESSION.campaignState.promoted[cid]||c.cls} · ${TYPE_NAME[c.type]}</p></div></header>
+      <div class="formation-stats">${loadoutDelta('HP',stats.before.hp,stats.after.hp)}${loadoutDelta('공격',stats.before.attack,stats.after.attack)}${loadoutDelta('방어',stats.before.def,stats.after.def)}${loadoutDelta('정신',stats.before.res,stats.after.res)}${loadoutDelta('이동',stats.before.mov,stats.after.mov)}</div>
+      <div class="formation-equips"><label>병기<select aria-label="${c.name} 병기" onchange="v2Equip('${cid}','w',this.value)">${campEquipOptions(cid,'w')}</select></label><label>보구<select aria-label="${c.name} 보구" onchange="v2Equip('${cid}','a',this.value)">${campEquipOptions(cid,'a')}</select></label></div>
+      <div class="formation-actions"><button class="btn small" onclick="openSkillLoadout('${cid}')">무공 ${skills}/3</button>${internalOptions(cid).length?`<button class="btn small" onclick="openInternalLoadout('${cid}')">${inner?inner.name:'무학 미해금'}</button>`:'<span class="formation-muted">고유 심법 없음</span>'}</div>
+      <div class="formation-inner">${inner?`<b>${inner.kind} · ${inner.role}</b><span>${internalEffectText(selectedInternal(cid))}</span>`:'<span>원작 사건을 진행하면 고유 무학이 열립니다.</span>'}</div>
+      <div class="formation-auto"><span>무공·심법 자동</span><button onclick="autoCampLoadout('${cid}','attack')">공격</button><button onclick="autoCampLoadout('${cid}','defense')">수비</button><button onclick="autoCampLoadout('${cid}','break')">파훼</button></div>
+      <footer>${promotion}</footer></article>`;
+  }).join('')+`</div>`;
 }
 function promotionEffectText(promo){
   const names={hp:'HP',str:'힘',int:'내공',def:'방어',res:'정신',spd:'속도',skl:'기술',mov:'이동',ki:'기'};
@@ -3296,8 +3323,8 @@ function openInternalLoadout(cid){
   const available=availableInternalOptions(cid),selected=selectedInternal(cid);
   if(selected)SESSION.campaignState.internalLoadouts[cid]=selected;
   const level=SESSION.campaignState.roster[cid]?.lvl||1;
-  const rows=options.map(id=>{const item=INTERNALS[id],on=id===selected,locked=!available.includes(id);return `<label class="skill-pick internal-pick ${on?'on':''} ${locked?'locked':''}"><input type="radio" name="inner-${cid}" ${on?'checked':''} ${locked?'disabled':''} onchange="setInternalLoadout('${cid}','${id}')"><span><b>${item.kind} · ${item.name}</b><em>${locked?`Lv.${item.unlockLevel} 해금`:item.role}</em><small>${item.desc}<br><strong>실제 효과: ${internalEffectText(id)}</strong><br>원작 근거: ${item.source}</small></span></label>`;}).join('');
-  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="internal-modal"><div class="modal internal-modal"><h3>내공·특성 편성 — ${c.name}</h3><p class="modal-note">현재 Lv.${level}. 원작에서 실제로 익힌 심법 또는 명확히 보여 준 전투 성향 중 하나를 운용합니다. ‘특성’은 가공 내공명이 아닙니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeInternalLoadout()">완료</button></div></div></div>`);
+  const rows=options.map(id=>{const item=INTERNALS[id],on=id===selected,state=internalUnlockState(item,SESSION.campaignState),locked=!available.includes(id);return `<label class="skill-pick internal-pick ${on?'on':''} ${locked?'locked':''}"><input type="radio" name="inner-${cid}" ${on?'checked':''} ${locked?'disabled':''} onchange="setInternalLoadout('${cid}','${id}')"><span><b>${item.kind} · ${item.name}</b><em>${locked?`사건 해금`:item.role}</em><small>${item.desc}<br><strong>실제 효과: ${internalEffectText(id)}</strong><br>${locked?`<mark>해금 조건: ${state.label}</mark><br>`:''}원작 근거: ${item.source}</small></span></label>`;}).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-back" id="internal-modal"><div class="modal internal-modal"><h3>내공·특성 편성 — ${c.name}</h3><p class="modal-note">현재 Lv.${level}. 레벨이 아니라 원작 사건을 완료한 순서대로 무학이 열립니다. ‘특성’은 가공 내공명이 아닙니다.</p><div class="skill-picks">${rows}</div><div class="btnrow"><button class="btn" onclick="closeInternalLoadout()">완료</button></div></div></div>`);
 }
 function setInternalLoadout(cid,id){
   if(!availableInternalOptions(cid).includes(id))return;
@@ -3517,6 +3544,10 @@ export const DEBUG = {
   relationshipProbe(score=2,cid='gj'){ return {faction:factionRelationTier(score),trust:characterTrustTier(score),effects:characterTrustEffects({[cid]:score},cid)}; },
   masteryProbe(sid='seoncheon',uses=0){ return masteryInfo(sid,uses); },
   internalProbe(cid='gj',id=null){const selected=validInternal(cid,id);return {selected,item:internalById(selected),options:internalOptions(cid),effectText:internalEffectText(selected)};},
+  internalUnlockProbe(id,campaign){return internalUnlockState(internalById(id),campaign);},
+  enemyMartialProbe(cid='oyb',context={}){const style=enemyMartialByCid(cid);return {style,counter:enemyMartialCounter(style,context),effectText:enemyMartialEffectText(style)};},
+  martialRuleProbe(context){return martialModifiers(context);},
+  inspectUnit(cid){const u=B?.units.find(item=>item.cid===cid);if(!u)return false;UCARD_HIDE=false;B.inspect=u;B.tileSel={x:u.x,y:u.y};renderSide();return true;},
   battleReports(){return deepClone(BATTLE_REPORTS);},
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },
@@ -3530,7 +3561,7 @@ export const DEBUG = {
   openCurrentDeploy(){ const node=curNode(); if(node?.kind==='battle') v2Deploy(node); },
   forceDefeat(){ if(B){ B.over=true; showDefeat(); } },
   previewCutin(){ const a=players()[0],sid=a&&a.skills[0]; if(a&&sid) void showMartialCutin(a,SKILLS[sid]); },
-  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, INTERNALS, HERO_INTERNALS, CAMPAIGNS, DISCOVERED_CAMPAIGN_IDS,
+  CHAPTERS, CHARS, SKILLS, ITEMS, SUPPORTS, INTERNALS, HERO_INTERNALS, ENEMY_MARTIALS, CAMPAIGNS, DISCOVERED_CAMPAIGN_IDS,
 };
 
 export const GLOBALS = {
@@ -3544,7 +3575,7 @@ export const GLOBALS = {
   showCampaignSelect, showChallengeSelect, startCampaignV2, showRouteMap, v2Enter, pickChoice,
   v2Buy, v2Sell, v2Equip, v2Promote, v2Depart, v2AfterBattle, v2UseTool, closeToolMenu,
   campTab, campBack, campFromDeploy, campFromRoute,
-  openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, openInternalLoadout, setInternalLoadout, closeInternalLoadout, showRewindHistory, rewindHistory,
+  openSkillLoadout, toggleSkillLoadout, closeSkillLoadout, openInternalLoadout, setInternalLoadout, closeInternalLoadout, autoCampLoadout, showRewindHistory, rewindHistory,
   showRelationshipLedger,
   openInvModal, closeEquipModal, battleEquip, sndToggleUI,
   toggleInfoPop, hideUcard, showSaveHub, hubContinue, saveHubResume, resumeLastSession, showSaveHealth, restoreCampaignCheckpoint, viewSupport,
