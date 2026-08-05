@@ -204,7 +204,7 @@ for(const item of Object.values(INTERNALS)){
 }
 console.log(`  총 ${Object.keys(INTERNALS).length}종 · 단일 조건 피해 +20% / 회피 +12 / 피해 감소 20% 안전 상한 통과`);
 
-console.log('\n## R19 주요 적 무학 — 압력 안전선');
+console.log('\n## R19~R20 주요 적 무학 — 압력 안전선');
 for(const [cid,item] of Object.entries(ENEMY_MARTIALS)){
   const e=item.effects||{},peak=(e.damage||0)+(e.skillDamage||0)+Math.max(e.stationaryDamage||0,e.lowHpDamage||0,e.vsLowHpDamage||0,e.vsLowKiDamage||0);
   console.log(`  ${CHARS[cid].name} · ${item.name}: 조건 최대 +${Math.round(peak*100)}% · 회피 ${e.avoid||0} · 반사 ${Math.round((e.reflect||0)*100)}%`);

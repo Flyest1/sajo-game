@@ -3,12 +3,14 @@
    ============================================================ */
 import './style.css';
 import { boot, GLOBALS, DEBUG } from './game.js';
-import { mountPwaUpdates, showUpdateNotice, APP_VERSION } from './pwa.js';
+import { mountPwaUpdates, showUpdateNotice, APP_VERSION, checkForUpdate, inspectPwaCache, repairPwaCache } from './pwa.js';
 
 /* 인라인 onclick 핸들러(동적 생성 HTML)에서 쓰는 함수들을 전역에 노출 */
 Object.assign(window, GLOBALS);
 window.__dbg = DEBUG;
-window.__pwa = { showUpdateNotice, version:APP_VERSION };
+window.__pwa = { showUpdateNotice, version:APP_VERSION, checkForUpdate, inspectPwaCache, repairPwaCache };
+document.documentElement.dataset.appVersion=APP_VERSION;
+document.title=`강호의 별 · ${APP_VERSION}`;
 
 boot();
 mountPwaUpdates();

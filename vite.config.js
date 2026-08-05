@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// A deployed bundle carries its source revision.  Keeping this in the bundle (rather
+// than in mutable storage) makes it possible to tell a stale PWA shell from main.
+const sourceRevision=(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7);
+const appVersion=`R20-${sourceRevision}`;
+
 export default defineConfig({
   // GitHub Pages 프로젝트 사이트 경로: https://flyest1.github.io/sajo-game/
   base: '/sajo-game/',
@@ -10,7 +15,7 @@ export default defineConfig({
   },
   server: { host: true },
   define: {
-    __APP_VERSION__: JSON.stringify((process.env.GITHUB_SHA||'local').slice(0,7)),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   plugins: [
     VitePWA({

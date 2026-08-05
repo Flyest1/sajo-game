@@ -50,6 +50,24 @@ export function internalUnlockState(item,campaign){
 }
 export function internalUnlocked(id,campaign){return internalUnlockState(internalById(id),campaign).unlocked;}
 
+/* 전투 전후의 캠페인 상태를 비교해 이번 사건에서 처음 열린 무학만 돌려준다.
+   화면과 테스트가 같은 판정을 쓰도록 순수 함수로 유지한다. */
+export function newlyUnlockedInternals(beforeCampaign,afterCampaign,rosterIds=[]){
+  const roster=new Set(rosterIds);
+  const rewards=[];
+  for(const [cid,ids] of Object.entries(HERO_INTERNALS)){
+    if(roster.size&&!roster.has(cid))continue;
+    for(const id of ids){
+      const item=internalById(id);
+      if(!item?.unlock)continue;
+      const before=internalUnlockState(item,beforeCampaign).unlocked;
+      const after=internalUnlockState(item,afterCampaign).unlocked;
+      if(!before&&after)rewards.push({cid,id,item});
+    }
+  }
+  return rewards;
+}
+
 export function internalEffectText(id){
   const item=internalById(id);if(!item)return '고유 심법 없음';
   const e=item.effects||{},parts=[];

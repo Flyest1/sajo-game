@@ -392,9 +392,42 @@ test('manual update prompt is readable and dismissible', async ({ page }) => {
   const notice=page.locator('#update-notice');
   await expect(notice).toBeVisible();
   await expect(notice.getByText('새 강호 기록이 도착했습니다')).toBeVisible();
-  await expect(notice.getByRole('button', { name:'업데이트 적용' })).toBeVisible();
+  await expect(notice.getByRole('button', { name:'지금 적용' })).toBeVisible();
+  await expect(notice.getByRole('button', { name:'캐시 복구' })).toBeVisible();
   await notice.getByRole('button', { name:'알림 닫기' }).click();
   await expect(notice).toHaveCount(0);
+});
+
+test('PWA build identity and recovery APIs are available without touching saves', async ({ page }) => {
+  const pwa=await page.evaluate(async () => ({
+    version:window.__pwa.version,
+    title:document.title,
+    build:document.documentElement.dataset.appVersion,
+    cache:await window.__pwa.inspectPwaCache(),
+    apis:['checkForUpdate','inspectPwaCache','repairPwaCache'].map(name=>typeof window.__pwa[name]),
+  }));
+  expect(pwa.version).toMatch(/^R20-/);
+  expect(pwa.title).toContain(pwa.version);
+  expect(pwa.build).toBe(pwa.version);
+  expect(pwa.apis).toEqual(['function','function','function']);
+  expect(Array.isArray(pwa.cache.appCaches)).toBe(true);
+});
+
+test('R20 event growth rewards and update controls expose their actual effects', async ({ page }) => {
+  const rewards=await page.evaluate(() => window.__dbg.growthRewardsProbe(
+    {camp:'chunryong',stageId:null,cleared:[]},
+    {camp:'chunryong',stageId:'dy1',cleared:['dy1']},
+    ['dy'],
+  ));
+  expect(rewards.map(item=>item.id)).toEqual(['dy_beiming','dy_lingbo']);
+  expect(rewards[0]).toMatchObject({cid:'dy',name:'북명신공'});
+  expect(rewards[0].effectText).toContain('적중 시 기력 +2');
+
+  await page.evaluate(() => window.showSettings());
+  const settings=page.locator('#set-modal');
+  await expect(settings.getByRole('button',{name:'새 버전 검사'})).toBeVisible();
+  await expect(settings.getByRole('button',{name:'캐시 복구'})).toBeVisible();
+  await expect(settings).toContainText('저장 기록은 유지');
 });
 
 test('seeded roam keeps direct movement and shows the action menu after moving', async ({ page }, testInfo) => {
@@ -609,6 +642,7 @@ test('R19 enemy martial counters are original-based, readable, and attached to b
   await page.reload();
   const rules=await page.evaluate(() => ({
     count:Object.keys(window.__dbg.ENEMY_MARTIALS).length,
+    actionCount:Object.values(window.__dbg.ENEMY_MARTIALS).filter(style=>style.actions?.length).length,
     toad:window.__dbg.enemyMartialProbe('oyb',{attackerType:'경',adjacentAllies:0,comboStep:0}),
     toadMiss:window.__dbg.enemyMartialProbe('oyb',{attackerType:'외',adjacentAllies:0,comboStep:0}),
     reflect:window.__dbg.enemyMartialProbe('myb',{attackerType:'내',adjacentAllies:1,comboStep:0}),
@@ -616,7 +650,8 @@ test('R19 enemy martial counters are original-based, readable, and attached to b
     after:window.__dbg.internalUnlockProbe('gj_jiuyin',{camp:'sajo',stageId:'c7',cleared:['s3','s7']}),
     miejue:window.__dbg.CHARS.myeoljeol.skills,
   }));
-  expect(rules.count).toBe(12);
+  expect(rules.count).toBe(20);
+  expect(rules.actionCount).toBe(8);
   expect(rules.toad.style.name).toBe('합마공·역구음');
   expect(rules.toad.counter.active).toBe(true);
   expect(rules.toadMiss.counter.active).toBe(false);

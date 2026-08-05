@@ -4,7 +4,7 @@
    ============================================================ */
 import fs from 'fs';
 import {LUNJIAN_HEROES,LUNJIAN_ROUNDS,TRIALS,makeLunjianBattle} from '../src/challenges.js';
-import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal} from '../src/internals.js';
+import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal,newlyUnlockedInternals} from '../src/internals.js';
 import {ENEMY_MARTIALS,enemyMartialEffectText} from '../src/enemy-martials.js';
 import {enemyMartialCounter} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
@@ -371,11 +371,20 @@ const SUPPORTS = J('supports.json');
     if(!camp){errs.push(`internal/${id}: unlock campaign missing ${item.unlock.campaign}`);continue;}
     for(const stageId of [...(item.unlock.clearedAny||[]),...(item.unlock.reachedAny||[])])if(!camp.stages[stageId])errs.push(`internal/${id}: unlock stage missing ${item.unlock.campaign}/${stageId}`);
   }
+  const growthProbe=newlyUnlockedInternals(
+    {camp:'sajo',stageId:'s7',cleared:[]},
+    {camp:'sajo',stageId:'s7',cleared:['s7']},
+    ['gj'],
+  );
+  if(growthProbe.length!==1||growthProbe[0].id!=='gj_jiuyin')errs.push('internal growth reward probe failed');
 }
 
-/* ── R19 주요 적 무학·파훼 검증 ── */
+/* ── R19~R20 주요 적 무학·파훼·예고 행동 검증 ── */
 {
-  if(Object.keys(ENEMY_MARTIALS).length!==12)errs.push(`enemy martials ${Object.keys(ENEMY_MARTIALS).length} != 12`);
+  if(Object.keys(ENEMY_MARTIALS).length!==20)errs.push(`enemy martials ${Object.keys(ENEMY_MARTIALS).length} != 20`);
+  let actionCount=0;
+  const actionShapes=new Set(['line','cross','cone','radius']);
+  const campaignBosses=new Set(CAMPAIGN_FILES.flatMap(campaign=>Object.values(campaign.stages||{}).flatMap(stage=>(stage.enemies||[]).filter(enemy=>enemy.boss).map(enemy=>enemy.cid))));
   for(const [cid,style] of Object.entries(ENEMY_MARTIALS)){
     if(!CHARS[cid])errs.push(`enemy martial: unknown character ${cid}`);
     if(!style.name||!style.kind||!style.role||!style.source||!style.tell||!style.counter?.text)errs.push(`enemy martial/${cid}: documentation incomplete`);
@@ -386,14 +395,27 @@ const SUPPORTS = J('supports.json');
     if(!routes.length)errs.push(`enemy martial/${cid}: counter route missing`);
     const probe=enemyMartialCounter(style,{attackerType:style.counter.types?.[0],adjacentAllies:style.counter.minAllies||0,comboStep:style.counter.combo?1:0});
     if(!probe.active||probe.guardDamage<1)errs.push(`enemy martial/${cid}: counter probe failed`);
+    for(const action of style.actions||[]){
+      actionCount++;
+      if(!action.id||!action.name||!action.charge?.label)errs.push(`enemy martial/${cid}: boss action documentation incomplete`);
+      if(!actionShapes.has(action.shape?.type)||!(action.shape?.range>=1&&action.shape.range<=6))errs.push(`enemy martial/${cid}: boss action shape invalid`);
+      if(action.skill&&!SKILLS[action.skill])errs.push(`enemy martial/${cid}: boss action skill unknown ${action.skill}`);
+      if(!['cancel','weaken'].includes(action.counter?.mode))errs.push(`enemy martial/${cid}: boss action counter mode invalid`);
+      if(action.power<.8||action.power>1.3||Math.abs(action.hitBonus||0)>15)errs.push(`enemy martial/${cid}: boss action exceeds safety cap`);
+      if(!campaignBosses.has(cid))errs.push(`enemy martial/${cid}: boss action has no campaign boss encounter`);
+    }
   }
+  if(actionCount!==8)errs.push(`boss actions ${actionCount} != 8`);
   if(CHARS.myeoljeol?.skills?.includes('wolnyeo')||!CHARS.myeoljeol?.skills?.includes('emei'))errs.push('character/myeoljeol: must use 아미검법, not 월녀검법');
+  if(!CHARS.geumhwa?.skills?.includes('geumhwaamgi'))errs.push('character/geumhwa: 금화암기 missing');
+  if(!CHARS.ichusu?.skills?.includes('baihong'))errs.push('character/ichusu: 백홍장력 missing');
+  if(CHARS.scs?.skills?.includes('wolnyeo')||!CHARS.scs?.skills?.includes('geumjeong'))errs.push('character/scs: must use 금정면장 계통, not 월녀검법');
 }
 
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
 console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
-console.log(`R19 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 검사`);
+console.log(`R19~R20 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 8종 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

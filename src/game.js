@@ -15,10 +15,17 @@ import {
 } from './challenges.js';
 import {
   INTERNALS, HERO_INTERNALS, internalOptions, defaultInternal, internalById, validInternal, internalEffectText,
-  internalUnlockState, internalUnlocked,
+  internalUnlockState, internalUnlocked, newlyUnlockedInternals,
 } from './internals.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
+import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
+import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
 import { ENEMY_MARTIALS, enemyMartialByCid, enemyMartialEffectText } from './enemy-martials.js';
+import {
+  advanceBossPlan, applyBossCounter, bossActionDefs as resolveBossActionDefs,
+  bossIntentDescription, bossPlanIntent, bossShapeLabel, createBossActionPlan,
+  nextBossActionIndex,
+} from './boss-actions.js';
 import {
   objectiveLeaves as resolveObjectiveLeaves, objectiveTiles as resolveObjectiveTiles,
   objectiveProgress as resolveObjectiveProgress, objectiveWon as resolveObjectiveWon,
@@ -351,6 +358,8 @@ function mkEnemyUnit(def){
     x:def.x, y:def.y, stats:st, maxhp:st.hp, hp:st.hp, maxki:st.ki, ki:st.ki,
     lvl:curCh().no*3, exp:0, acted:false, alive:true,
     boss:!!def.boss, wait:def.wait||0, poison:0, martial,
+    bossActions:Array.isArray(def.bossActions)?deepClone(def.bossActions):null,
+    bossActionState:{index:0,pending:null},bossStance:null,
     guardMax, guard:guardMax, broken:false, phaseIndex:0};
 }
 
@@ -611,10 +620,11 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     inkTrail(a,d,sk?a.type:'basic',isCrit);
     if(c.guarded){
       const gp=c.guardDmg+(isCrit?2:0);
-      d.guard=Math.max(0,d.guard-gp);
+      const guardHit=resolveGuardHit({guard:d.guard,guardMax:d.guardMax,broken:d.broken,damage:gp});
+      d.guard=guardHit.guard;
       const meter=contribution(a);if(meter)meter.guard+=gp;
       fx(d.x,d.y,`강기 -${gp}`,'guard');
-      if(d.guard===0){
+      if(guardHit.broke){
         if(a.team==='P'&&d.team==='E') B.guardBreaks=(B.guardBreaks||0)+1;
         if(a.team==='P'&&a.internal?.effects?.kiOnBreak)a.ki=Math.min(a.maxki,a.ki+a.internal.effects.kiOnBreak);
         const reward=c.martialCounter?.active?d.martial?.counter?.reward:null;
@@ -627,13 +637,21 @@ async function strike(a,d,skillId,followup,suppressCutin=false){
     const subdue=obj.type==='subdue'&&d.cid===obj.target&&a.team==='P';
     const floor=subdue?Math.max(1,Math.ceil(d.maxhp*(obj.threshold||.2))):0;
     const hpBefore=d.hp;
-    d.hp=Math.max(floor,d.hp-dmg);
-    const actualDamage=Math.max(0,hpBefore-d.hp),attackMeter=contribution(a),defendMeter=contribution(d);
+    const healthHit=resolveHealthHit({hp:d.hp,maxhp:d.maxhp,damage:dmg,floor});
+    d.hp=healthHit.hp;
+    const actualDamage=healthHit.damage,attackMeter=contribution(a),defendMeter=contribution(d);
     if(attackMeter){attackMeter.damage+=actualDamage;if(c.bA>0)attackMeter.bond++;}
     if(defendMeter)defendMeter.taken+=actualDamage;
     if(c.martialCounter?.active&&a.team==='P'){
       B.martialCounters=(B.martialCounters||0)+1;if(attackMeter)attackMeter.counters=(attackMeter.counters||0)+1;fx(d.x,d.y,'간파!','break');
       log(`<b>${a.name} — ${d.martial.name} 간파!</b> ${c.martialCounter.reasons.join('·')}`,true);
+      const disrupted=disruptBossAction(d,c.martialCounter.reasons.join('·'));
+      if(disrupted.changed){
+        const result=disrupted.outcome==='cancel'?'초식 취소':'범위·위력 약화';
+        fx(d.x,d.y,result,'phase');
+        log(`<b>${d.name}의 ${disrupted.actionName} — ${result}!</b> 붉은 예고 범위가 갱신되었다.`,true);
+        refreshEnemyIntents();
+      }
     }
     const attackStyle=a.martial?.effects||{};
     if(a.team==='E'&&d.team==='P'&&attackStyle.kiDrain){const drained=Math.min(d.ki,attackStyle.kiDrain);d.ki-=drained;if(drained)fx(d.x,d.y,`기-${drained}`,'miss');}
@@ -751,6 +769,82 @@ async function combat(a,d,skillId){
   B.busy=false;
 }
 
+/* ── R20 보스 범위 초식: 고정된 경고 타일을 그대로 판정 ── */
+async function executeBossAction(u,execution){
+  const action=execution.action,keys=new Set((execution.tiles||[]).map(value=>`${value.x},${value.y}`));
+  const sid=action.skill&&SKILLS[action.skill]?action.skill:null,sk=sid?SKILLS[sid]:null;
+  const targets=players().filter(target=>keys.has(`${target.x},${target.y}`));
+  if(sk){
+    u.ki=Math.max(0,u.ki-(sk.cost||0));
+    await showMartialCutin(u,sk,null,action.name);
+  }
+  fx(u.x,u.y,action.name,'phase');SFX.play('skill');shakeMap(true);
+  log(`<b>${u.name} — ${action.name} 발동!</b> ${bossShapeLabel(action.shape.type)} ${execution.tiles.length}칸을 덮친다.`,true);
+  await aSleep(360);
+  const hits=[];
+  for(const target of targets){
+    if(!target.alive)continue;
+    const preview=calcStrike(u,target,sid),impact=resolveBossImpact({
+      hp:target.hp,maxhp:target.maxhp,baseDamage:preview.dmg,power:action.power,
+      hitChance:Math.min(100,preview.hit+action.hitBonus),hitRoll:Math.random()*100,
+      critChance:preview.crit,critRoll:Math.random()*100,status:execution.status,
+      counterDamageMultiplier:action.counter.damageMultiplier,
+    });
+    inkTrail(u,target,u.type,impact.crit);
+    if(!impact.hit){
+      fx(target.x,target.y,'회피!','miss');SFX.play('miss');
+      log(`${target.name}이(가) ${action.name}의 예고 범위를 빠져나갔다.`);
+      hits.push({uid:target.uid,hit:false,damage:0});
+      continue;
+    }
+    const hpBefore=target.hp;target.hp=impact.hp;
+    const defendMeter=contribution(target);if(defendMeter)defendMeter.taken+=impact.damage;
+    B.damageTaken=(B.damageTaken||0)+impact.damage;
+    const attackStyle=u.martial?.effects||{};
+    if(attackStyle.kiDrain){const drained=Math.min(target.ki,attackStyle.kiDrain);target.ki-=drained;if(drained)fx(target.x,target.y,`기-${drained}`,'miss');}
+    if(attackStyle.poisonOnSkill&&sid&&!target.poison&&target.hp>0){target.poison=3;fx(target.x,target.y,'중독!','label');}
+    SFX.play(impact.crit?'crit':'hit');flashTile(target.x,target.y,impact.crit?'crit':'');
+    fx(target.x,target.y,impact.damage,impact.crit?'crit':'');
+    log(`${u.name}의 ${action.name} → ${target.name} ${impact.damage} 피해${execution.status==='weakened'?' (간파 약화)':''}`);
+    hits.push({uid:target.uid,hit:true,damage:hpBefore-target.hp,crit:impact.crit});
+    if(target.hp<=0){
+      target.alive=false;B.allyLost=true;SFX.play('kill');fx(target.x,target.y,'격파!','label');
+      log(`<b>${target.name}이(가) 부상으로 이탈했다…</b>`,true);
+    }
+    await aSleep(180);
+  }
+  if(!targets.length)log(`<b>${action.name} 불발!</b> 협객들이 예고 범위를 모두 벗어났다.`,true);
+  u.bossActionState.lastExecution={planId:execution.id,actionId:action.id,status:execution.status,tiles:execution.tiles.map(value=>({...value})),hits};
+  renderBattle(true);
+  await aSleep(420);
+  checkEnd();
+}
+
+async function performBossActionTurn(u){
+  const state=u?.bossActionState,pending=state?.pending;
+  if(!pending)return false;
+  const actions=bossActionsFor(u),step=advanceBossPlan(pending);
+  if(step.event==='cancelled'){
+    state.pending=null;state.index=nextBossActionIndex(state.index,actions);u.bossStance=null;
+    state.lastExecution={planId:pending.id,actionId:pending.action.id,status:'cancelled',tiles:[],hits:[]};
+    fx(u.x,u.y,'초식 취소','break');SFX.play('crit');
+    log(`<b>${u.name}의 ${pending.action.name}이(가) 간파되어 끊겼다!</b> ${pending.counterReason||pending.action.counter.label}`,true);
+    renderBattle(true);await aSleep(520);return true;
+  }
+  if(step.event==='charge'){
+    state.pending=step.plan;u.bossStance=pending.action.charge.stance;
+    const weakened=pending.status==='weakened'?' · 간파로 흐트러짐':'';
+    fx(u.x,u.y,pending.action.charge.stance,'phase');
+    log(`<b>${u.name} — ${pending.action.name} 축력!</b> ${pending.action.charge.label}${weakened}`,true);
+    renderBattle(true);await aSleep(620);return true;
+  }
+  if(step.event==='execute'){
+    state.pending=null;state.index=nextBossActionIndex(state.index,actions);u.bossStance=null;
+    await executeBossAction(u,step.execution);return true;
+  }
+  return false;
+}
+
 /* ── 치료 ── */
 async function healAction(a,t,skillId){
   B.busy=true;
@@ -846,41 +940,56 @@ function pickAttackPos(u,target,mr){
   return best;
 }
 
-/* ── 적 의도: 표시와 실제 AI가 동일한 평가 함수를 사용 ── */
-function chooseEnemyAction(u){
+/* ── 적 의도: 표시와 실제 AI가 동일한 평가 함수/고정 계획을 사용 ── */
+function bossActionsFor(u){
+  return resolveBossActionDefs(u,{
+    stageActions:curCh()?.bossActions,
+    unitActions:u.bossActions,
+    martialActions:u.martial?.actions||u.martial?.bossActions,
+  });
+}
+function ensureBossActionPlan(u){
+  const actions=bossActionsFor(u);
+  if(!actions.length)return null;
+  u.bossActionState=u.bossActionState||{index:0,pending:null};
+  if(!u.bossActionState.pending){
+    const index=u.bossActionState.index%actions.length;
+    u.bossActionState.pending=createBossActionPlan({
+      unit:u,action:actions[index],targets:players(),bounds:{w:B.w,h:B.h},turn:B.turn,sequence:index,
+    });
+  }
+  return u.bossActionState.pending;
+}
+function disruptBossAction(u,reason){
+  const pending=u?.bossActionState?.pending;
+  if(!pending)return {changed:false,outcome:'none',actionName:null};
+  const result=applyBossCounter(pending,reason);
+  u.bossActionState.pending=result.plan;
+  return {...result,actionName:pending.action.name};
+}
+function chooseBossAction(u){
+  /* 대기 중인 보스는 실제 각성 시점에 표적을 고정해야 초기 배치 칸을 향한 낡은 예고가 남지 않는다. */
+  if(!u?.bossActionState?.pending&&u.wait&&u.hp===u.maxhp&&!players().some(player=>dist(player,u)<=u.wait))return null;
+  const plan=ensureBossActionPlan(u);
+  return plan?bossPlanIntent(plan):null;
+}
+function chooseEnemyAction(u,{allowBoss=true}={}){
+  if(allowBoss){
+    const bossAction=chooseBossAction(u);
+    if(bossAction)return bossAction;
+  }
   const mr=moveRange(u);
-  let best=null;
-  for(const k of mr.keys()){
-    const [x,y]=k.split(',').map(Number);
-    if(!stoppable(u,x,y)) continue;
-    for(const p of players()){
-      const dd=Math.abs(p.x-x)+Math.abs(p.y-y);
-      if(!u.range.includes(dd)) continue;
-      const sid=u.skills.find(s=>!SKILLS[s].heal&&u.ki>=SKILLS[s].cost)||null;
-      const pv=calcStrike(u,p,sid);
-      let score=pv.dmg*(pv.hit/100)+(pv.dmg>=p.hp?60:0)+TILE[tileChar(x,y)].avoid*.2+(p.leader?6:0);
-      if(u.tactic==='hunter') score+=(1-p.hp/p.maxhp)*34;
-      if(u.tactic==='leader'&&p.leader) score+=28;
-      if(u.tactic==='execute'&&p.hp<=p.maxhp*.45) score+=38;
-      if(p.range.includes(dd)){
-        const c=calcStrike(p,u,null);
-        score-=c.dmg*(c.hit/100)*.5;
-      }
-      if(!best||score>best.score) best={kind:'attack',x,y,targetUid:p.uid,targetCid:p.cid,score,sid};
-    }
-  }
-  if(best) return best;
-  let tgt=null;
-  for(const p of players()) if(!tgt||dist(p,u)<dist(tgt,u)) tgt=p;
-  if(!tgt) return {kind:'wait',x:u.x,y:u.y};
-  let move=null;
-  for(const k of mr.keys()){
-    const [x,y]=k.split(',').map(Number);
-    if(!stoppable(u,x,y)) continue;
-    const dd=Math.abs(tgt.x-x)+Math.abs(tgt.y-y);
-    if(!move||dd<move.dd) move={kind:'move',x,y,targetUid:tgt.uid,targetCid:tgt.cid,dd};
-  }
-  return move||{kind:'wait',x:u.x,y:u.y};
+  return resolveEnemyAction({
+    unit:u,players:players(),moveTiles:mr,ranges:u.range,
+    canStop:(x,y)=>stoppable(u,x,y),
+    selectSkill:()=>u.skills.find(s=>!SKILLS[s].heal&&u.ki>=SKILLS[s].cost)||null,
+    terrainAt:(x,y)=>TILE[tileChar(x,y)].avoid,
+    previewStrike:(attacker,target,sid,position)=>{
+      const preview=calcStrike(attacker,target,sid),dd=Math.abs(target.x-position.x)+Math.abs(target.y-position.y);
+      if(target.range.includes(dd))preview.retaliation=calcStrike(target,attacker,null);
+      return preview;
+    },
+  });
 }
 function refreshEnemyIntents(){
   if(!B) return;
@@ -891,6 +1000,7 @@ function enemyIntent(u){ return B&&B.intents?B.intents[u.uid]:null; }
 function intentText(u){
   const it=enemyIntent(u); if(!it) return '의도 미확인';
   const target=B.units.find(x=>x.uid===it.targetUid);
+  if(it.bossAction)return bossIntentDescription(it,target?.name);
   const tactic=u.tactic?`${{hunter:'약자 추격',leader:'대장 압박',execute:'마무리 공세'}[u.tactic]||u.tactic} · `:'';
   const martial=u.martial?`${u.martial.name} · `:'';
   if(it.kind==='attack') return `${martial}${tactic}${it.sid?SKILLS[it.sid].name:'일반 공격'} → ${target?target.name:'목표'}${it.x!==u.x||it.y!==u.y?' · 이동 후':''}`;
@@ -900,10 +1010,16 @@ function intentText(u){
 function enemyThreatTiles(){
   const set=new Set();
   for(const e of foes()){
+    const intent=enemyIntent(e);
+    if(intent?.bossAction){for(const key of intent.warningKeys||[])set.add(key);continue;}
     const mr=moveRange(e), atk=attackTiles(e,mr);
     for(const k of atk) set.add(k);
   }
   return set;
+}
+function bossWarningIntents(){
+  if(!B)return [];
+  return foes().map(unit=>({unit,intent:enemyIntent(unit)})).filter(item=>item.intent?.bossAction);
 }
 function toggleThreats(){
   if(!B) return;
@@ -1148,15 +1264,21 @@ async function enemyPhase(){
     }
     focusUnit(u); /* 행동할 적에게 화면 이동 */
     if(!(SETTINGS.fastEnemy&&SETTINGS.speed>=2)) await aSleep(160);
-    const intent=chooseEnemyAction(u);
-    if(intent.kind==='attack'){
-      const target=B.units.find(x=>x.uid===intent.targetUid&&x.alive);
-      if(!target) continue;
-      if(intent.x!==u.x||intent.y!==u.y){ const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy); }
-      await combat(u,target,intent.sid);
-      if(B.over) return;
-    }else if(intent.kind==='move'&&(intent.x!==u.x||intent.y!==u.y)){
-      const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy);
+    const bossIntent=chooseBossAction(u);
+    if(bossIntent){
+      await performBossActionTurn(u);
+      if(B.over)return;
+    }else{
+      const intent=chooseEnemyAction(u,{allowBoss:false});
+      if(intent.kind==='attack'){
+        const target=B.units.find(x=>x.uid===intent.targetUid&&x.alive);
+        if(!target) continue;
+        if(intent.x!==u.x||intent.y!==u.y){ const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy); }
+        await combat(u,target,intent.sid);
+        if(B.over) return;
+      }else if(intent.kind==='move'&&(intent.x!==u.x||intent.y!==u.y)){
+        const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy);
+      }
     }
     if(u.alive&&u.broken){ u.guard=u.guardMax; u.broken=false; log(`${u.name}이(가) 호흡을 가다듬어 호신강기를 되찾았다.`); }
   }
@@ -1393,6 +1515,7 @@ function renderScreenBattle(){
         </div>
       </div></div>
       <div id="minimap" title="미니맵 — 클릭하면 그 위치로 이동"></div>
+      <div id="boss-intent-hud" role="status" aria-live="polite" aria-atomic="true" hidden></div>
       <div id="ucard-pop" class="hidden"></div>
       <div id="info-pop" class="hidden"></div>
     </div>
@@ -1500,6 +1623,14 @@ function renderBattle(light){
     const [x,y]=k.split(',').map(Number);
     s+=`<rect x="${x*TS+2}" y="${y*TS+2}" width="${TS-4}" height="${TS-4}" rx="6" fill="${c}" stroke="rgba(255,255,255,.25)"/>`;
   }
+  if(B.showThreats&&B.phase==='P')for(const {unit,intent} of bossWarningIntents()){
+    const status=intent.status==='weakened'?'weakened':(intent.kind==='boss-execute'?'ready':'charging');
+    const title=escHtml(`${unit.name} · ${intent.actionName} ${bossShapeLabel(intent.shape)} 공격 예고`);
+    for(const warning of intent.warningTiles||[]){
+      const px=warning.x*TS,py=warning.y*TS;
+      s+=`<g class="boss-warning-tile ${status}" data-boss="${unit.uid}" data-action="${escHtml(intent.actionId)}" role="img" aria-label="${title}"><title>${title}</title><rect x="${px+3}" y="${py+3}" width="${TS-6}" height="${TS-6}" rx="5"/><path d="M${px+9} ${py+TS-9} L${px+TS-9} ${py+9}"/></g>`;
+    }
+  }
   if(B.tileSel&&!B.busy){
     s+=`<rect x="${B.tileSel.x*TS+1.5}" y="${B.tileSel.y*TS+1.5}" width="${TS-3}" height="${TS-3}" rx="4" fill="none" stroke="#f0d49a" stroke-width="2"/>`;
   }
@@ -1509,10 +1640,18 @@ function renderBattle(light){
   if(B.phase==='P'){
     for(const u of foes()){
       const it=enemyIntent(u), px=u.x*TS, py=u.y*TS;
-      const kind=it&&it.kind==='attack'?(it.sid?'skill':'attack'):(it&&it.kind==='move'?'move':'wait');
-      const label={skill:'무공 공격 예고',attack:'일반 공격 예고',move:'이동 예고',wait:'대기 예고'}[kind];
+      const kind=it?.bossAction?it.kind:(it&&it.kind==='attack'?(it.sid?'skill':'attack'):(it&&it.kind==='move'?'move':'wait'));
+      const label=it?.bossAction
+        ?`보스 공격 예고 · ${kind==='boss-cancelled'?'취소됨':(kind==='boss-execute'?'발동':'축력')} · ${it.actionName}`
+        :{skill:'무공 공격 예고',attack:'일반 공격 예고',move:'이동 예고',wait:'대기 예고'}[kind];
       const cx=px+9,cy=py+9;
-      const shape=kind==='skill'
+      const shape=kind==='boss-execute'
+        ?`<path d="M${cx},${cy-5} L${cx+5},${cy+4} H${cx-5}Z"/><path d="M${cx},${cy-2} V${cy+1} M${cx},${cy+3} V${cy+3.2}"/>`
+        :kind==='boss-charge'
+          ?`<path d="M${cx-4},${cy-5} H${cx+4} M${cx-4},${cy+5} H${cx+4} M${cx-3},${cy-4} C${cx-3},${cy-1} ${cx+3},${cy+1} ${cx+3},${cy+4} M${cx+3},${cy-4} C${cx+3},${cy-1} ${cx-3},${cy+1} ${cx-3},${cy+4}"/>`
+          :kind==='boss-cancelled'
+            ?`<path d="M${cx-4},${cy-4} L${cx+4},${cy+4} M${cx+4},${cy-4} L${cx-4},${cy+4}"/>`
+            :kind==='skill'
         ?`<path d="M${cx},${cy-5} L${cx+1.7},${cy-1.7} L${cx+5},${cy} L${cx+1.7},${cy+1.7} L${cx},${cy+5} L${cx-1.7},${cy+1.7} L${cx-5},${cy} L${cx-1.7},${cy-1.7}Z"/>`
         :kind==='attack'
           ?`<circle cx="${cx}" cy="${cy}" r="3.2"/><circle cx="${cx}" cy="${cy}" r=".9" fill="#ffd8c8" stroke="none"/><path d="M${cx},${cy-5} V${cy-3.2} M${cx},${cy+3.2} V${cy+5} M${cx-5},${cy} H${cx-3.2} M${cx+3.2},${cy} H${cx+5}"/>`
@@ -1525,7 +1664,22 @@ function renderBattle(light){
   svg.innerHTML=s;
   renderBattleAtmosphere();
   renderWeather();
+  renderBossIntentHUD();
   renderSide();
+}
+
+function renderBossIntentHUD(){
+  const el=document.getElementById('boss-intent-hud');if(!el||!B)return;
+  const warnings=B.phase==='P'?bossWarningIntents():[];
+  if(!warnings.length){el.hidden=true;el.innerHTML='';return;}
+  const html=warnings.map(({unit,intent})=>{
+    const state=intent.kind==='boss-cancelled'?'cancelled':(intent.status==='weakened'?'weakened':(intent.kind==='boss-execute'?'ready':'charging'));
+    const badge=intent.kind==='boss-cancelled'?'간파 취소':(intent.kind==='boss-execute'?'발동 임박':'축력 중');
+    const detail=intent.kind==='boss-cancelled'?intent.counterLabel:`${bossShapeLabel(intent.shape)} ${intent.warningTiles.length}칸${intent.status==='weakened'?' · 위력 약화':''}`;
+    return `<div class="boss-intent-chip ${state}"><span>${badge}</span><b>${escHtml(unit.name)} · ${escHtml(intent.actionName)}</b><small>${escHtml(detail)}</small></div>`;
+  }).join('');
+  if(el.innerHTML!==html)el.innerHTML=html;
+  el.hidden=false;
 }
 
 function statRow(lbl,val,eq){
@@ -1575,7 +1729,7 @@ function ucardHTML(u){
   ${u.internal?`<div class="uc-internal"><b>${u.internal.kind} · ${u.internal.name}</b><span>${internalEffectText(u.internalId)}</span></div>`:''}
   ${u.martial?`<div class="uc-internal enemy-martial"><b>${u.martial.kind} · ${u.martial.name}</b><span>${enemyMartialEffectText(u.martial)}</span><small>행동: ${u.martial.tell}<br>파훼: ${u.martial.counter.text}</small></div>`:''}
   ${bossPatternHTML(u)}
-  ${u.team==='E'?`<div class="intent-line"><b>다음 의도</b><span>${intentText(u)}</span></div>`:''}
+  ${u.team==='E'?`<div class="intent-line ${enemyIntent(u)?.bossAction?'boss-intent':''}"><b>다음 의도</b><span>${intentText(u)}</span></div>`:''}
   ${u.skills.map(sid=>{const sk=SKILLS[sid];const ml=u.team==='P'?masteryLabel(sid):'';const cost=u.team==='P'?masteryCost(sid):sk.cost;const mp=u.team==='P'?masteryProgress(sid):'';const me=u.team==='P'?masteryEffectText(sid):'';return `<div class="uc-skill">◆ ${sk.name}${ml?` <span style="color:#e8c96a">${ml}</span>`:''} — ${sk.desc} (기 ${cost})${mp?`<br><span style="color:#c9a86a">${mp} · 실제 효과: ${me}</span>`:''}</div>`;}).join('')}
   <div class="uc-sub" style="margin-top:6px">${terrLine()}</div>`;
 }
@@ -1886,6 +2040,10 @@ function sealSVG(ch,color){
     <text x="32" y="45" text-anchor="middle" font-size="34" font-weight="900" fill="${color}" transform="rotate(-5 32 32)">${ch}</text>
   </svg>`;
 }
+function growthRewardsHTML(rewards=[]){
+  if(!rewards.length)return '';
+  return `<section class="growth-rewards"><div class="growth-rewards-head"><span>武學開眼</span><div><b>사건 성장</b><small>이번 이야기에서 새 무학이 열렸습니다</small></div></div><div class="growth-rewards-grid">${rewards.map(({cid,id,item})=>`<article><div class="growth-portrait">${ptSVG(cid,'','awaken')}</div><div><small>${CHARS[cid]?.name||cid} · ${item.kind} · ${item.role}</small><h3>${item.name}</h3><p>${internalEffectText(id)}</p><em>${item.unlock?.label||'원작 사건 완료'}</em></div></article>`).join('')}</div></section>`;
+}
 function showVictory(){
   const ch=curCh();
   const outcome=SESSION.outcome();
@@ -1895,6 +2053,9 @@ function showVictory(){
   recordBattleWin();
   if(outcome==='campaign'){
     const campaign=SESSION.campaign();
+    const beforeGrowth=deepClone(campaign);
+    /* reachedAny 사건도 첫 승리 보상에서 한 번만 드러내기 위해 현재 전투 도달은 완료 전 상태에서 제외한다. */
+    beforeGrowth.stageId=null;
     const n=curNode();
     if(n.judge&&B){ /* 특정 유닛 생존 여부 → 플래그 */
       const ju=B.units.find(u=>u.team==='P'&&u.cid===n.judge.unit);
@@ -1914,6 +2075,7 @@ function showVictory(){
       }
     }
     if(!campaign.cleared.includes(campaign.stageId)) campaign.cleared.push(campaign.stageId);
+    const growthRewards=newlyUnlockedInternals(beforeGrowth,campaign,campaign.party);
     campaign.curBattle=null;
     v2Save();
     const lootTxt=[
@@ -1926,6 +2088,7 @@ function showVictory(){
       ${journeyTrail('aftermath')}
       ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
       <p>${n.title} — 클리어!${learnMsg}${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${campaign.gold}냥</p>
+      ${growthRewardsHTML(growthRewards)}
       ${contribHtml}
       <button class="btn" onclick="v2AfterBattle()">계속</button>
     </div>`;
@@ -2564,6 +2727,9 @@ function showSettings(){
     <div class="set-sec"><div class="set-h">저장 상태</div>
       <div class="set-line"><button class="btn small" onclick="showSaveHealth()">검사·복구</button>
         <span style="color:var(--dim);font-size:11.5px">격리 ${V3STORE.quarantine?.issues?.length||0}건 · 체크포인트 ${V3STORE.checkpoints?.history?.length||0}개</span></div></div>
+    <div class="set-sec"><div class="set-h">앱 업데이트</div>
+      <div class="set-line"><button class="btn small" onclick="window.__pwa?.checkForUpdate()">새 버전 검사</button><button class="btn small" onclick="window.__pwa?.repairPwaCache()">캐시 복구</button>
+        <span style="color:var(--dim);font-size:11.5px">앱 캐시만 새로 받고 저장 기록은 유지</span></div></div>
     <div class="set-sec"><div class="set-h">조작 안내</div>
       <div style="color:var(--dim);font-size:12px;line-height:1.7">방향키/WASD 커서 · Enter/Space 선택·확정 · Esc 취소 · Tab 다음 유닛 · E 턴 종료 · I 정보 · Z 배율<br>게임패드: 방향패드 이동 · A 확정 · B 취소 · Start 턴 종료 · Y 다음 유닛</div></div>
     <div class="version-line">현재 버전 ${window.__pwa?.version||'local'} · 새 버전은 화면 아래 알림에서 적용</div>
@@ -3545,8 +3711,32 @@ export const DEBUG = {
   masteryProbe(sid='seoncheon',uses=0){ return masteryInfo(sid,uses); },
   internalProbe(cid='gj',id=null){const selected=validInternal(cid,id);return {selected,item:internalById(selected),options:internalOptions(cid),effectText:internalEffectText(selected)};},
   internalUnlockProbe(id,campaign){return internalUnlockState(internalById(id),campaign);},
+  growthRewardsProbe(before,after,roster=[]){return newlyUnlockedInternals(before,after,roster).map(({cid,id,item})=>({cid,id,name:item.name,effectText:internalEffectText(id)}));},
   enemyMartialProbe(cid='oyb',context={}){const style=enemyMartialByCid(cid);return {style,counter:enemyMartialCounter(style,context),effectText:enemyMartialEffectText(style)};},
   martialRuleProbe(context){return martialModifiers(context);},
+  bossActionProbe(action={},context={}){
+    const unit=context.unit||{uid:'boss-probe',cid:'boss',name:'강적',boss:true,x:6,y:3};
+    const targets=context.targets||[{uid:'hero-probe',cid:'hero',name:'협객',team:'P',alive:true,x:2,y:3,hp:20,maxhp:20}];
+    const plan=createBossActionPlan({unit,action,targets,bounds:context.bounds||{w:10,h:7},turn:context.turn||1,sequence:0});
+    const first=bossPlanIntent(plan),charged=advanceBossPlan(plan),ready=charged.plan?bossPlanIntent(charged.plan):null;
+    const counter=applyBossCounter(charged.plan||plan,context.reason||'간파 시험');
+    return {plan,first,charged,ready,counter:{...counter,intent:counter.plan?bossPlanIntent(counter.plan):null}};
+  },
+  installBossActions(cid,actions){
+    const unit=B?.units.find(item=>item.cid===cid&&item.team==='E');if(!unit)return null;
+    unit.boss=true;unit.wait=0;unit.bossActions=deepClone(actions||[]);unit.bossActionState={index:0,pending:null};
+    refreshEnemyIntents();renderBattle();return deepClone(enemyIntent(unit));
+  },
+  disruptBossAction(cid,reason='간파 시험'){
+    const unit=B?.units.find(item=>item.cid===cid&&item.team==='E');if(!unit)return null;
+    const result=disruptBossAction(unit,reason);refreshEnemyIntents();renderBattle();
+    return {...result,intent:deepClone(enemyIntent(unit)),state:deepClone(unit.bossActionState)};
+  },
+  async performBossAction(cid){
+    const unit=B?.units.find(item=>item.cid===cid&&item.team==='E');if(!unit)return null;
+    ensureBossActionPlan(unit);await performBossActionTurn(unit);refreshEnemyIntents();renderBattle();
+    return deepClone(unit.bossActionState);
+  },
   inspectUnit(cid){const u=B?.units.find(item=>item.cid===cid);if(!u)return false;UCARD_HIDE=false;B.inspect=u;B.tileSel={x:u.x,y:u.y};renderSide();return true;},
   battleReports(){return deepClone(BATTLE_REPORTS);},
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
