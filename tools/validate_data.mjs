@@ -10,6 +10,7 @@ import {enemyMartialCounter} from '../src/combat-rules.js';
 import {patternTiles} from '../src/boss-actions.js';
 import {newlyUnlockedPromotions,promotionStatus} from '../src/progression.js';
 import {advanceBattleEnvironment,createBattleEnvironment,environmentBlocked,resolveEnvironmentEffects} from '../src/battle-environment.js';
+import {applyBattleVariant,battleVariantConditionMatches} from '../src/campaign-battles.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -72,6 +73,30 @@ const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangmi
 const specialCounts = Object.fromEntries([...MAIN_CAMPAIGNS].map(id=>[id,0]));
 const flowStats=[];
 const environmentStats={stages:0,types:new Set()};
+const battleVariantStats={stages:0,branches:0,campaigns:new Set()};
+const declaredCampaignFlags=new Set();
+const collectFlags=node=>{
+  for(const key of Object.keys(node?.set||{}))declaredCampaignFlags.add(key);
+  for(const key of Object.keys(node?.add||{}))declaredCampaignFlags.add(key);
+  for(const option of (node?.options||[])){for(const key of Object.keys(option.set||{}))declaredCampaignFlags.add(key);for(const key of Object.keys(option.add||{}))declaredCampaignFlags.add(key);}
+};
+for(const campaign of CAMPAIGN_FILES)for(const node of Object.values(campaign.stages))collectFlags(node);
+for(const pack of Object.values(STORY_EXPANSIONS.campaigns||{}))for(const node of Object.values(pack.after||{}).flat())collectFlags(node);
+const conditionFlagKeys=condition=>{
+  if(!condition)return [];
+  return [condition.if,condition.ifNot,condition.gte?.[0],condition.eq?.[0],...(condition.all||[]).flatMap(rule=>typeof rule==='string'?[rule]:conditionFlagKeys(rule)),...(condition.any||[]).flatMap(rule=>typeof rule==='string'?[rule]:conditionFlagKeys(rule))].filter(Boolean);
+};
+const flagsSatisfying=condition=>{
+  const flags={};
+  if(!condition)return flags;
+  if(condition.if)flags[condition.if]=1;
+  if(condition.ifNot)flags[condition.ifNot]=0;
+  if(condition.gte)flags[condition.gte[0]]=condition.gte[1];
+  if(condition.eq)flags[condition.eq[0]]=condition.eq[1];
+  for(const rule of (condition.all||[])){if(typeof rule==='string')flags[rule]=1;else Object.assign(flags,flagsSatisfying(rule));}
+  const first=condition.any?.[0];if(first){if(typeof first==='string')flags[first]=1;else Object.assign(flags,flagsSatisfying(first));}
+  return flags;
+};
 for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
   if(!camp){ errs.push(`story expansion unknown campaign ${campId}`); continue; }
@@ -106,6 +131,29 @@ for (const [campId,pack] of Object.entries(BATTLE_EXPANSIONS.campaigns||{})) {
     defs.forEach((raw,i)=>{
       const layout=BATTLE_EXPANSIONS.layouts[raw.layout];
       if(!layout) errs.push(`${campId}/${raw.id}: unknown battle layout ${raw.layout}`);
+      if(raw.battleVariants){
+        battleVariantStats.stages++;battleVariantStats.campaigns.add(campId);battleVariantStats.branches+=raw.battleVariants.length;
+        const ids=new Set(),defaults=raw.battleVariants.filter(variant=>variant.default);
+        if(raw.source!=='canon'||!raw.id.startsWith('r23_'))errs.push(`${campId}/${raw.id}: R23 variant battle must be canon and use r23 id`);
+        if(raw.battleVariants.length<2||defaults.length!==1)errs.push(`${campId}/${raw.id}: battleVariants require conditional and one default branch`);
+        for(const [variantIndex,variant] of raw.battleVariants.entries()){
+          const vtag=`${campId}/${raw.id} variant${variantIndex}`;
+          if(!variant.id||ids.has(variant.id))errs.push(`${vtag}: duplicate or missing id ${variant.id}`);ids.add(variant.id);
+          if(!variant.label||!variant.desc)errs.push(`${vtag}: label/desc missing`);
+          if(!variant.default&&!variant.when)errs.push(`${vtag}: condition missing`);
+          for(const key of conditionFlagKeys(variant.when))if(!declaredCampaignFlags.has(key))errs.push(`${vtag}: undeclared campaign flag ${key}`);
+          if(variant.when&&!battleVariantConditionMatches(variant.when,flagsSatisfying(variant.when)))errs.push(`${vtag}: condition cannot be satisfied`);
+          const effects=variant.effects||{};
+          if(effects.enemyBoost!==undefined&&(effects.enemyBoost<.85||effects.enemyBoost>1.15))errs.push(`${vtag}: enemyBoost outside 0.85~1.15`);
+          if(effects.goldDelta!==undefined&&Math.abs(effects.goldDelta)>200)errs.push(`${vtag}: goldDelta exceeds 200`);
+          const added=[...(effects.addEnemies||[]),...(effects.addReinforce||[]).flatMap(wave=>wave.units||[])];
+          if(added.length>2)errs.push(`${vtag}: adds more than two enemies`);
+          const map=layout?.map||raw.map||[],blocked=(x,y)=>{const tile=map[y]?.[x];return !tile||TILE[tile].cost>=99;};
+          for(const enemy of added){if(!CHARS[enemy.cid])errs.push(`${vtag}: added enemy unknown ${enemy.cid}`);if(blocked(enemy.x,enemy.y))errs.push(`${vtag}: added enemy blocked (${enemy.x},${enemy.y})`);}
+          const resolved=applyBattleVariant({...JSON.parse(JSON.stringify(layout||{})),...JSON.parse(JSON.stringify(raw))},variant.default?{}:flagsSatisfying(variant.when));
+          if(resolved.battleVariant?.id!==variant.id)errs.push(`${vtag}: resolver selected ${resolved.battleVariant?.id||'none'}`);
+        }
+      }
       camp.stages[raw.id]={...JSON.parse(JSON.stringify(layout||{})),...JSON.parse(JSON.stringify(raw)),next:ids[i+1]||oldNext};
     });
     const pos=camp.order.indexOf(anchorId);
@@ -309,6 +357,8 @@ for(const [cid,count] of Object.entries(specialCounts)) if(count<3) errs.push(`$
 if(specialTotal<12) errs.push(`main campaigns: special battles ${specialTotal} < 12`);
 if(environmentStats.stages<4)errs.push(`R22 environment stages ${environmentStats.stages} < 4`);
 for(const type of ['fire','poison','current','moving','cliff','gate'])if(!environmentStats.types.has(type))errs.push(`R22 environment type missing ${type}`);
+if(battleVariantStats.stages!==4||battleVariantStats.branches!==8)errs.push(`R23 variant coverage ${battleVariantStats.stages} stages/${battleVariantStats.branches} branches != 4/8`);
+for(const campaignId of MAIN_CAMPAIGNS)if(!battleVariantStats.campaigns.has(campaignId))errs.push(`R23 variant battle missing ${campaignId}`);
 {
   const corePromotionIds=['gj','hy','yg','syn','jmk','jomin','sb','dy','hj','zbt','wjy','ijy'];
   const bonusKeys=new Set(['hp','str','int','def','res','spd','skl','mov','ki']);
@@ -483,6 +533,7 @@ console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 ·
 console.log(`R20.1 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 20종 검사`);
 console.log('R21 핵심 협객 승급 12종 · 원작 사건형 7종 검사');
 console.log(`R22 상호작용 전장 ${environmentStats.stages}개 · 환경 유형 ${environmentStats.types.size}종 검사`);
+console.log(`R23 본편 보강전 ${battleVariantStats.stages}개 · 선택 여파 ${battleVariantStats.branches}분기 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

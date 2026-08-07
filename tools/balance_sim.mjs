@@ -10,7 +10,7 @@ import {ENEMY_MARTIALS,enemyMartialByCid} from '../src/enemy-martials.js';
 import {patternTiles} from '../src/boss-actions.js';
 import {martialModifiers} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
-const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
+const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json'), BATTLE_EXPANSIONS=J('battle_expansions.json');
 const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
 
 const DIFFS = {
@@ -240,3 +240,19 @@ for(const [campId,updates] of Object.entries(BATTLE_UPDATES.campaigns||{}))for(c
 }
 if(environmentFlags.length)environmentFlags.forEach(flag=>console.log(`  - [환경 주의] ${flag}`));
 else console.log('  환경 직접 피해 6·확산 8칸·문 내구 3 안전 상한 통과');
+
+console.log('\n## R23 본편 보강전 — 선택 분기 압력 안전선');
+const variantFlags=[];let variantStages=0,variantBranches=0;
+for(const [campId,pack] of Object.entries(BATTLE_EXPANSIONS.campaigns||{}))for(const defs of Object.values(pack.after||{}))for(const stage of defs)if(stage.battleVariants){
+  variantStages++;
+  for(const variant of stage.battleVariants){
+    variantBranches++;const effects=variant.effects||{},added=(effects.addEnemies||[]).length+(effects.addReinforce||[]).flatMap(wave=>wave.units||[]).length;
+    console.log(`  ${campId}/${stage.id} · ${variant.label}: 적 ×${(effects.enemyBoost||1).toFixed(2)} · 추가 적 ${added} · 보상 ${effects.goldDelta>=0?'+':''}${effects.goldDelta||0}`);
+    if(effects.enemyBoost!==undefined&&(effects.enemyBoost<.85||effects.enemyBoost>1.15))variantFlags.push(`${campId}/${stage.id} 적 보정 ×${effects.enemyBoost}`);
+    if(added>2)variantFlags.push(`${campId}/${stage.id} 추가 적 ${added}`);
+    if(Math.abs(effects.goldDelta||0)>200)variantFlags.push(`${campId}/${stage.id} 보상 변동 ${effects.goldDelta}`);
+  }
+}
+if(variantStages!==4||variantBranches!==8)variantFlags.push(`분기 범위 ${variantStages}전투/${variantBranches}분기`);
+if(variantFlags.length)variantFlags.forEach(flag=>console.log(`  - [선택 압력 주의] ${flag}`));
+else console.log('  4전투·8분기 모두 적 보정 15%·추가 적 2명·보상 변동 200 안전 상한 통과');

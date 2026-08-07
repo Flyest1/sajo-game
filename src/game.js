@@ -25,6 +25,7 @@ import {
   damageEnvironmentGate, environmentBlocked, environmentEffectsAt, environmentSummary,
   resolveEnvironmentEffects,
 } from './battle-environment.js';
+import { applyBattleVariant } from './campaign-battles.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
 import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
@@ -1371,6 +1372,7 @@ function startBattle(){
     sceneSeed:strSeed(ctx.sceneKey),
     timeBase:pickBattleTime(),
     enemyKills:0,guardBreaks:0,bondStrikes:0,martialCounters:0,subdues:0,damageTaken:0,contributions:{},
+    battleVariant:ch.battleVariant?deepClone(ch.battleVariant):null,
   };
   B.environment=createBattleEnvironment(ch.environment||{},{w:B.w,h:B.h});
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
@@ -1389,6 +1391,7 @@ function startBattle(){
   startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${activeObjective().text||ch.win.text}`,true);
+  if(B.battleVariant)log(`<b>선택의 여파 · ${B.battleVariant.label}</b> — ${B.battleVariant.desc}`,true);
   const environmentLine=environmentSummary(B.environment);
   if(environmentLine.length)log(`<b>전장 환경</b> — ${environmentLine.join(' · ')}. 정보창과 지도 문양을 확인하십시오.`,true);
   const innerLine=players().filter(u=>u.internal).map(u=>`${u.name}·${u.internal.name}`).join(' / ');
@@ -3147,12 +3150,13 @@ function v2Lines(lines){
   });
 }
 function v2BattleDef(n){
+  const stage=applyBattleVariant(n,SESSION.campaignState.flags);
   const battles=SESSION.campaignState.cleared.filter(id=>{const st=CAMPAIGNS[SESSION.campaignState.camp].stages[id];return st&&st.kind==='battle';}).length;
-  return { no:battles+1, joins:[], title:n.title, map:n.map, spawns:n.spawns, enemies:n.enemies,
-    reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', defeat:n.defeat||null, pre:[], post:[],
-    treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null,
-    learn:n.learn||null, objective:n.objective||null, bossPhases:n.bossPhases||null,
-    sceneTheme:n.sceneTheme||null, environment:n.environment||null };
+  return { no:battles+1, joins:[], title:stage.title, map:stage.map, spawns:stage.spawns, enemies:stage.enemies,
+    reinforce:stage.reinforce, win:stage.win, lose:stage.lose||'수령이 쓰러지면 패배', defeat:stage.defeat||null, pre:[], post:[],
+    treasures:stage.treasures||[], goldReward:stage.goldReward||0, deploy:stage.deploy||null,
+    learn:stage.learn||null, objective:stage.objective||null, bossPhases:stage.bossPhases||null,
+    sceneTheme:stage.sceneTheme||null, environment:stage.environment||null,battleVariant:stage.battleVariant||null };
 }
 function v2Enter(){
   if(!SESSION.campaignState) return;
