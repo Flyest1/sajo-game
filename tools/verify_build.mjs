@@ -19,7 +19,7 @@ if(!errors.length){
   if(!sw.includes('index.html')||!assets.every(asset=>sw.includes(asset))) errors.push('service worker precache is missing the app shell');
   if(sw.includes('portraits/hero/')||sw.includes('portraits/thumb/')) errors.push('portrait library leaked into core precache');
   const bundle=assets.filter(asset=>asset.endsWith('.js')).map(asset=>fs.readFileSync(path.join(dist,asset),'utf8')).join('\n');
-  const expectedVersion=`R23-${(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7)}`;
+  const expectedVersion=`R24-${(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7)}`;
   if(!bundle.includes(expectedVersion)) errors.push(`bundle build identifier mismatch (expected ${expectedVersion})`);
 }
 

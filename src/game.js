@@ -456,7 +456,8 @@ function canCounter(d,a){ return d.alive && d.range.includes(dist(a,d)); }
 function fx(x,y,txt,cls){
   const layer=document.getElementById('fx'); if(!layer) return;
   const el=document.createElement('div');
-  el.className='dmgpop '+(cls||'');
+  el.className='dmgpop '+(cls||'damage');
+  el.dataset.kind=cls||'damage';el.setAttribute('aria-label',String(txt));
   el.style.left=(x*TS+TS/2)+'px'; el.style.top=(y*TS+2)+'px';
   el.textContent=txt;
   layer.appendChild(el);
@@ -1516,7 +1517,8 @@ function renderBattleAtmosphere(){
   const time=currentBattleTime();
   wrap.dataset.time=time;
   wrap.classList.toggle('reduced-fx',SETTINGS.reducedFx);
-  if(depth) depth.className=`time-${time} weather-${B.weather}`;
+  const theme=curCh().sceneTheme||'jianghu';
+  if(depth){depth.className=`time-${time} weather-${B.weather} theme-${theme}`;depth.dataset.theme=theme;}
   if(wash) wash.className=`time-${time}`;
   updateBattleParallax();
 }
@@ -2034,8 +2036,8 @@ function showDlgLine(){
     const expression=dialogueExpression(L);
     if(L.side==='L'){ DLG.lastL=L.s; DLG.exprL=expression; } else { DLG.lastR=L.s; DLG.exprR=expression; }
   }
-  pL.innerHTML=DLG.lastL?`<div class="dlg-pt L ${L.s!==DLG.lastL||L.s===null?'dimmed':''}">${ptSVG(DLG.lastL,'',DLG.exprL)}</div>`:'';
-  pR.innerHTML=DLG.lastR?`<div class="dlg-pt R ${L.s!==DLG.lastR||L.s===null?'dimmed':''}">${ptSVG(DLG.lastR,'',DLG.exprR)}</div>`:'';
+  pL.innerHTML=DLG.lastL?`<div class="dlg-pt L ${L.s!==DLG.lastL||L.s===null?'dimmed':''}" data-cid="${DLG.lastL}" data-expression="${DLG.exprL}">${ptSVG(DLG.lastL,'',DLG.exprL)}</div>`:'';
+  pR.innerHTML=DLG.lastR?`<div class="dlg-pt R ${L.s!==DLG.lastR||L.s===null?'dimmed':''}" data-cid="${DLG.lastR}" data-expression="${DLG.exprR}">${ptSVG(DLG.lastR,'',DLG.exprR)}</div>`:'';
 }
 
 /* ── 챕터 진행 ── */
@@ -3835,6 +3837,7 @@ export const DEBUG = {
     return deepClone(unit.bossActionState);
   },
   inspectUnit(cid){const u=B?.units.find(item=>item.cid===cid);if(!u)return false;UCARD_HIDE=false;B.inspect=u;B.tileSel={x:u.x,y:u.y};renderSide();return true;},
+  previewImpactFeedback(){if(!B)return [];const unit=players()[0]||foes()[0];if(!unit)return [];const samples=[['17','damage'],['31','crit'],['+12','heal'],['회피!','miss'],['강기 -4','guard'],['破 파훼!','break']];samples.forEach(([text,kind],index)=>fx(unit.x+(index%3)*.28,unit.y-Math.floor(index/3)*.35,text,kind));return samples.map(([text,kind])=>({text,kind}));},
   battleReports(){return deepClone(BATTLE_REPORTS);},
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },

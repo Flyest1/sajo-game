@@ -406,7 +406,7 @@ test('PWA build identity and recovery APIs are available without touching saves'
     cache:await window.__pwa.inspectPwaCache(),
     apis:['checkForUpdate','inspectPwaCache','repairPwaCache'].map(name=>typeof window.__pwa[name]),
   }));
-  expect(pwa.version).toMatch(/^R23-/);
+  expect(pwa.version).toMatch(/^R24-/);
   expect(pwa.title).toContain(pwa.version);
   expect(pwa.build).toBe(pwa.version);
   expect(pwa.apis).toEqual(['function','function','function']);

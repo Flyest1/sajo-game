@@ -339,6 +339,9 @@ function ridgePath(w,h,seed,base,amp,steps){
   return d+` L${w} 0 L0 0 Z`;
 }
 function sceneThemeDecor(theme,w,h){
+  if(theme==='palace') return `<g class="theme-landmark imperial-palace"><path d="M${w*.08},${h*.72} V${h*.42} H${w*.38} V${h*.72}Z M${w*.04},${h*.42} Q${w*.23},${h*.28} ${w*.42},${h*.42} L${w*.36},${h*.46} H${w*.1}Z"/><path class="palace-rail" d="M${w*.12},${h*.58} H${w*.34} M${w*.16},${h*.46} V${h*.7} M${w*.23},${h*.43} V${h*.7} M${w*.3},${h*.46} V${h*.7}"/></g>`;
+  if(theme==='coast') return `<g class="theme-landmark island-coast"><path d="M0,${h*.76} Q${w*.18},${h*.6} ${w*.34},${h*.72} T${w*.66},${h*.7} T${w},${h*.76}"/><path class="sea-lines" d="M0,${h*.8} Q${w*.24},${h*.74} ${w*.48},${h*.8} T${w},${h*.79} M${w*.5},${h*.88} Q${w*.72},${h*.82} ${w},${h*.87}"/><path class="junk-sail" d="M${w*.75},${h*.55} v${h*.19} m0,-${h*.17} q${w*.1},${h*.06} 0,${h*.13}z"/></g>`;
+  if(theme==='grassland') return `<g class="theme-landmark steppe-camp"><path d="M${w*.62},${h*.72} q${w*.08},-${h*.18} ${w*.16},0z M${w*.7},${h*.53} v${h*.2}"/><path class="horse-banners" d="M${w*.14},${h*.72} v-${h*.28} l${w*.08},${h*.04} l-${w*.08},${h*.06} M${w*.86},${h*.7} v-${h*.24} l-${w*.07},${h*.04} l${w*.07},${h*.06}"/><path class="steppe-line" d="M0,${h*.77} Q${w*.3},${h*.68} ${w*.56},${h*.76} T${w},${h*.72}"/></g>`;
   if(theme==='taohua') return `<g class="theme-landmark peach-grove"><path d="M${w*.08},${h*.8} Q${w*.12},${h*.35} ${w*.2},${h*.18} M${w*.15},${h*.48} Q${w*.08},${h*.36} ${w*.04},${h*.28} M${w*.16},${h*.42} Q${w*.25},${h*.28} ${w*.31},${h*.22}"/><circle cx="${w*.07}" cy="${h*.29}" r="5"/><circle cx="${w*.3}" cy="${h*.23}" r="6"/><path d="M0,${h*.84} Q${w*.28},${h*.76} ${w*.5},${h*.86}" class="shoreline"/></g>`;
   if(theme==='xiangyang') return `<g class="theme-landmark city-wall"><path d="M0,${h*.7} V${h*.5} H${w*.1} V${h*.43} H${w*.18} V${h*.5} H${w*.32} V${h*.44} H${w*.4} V${h*.7}Z"/><path d="M${w*.08},${h*.43} v-${h*.13} l${w*.025},-${h*.04} l${w*.025},${h*.04} v${h*.13}"/><path class="beacon-smoke" d="M${w*.105},${h*.25} q${w*.04},-${h*.08} 0,-${h*.15} q-${w*.03},-${h*.06} ${w*.02},-${h*.1}"/></g>`;
   if(theme==='guangming') return `<g class="theme-landmark bright-peak"><path d="M${w*.58},${h*.58} L${w*.72},${h*.12} L${w*.86},${h*.58}Z M${w*.67},${h*.28} L${w*.72},${h*.12} L${w*.77},${h*.29}Z"/><path class="sacred-flame" d="M${w*.14},${h*.65} q-${w*.04},-${h*.13} ${w*.02},-${h*.22} q${w*.01},${h*.1} ${w*.06},${h*.16} q-${w*.02},${h*.05} -${w*.08},${h*.06}Z"/></g>`;
@@ -346,6 +349,8 @@ function sceneThemeDecor(theme,w,h){
   if(theme==='huashan') return `<g class="theme-landmark sword-peak"><path d="M${w*.05},${h*.73} L${w*.28},${h*.08} L${w*.43},${h*.73}Z M${w*.18},${h*.38} L${w*.28},${h*.08} L${w*.34},${h*.39}Z"/><path class="cloud-line" d="M${w*.05},${h*.5} Q${w*.24},${h*.42} ${w*.42},${h*.52} T${w*.72},${h*.48}"/></g>`;
   return '';
 }
+const SCENE_THEME_NAMES={jianghu:'강호 산야',jiangnan:'강남 수향',taohua:'도화도',xiangyang:'양양 성곽',guangming:'광명정',shaolin:'소림 산문',huashan:'화산 절봉',palace:'임안 황궁',coast:'영사도 해안',grassland:'몽골·요 초원'};
+export function sceneThemeName(theme='jianghu'){return SCENE_THEME_NAMES[theme]||SCENE_THEME_NAMES.jianghu;}
 function battleSceneHTML(w,h,weather='clear',time='day',seed=1,theme='jianghu'){
   const far=ridgePath(w,h,seed,h*.23,h*.16,8);
   const mid=ridgePath(w,h,seed+3,h*.15,h*.08,12);
@@ -364,6 +369,7 @@ function battleSceneHTML(w,h,weather='clear',time='day',seed=1,theme='jianghu'){
     <div class="depth-layer depth-far"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge far-ridge" d="${far}"/><circle class="scene-orb" cx="${w*.78}" cy="${h*.11}" r="${Math.max(18,Math.min(w,h)*.07)}"/></svg></div>
     <div class="depth-layer depth-mid"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="ink-ridge mid-ridge" d="${mid}"/><g class="roofline"><path d="M${w*.05},${roofY} l${w*.08},-${h*.05} l${w*.08},${h*.05} h${w*.04} v${h*.08} h-${w*.2}z"/><path d="M${w*.76},${roofY+h*.035} l${w*.07},-${h*.045} l${w*.08},${h*.045} h${w*.035} v${h*.07} h-${w*.185}z"/></g>${landmark}</svg></div>
     <div class="depth-layer depth-near"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><g class="ink-branches">${branches}</g><g class="ink-reeds">${reeds}</g><path class="ink-wash" d="M0,${h*.92} Q${w*.24},${h*.86} ${w*.48},${h*.94} T${w},${h*.9} L${w},${h} L0,${h}Z"/></svg></div>
+    <div class="scene-signature"><b>${sceneThemeName(theme)}</b><span>江湖行旅圖</span></div>
     <div class="paper-grain"></div>
   </div>`;
 }

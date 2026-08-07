@@ -69,7 +69,7 @@ const BATTLE_EXPANSIONS = J('battle_expansions.json');
 const BATTLE_UPDATES = J('battle_updates.json');
 const MAIN_CAMPAIGNS = new Set(['sajo','sinjo','uicheon','chunryong']);
 const SPECIAL_OBJECTIVES = new Set(['survive','seize','escape','subdue','all','any']);
-const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan']);
+const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan','palace','coast','grassland']);
 const specialCounts = Object.fromEntries([...MAIN_CAMPAIGNS].map(id=>[id,0]));
 const flowStats=[];
 const environmentStats={stages:0,types:new Set()};
@@ -351,6 +351,14 @@ for(const [cid,meta] of Object.entries(PORTRAITS.characters||{})){
     if(fs.statSync(url).size>220*1024) errs.push(`portrait ${cid}: expression ${expression} exceeds 220KB`);
   }
 }
+{
+  const gfxSource=fs.readFileSync(new URL('../src/gfx.js',import.meta.url),'utf8'),styleSource=fs.readFileSync(new URL('../src/style.css',import.meta.url),'utf8');
+  if(!/portrait-vector-fallback[^`]*display:none/.test(gfxSource)||!/previousElementSibling\.style\.display='block'/.test(gfxSource))errs.push('R24 portrait fallback must stay hidden until image failure');
+  for(const [kind,symbol] of Object.entries({damage:'傷',crit:'絶',heal:'生',miss:'虛',guard:'氣',break:'破'})){
+    const marker=kind==='damage'?`.dmgpop:before{content:'${symbol}'`:`.dmgpop.${kind}:before{content:'${symbol}'`;
+    if(!styleSource.includes(marker))errs.push(`R24 impact symbol missing ${kind}/${symbol}`);
+  }
+}
 
 const specialTotal=Object.values(specialCounts).reduce((sum,n)=>sum+n,0);
 for(const [cid,count] of Object.entries(specialCounts)) if(count<3) errs.push(`${cid}: special battles ${count} < 3`);
@@ -384,6 +392,11 @@ for(const campaignId of MAIN_CAMPAIGNS)if(!battleVariantStats.campaigns.has(camp
     if(!promotionStatus(promo,{level:promo.lvl,inventory:{},campaign:after}).available)errs.push(`char ${cid}: promo remains locked after event`);
     if(newlyUnlockedPromotions(before,after,CHARS,[cid]).length!==1)errs.push(`char ${cid}: promo reward transition missing`);
   }
+}
+{
+  const r24Themes=new Set();
+  for(const pack of Object.values(BATTLE_EXPANSIONS.campaigns||{}))for(const node of Object.values(pack.after||{}).flat())if(node.id?.startsWith('r23_'))r24Themes.add(node.sceneTheme);
+  for(const theme of ['palace','coast','grassland'])if(!r24Themes.has(theme))errs.push(`R24 regional scene theme missing ${theme}`);
 }
 
 /* ── 인연(지원 대화) 검증 ── */
@@ -534,6 +547,7 @@ console.log(`R20.1 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).lengt
 console.log('R21 핵심 협객 승급 12종 · 원작 사건형 7종 검사');
 console.log(`R22 상호작용 전장 ${environmentStats.stages}개 · 환경 유형 ${environmentStats.types.size}종 검사`);
 console.log(`R23 본편 보강전 ${battleVariantStats.stages}개 · 선택 여파 ${battleVariantStats.branches}분기 검사`);
+console.log('R24 지역 수묵 테마 3종 · 전투 피드백 6문양 · 초상 단일 대체 경로 검사');
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

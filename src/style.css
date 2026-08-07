@@ -156,12 +156,17 @@ body:has(#battle.full){align-items:flex-start;}
 #battle-depth .bright-peak{fill:#697079;stroke:#292d32}.theme-guangming .sacred-flame{fill:#b54226;stroke:#e19a4b;stroke-width:2}.theme-guangming .mid-ridge{fill:#5c626b!important}
 #battle-depth .pagoda{fill:#4b3329;stroke:#201714}.theme-shaolin .scene-orb{fill:#d68b52}.theme-shaolin .ink-branches{stroke:#4a2e21}
 #battle-depth .sword-peak{fill:#53595c;stroke:#24292c}.theme-huashan .cloud-line{fill:none;stroke:#bbc0bd;stroke-width:10;opacity:.62}.theme-huashan .mid-ridge{fill:#646b6c!important}
+#battle-depth .imperial-palace{fill:#704839;stroke:#241511}.theme-palace .palace-rail{fill:none;stroke:#d4a65e;stroke-width:3}.theme-palace .scene-orb{fill:#dc8b61}.theme-palace .mid-ridge{fill:#594038!important}
+#battle-depth .island-coast{fill:#425a5b;stroke:#1e3235}.theme-coast .sea-lines{fill:none;stroke:#86aeb2;stroke-width:6;opacity:.72}.theme-coast .junk-sail{fill:#8a7255;stroke:#30291f}.theme-coast .mid-ridge{fill:#496266!important}.theme-coast .scene-orb{fill:#e0c189}
+#battle-depth .steppe-camp{fill:#63533d;stroke:#282116}.theme-grassland .horse-banners{fill:none;stroke:#77352d;stroke-width:6}.theme-grassland .steppe-line{fill:none;stroke:#807452;stroke-width:12;opacity:.68}.theme-grassland .mid-ridge{fill:#62644a!important}.theme-grassland .scene-orb{fill:#e3b56d}
 #battle-depth .ink-branches,#battle-depth .ink-reeds{fill:none;stroke:#171611;stroke-width:5;stroke-linecap:round;}
 #battle-depth .ink-reeds{stroke-width:2.2;opacity:.82;}
 #battle-depth .ink-wash{fill:#17140f;opacity:.42;}
 #battle-depth .scene-orb{fill:#f0d49a;opacity:.46;filter:blur(.4px);}
 #battle-depth .paper-grain{position:absolute;inset:0;opacity:.14;mix-blend-mode:overlay;
   background-image:repeating-linear-gradient(11deg,rgba(255,255,255,.08) 0 1px,transparent 1px 5px),repeating-linear-gradient(94deg,rgba(30,20,10,.08) 0 1px,transparent 1px 7px);}
+.scene-signature{position:absolute;right:12px;bottom:10px;display:grid;justify-items:end;padding:5px 8px;border-right:3px solid rgba(116,40,31,.72);background:linear-gradient(90deg,transparent,rgba(238,220,180,.35));color:#33281e;text-shadow:0 1px rgba(255,255,255,.28);opacity:.72;transform:rotate(-1deg)}
+.scene-signature b{font:700 12px/1.2 'Noto Serif KR','Malgun Gothic',serif;letter-spacing:.12em}.scene-signature span{font:700 8px/1.2 Georgia,serif;letter-spacing:.24em;color:#74362e}
 #battle-depth.time-dawn{filter:sepia(.18) hue-rotate(-8deg) saturate(.86) brightness(1.05);}
 #battle-depth.time-day{filter:saturate(.82) contrast(1.04);}
 #battle-depth.time-dusk{filter:sepia(.4) hue-rotate(-12deg) saturate(1.08) brightness(.9);}
@@ -174,6 +179,7 @@ body:has(#battle.full){align-items:flex-start;}
 #timewash.time-dusk{background:linear-gradient(125deg,rgba(139,60,38,.24),transparent 52%,rgba(49,39,76,.22));}
 #timewash.time-night{background:radial-gradient(circle at 72% 10%,rgba(180,200,224,.11),rgba(7,14,31,.48) 72%);box-shadow:inset 0 0 90px rgba(0,0,0,.42);}
 #mapwrap.reduced-fx #battle-depth .depth-layer{transform:none!important;transition:none;}
+#mapwrap.reduced-fx .scene-signature{opacity:.52;transform:none}
 /* 날씨 오버레이 */
 #weather{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:5;}
 #weather.w-night{background:radial-gradient(ellipse at 50% 30%, rgba(20,30,60,.12), rgba(6,10,26,.5));}
@@ -196,6 +202,8 @@ body:has(#battle.full){align-items:flex-start;}
   text-shadow:0 0 6px #c02020,0 2px 2px #000;animation:floatup .9s ease-out forwards;
   transform:translate(-50%,-50%);font-family:'Malgun Gothic',sans-serif;
 }
+.dmgpop:before{content:'傷';display:inline-grid;place-items:center;width:18px;height:18px;margin-right:3px;border:1px solid currentColor;border-radius:50%;font:800 10px/1 Georgia,serif;vertical-align:3px;background:rgba(20,14,10,.76);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.dmgpop.crit:before{content:'絶';border-radius:2px;transform:rotate(-5deg)}.dmgpop.heal:before{content:'生';border-radius:45% 55% 46% 54%}.dmgpop.miss:before{content:'虛';border-style:dashed}.dmgpop.guard:before{content:'氣';color:#9fd7ff}.dmgpop.break:before{content:'破';color:#ffd56a;border-width:2px}.dmgpop.combo:before{content:'連';color:#9fe4c3}.dmgpop.phase:before{content:'勢';color:#d6a7ed}.dmgpop.label:before{content:none}
 .dmgpop.heal{text-shadow:0 0 6px #20a040,0 2px 2px #000;}
 .dmgpop.miss{color:#ccc;text-shadow:0 2px 2px #000;font-size:18px;}
 .dmgpop.crit{font-size:30px;color:#ffd94a;}
@@ -556,7 +564,7 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
 }
 
 @media(prefers-reduced-motion:reduce){
-  #battle-depth .depth-layer,.martial-cutin *,.boss-reveal *,.ink-strike path{animation:none!important;transition:none!important;}
+  #battle-depth .depth-layer,.scene-signature,.martial-cutin *,.boss-reveal *,.ink-strike path{animation:none!important;transition:none!important;transform:none!important;}
 }
 
 /* ── 가로 모바일(낮은 높이): 상단 잘림 방지 + 대화 화면 축소 ── */

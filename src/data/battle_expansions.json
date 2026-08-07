@@ -54,7 +54,7 @@
         "id":"r23_sj_wumu_pursuit","kind":"battle","source":"canon","layout":"hall","title":"본편 보강전 五  임안 황궁의 군략도","goldReward":430,
         "enemies":[{"cid":"gwi","x":4,"y":2},{"cid":"gwi","x":13,"y":2},{"cid":"mgs","x":5,"y":5},{"cid":"mgs","x":12,"y":5},{"cid":"ogg","x":8,"y":1,"boss":true,"guard":9,"wait":2}],
         "reinforce":[{"turn":4,"msg":"완안홍렬의 퇴로를 지키던 금국 무사들이 회랑으로 밀려든다!","units":[{"cid":"gwi","x":2,"y":4}]}],
-        "win":{"type":"boss","boss":"ogg","text":"구양극을 물리치고 무목유서 단서를 확보"},"deploy":{"cap":7,"forced":["gj","hy"]},"sceneTheme":"jiangnan",
+        "win":{"type":"boss","boss":"ogg","text":"구양극을 물리치고 무목유서 단서를 확보"},"deploy":{"cap":7,"forced":["gj","hy"]},"sceneTheme":"palace",
         "battleVariants":[
           {"id":"quanzhen-intel","label":"전진교의 은혜","desc":"왕처일이 보낸 황궁 회랑 지도로 매복의 허점을 먼저 읽었다.","when":{"if":"jeonjin"},"effects":{"enemyBoost":0.94,"goldDelta":60}},
           {"id":"palace-blindspot","label":"낯선 황궁","desc":"회랑의 퇴로를 찾는 사이 금국 무사 한 패가 더 합류한다.","default":true,"effects":{"addReinforce":[{"turn":3,"msg":"측랑에 숨었던 금국 무사가 퇴로를 막는다!","units":[{"cid":"gwi","x":15,"y":7}]}]}}
@@ -88,7 +88,7 @@
       "u5_sn_father_truth": [{
         "id":"r23_sn_mongol_choice","kind":"battle","source":"canon","layout":"field","title":"본편 보강전 四  몽골 군영의 살의","goldReward":470,
         "enemies":[{"cid":"mgb","x":11,"y":2},{"cid":"mgs","x":14,"y":3},{"cid":"mgb","x":12,"y":7},{"cid":"gwd","x":10,"y":5,"wait":1},{"cid":"grb","x":15,"y":5,"boss":true,"guard":11,"wait":2}],
-        "win":{"type":"boss","boss":"grb","text":"금륜국사를 물리치고 곽정과 함께 군영 탈출"},"deploy":{"cap":7,"forced":["yg","gj"]},"sceneTheme":"xiangyang",
+        "win":{"type":"boss","boss":"grb","text":"금륜국사를 물리치고 곽정과 함께 군영 탈출"},"deploy":{"cap":7,"forced":["yg","gj"]},"sceneTheme":"grassland",
         "battleVariants":[
           {"id":"guo-trust","label":"직접 본 협의","desc":"대승관에서 곽정이 백성을 지키는 모습을 본 양과가 처음부터 등을 맡긴다.","when":{"if":"mv_gj"},"effects":{"enemyBoost":0.94,"goldDelta":50}},
           {"id":"revenge-hesitation","label":"남은 복수심","desc":"절정곡에서 돌아온 양과가 망설이는 사이 곽도의 추격대가 합류한다.","default":true,"effects":{"addReinforce":[{"turn":3,"msg":"곽도가 이끄는 몽골 추격대가 퇴로로 쇄도한다!","units":[{"cid":"mgb","x":16,"y":8},{"cid":"mgs","x":16,"y":9}]}]}}
@@ -123,7 +123,7 @@
       "u5_yt_persia": [{
         "id":"r23_yt_persian_fleet","kind":"battle","source":"canon","layout":"field","title":"본편 보강전 四  영사도의 성화진","goldReward":490,
         "enemies":[{"cid":"psa","x":11,"y":2},{"cid":"psa","x":14,"y":3},{"cid":"psa","x":12,"y":7},{"cid":"psa","x":10,"y":5},{"cid":"geumhwa","x":15,"y":5,"boss":true,"guard":10,"wait":2}],
-        "win":{"type":"survive","turns":7,"boss":"geumhwa","text":"소소의 결단까지 7턴 버티거나 자삼용왕 제압"},"deploy":{"cap":7,"forced":["jmk"]},"sceneTheme":"jianghu",
+        "win":{"type":"survive","turns":7,"boss":"geumhwa","text":"소소의 결단까지 7턴 버티거나 자삼용왕 제압"},"deploy":{"cap":7,"forced":["jmk"]},"sceneTheme":"coast",
         "battleVariants":[
           {"id":"ming-formation","label":"명교의 성화진","desc":"광명정을 함께 지킨 인연으로 중원 명교가 총교 사자의 진법을 빠르게 해독한다.","when":{"if":"mv_ming"},"effects":{"enemyBoost":0.94,"goldDelta":60}},
           {"id":"six-sect-delay","label":"늦은 합류","desc":"육대문파와 움직였던 여파로 명교 지원대가 늦어 총교의 두 번째 파도를 홀로 막는다.","default":true,"effects":{"addReinforce":[{"turn":4,"msg":"페르시아 총교의 증원선에서 사자 둘이 상륙한다!","units":[{"cid":"psa","x":16,"y":7},{"cid":"psa","x":16,"y":9}]}]}}
@@ -186,7 +186,7 @@
       "u5_tl_liao": [{
         "id":"r23_tl_liao_rebellion","kind":"battle","source":"canon","layout":"field","title":"소봉편 보강전 三  요나라 사냥터의 반란","goldReward":450,
         "enemies":[{"cid":"mgs","x":11,"y":2},{"cid":"mgs","x":14,"y":3},{"cid":"mgb","x":12,"y":7},{"cid":"mgb","x":10,"y":5},{"cid":"gunung","x":15,"y":5,"boss":true,"guard":9,"wait":2}],
-        "win":{"type":"rout","text":"반란군을 격퇴하고 야율홍기 구출"},"deploy":{"cap":5,"forced":["sb"]},"sceneTheme":"jianghu",
+        "win":{"type":"rout","text":"반란군을 격퇴하고 야율홍기 구출"},"deploy":{"cap":5,"forced":["sb"]},"sceneTheme":"grassland",
         "battleVariants":[
           {"id":"mercy-intel","label":"취현장의 생환자","desc":"살수를 거둔 소봉에게 목숨을 빚진 강호인이 반란군의 우회로를 미리 알렸다.","when":{"if":"inui"},"effects":{"enemyBoost":0.94,"goldDelta":60}},
           {"id":"unseen-flank","label":"보이지 않은 우회대","desc":"사냥터 바깥의 우회대를 놓쳐 반란군 기병이 뒤늦게 전장에 합류한다.","default":true,"effects":{"addReinforce":[{"turn":3,"msg":"반란군의 우회 기병이 사냥터 남쪽을 덮친다!","units":[{"cid":"mgs","x":16,"y":8},{"cid":"mgb","x":16,"y":9}]}]}}
