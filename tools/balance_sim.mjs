@@ -227,3 +227,16 @@ for(const [cid,style] of Object.entries(ENEMY_MARTIALS))for(const action of styl
 }
 if(actionFlags.length)actionFlags.forEach(flag=>console.log(`  - [전조 주의] ${flag}`));
 else console.log('  20종 모두 범위 18칸·위력 ×1.20·밀집 4인 재사용 안전선 통과');
+
+console.log('\n## R22 상호작용 전장 — 턴 압력 안전선');
+const environmentFlags=[];
+for(const [campId,updates] of Object.entries(BATTLE_UPDATES.campaigns||{}))for(const [stageId,stage] of Object.entries(updates))if(stage.environment){
+  const hazards=stage.environment.hazards||[],peak=Math.max(0,...hazards.map(hazard=>(hazard.damage||0)+(hazard.poison?2:0)));
+  const labels=hazards.map(hazard=>hazard.label).concat(stage.environment.cliffs?.length?'절벽':'',stage.environment.gates?.length?'파괴문':'').filter(Boolean);
+  console.log(`  ${campId}/${stageId} ${stage.environment.name}: ${labels.join(' · ')} · 단일 턴 직접 압력 최대 ${peak}`);
+  if(peak>6)environmentFlags.push(`${campId}/${stageId} 단일 턴 압력 ${peak}`);
+  if(hazards.some(hazard=>(hazard.maxTiles||0)>8))environmentFlags.push(`${campId}/${stageId} 확산 범위 과다`);
+  if((stage.environment.gates||[]).some(gate=>(gate.hp||0)>3))environmentFlags.push(`${campId}/${stageId} 문 내구 과다`);
+}
+if(environmentFlags.length)environmentFlags.forEach(flag=>console.log(`  - [환경 주의] ${flag}`));
+else console.log('  환경 직접 피해 6·확산 8칸·문 내구 3 안전 상한 통과');

@@ -20,6 +20,11 @@ import {
 import {
   newlyUnlockedPromotions, promotionRequirementParts, promotionStatus,
 } from './progression.js';
+import {
+  adjacentEnvironmentGates, advanceBattleEnvironment, createBattleEnvironment,
+  damageEnvironmentGate, environmentBlocked, environmentEffectsAt, environmentSummary,
+  resolveEnvironmentEffects,
+} from './battle-environment.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
 import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
@@ -372,6 +377,8 @@ const tileChar = (x,y) => B.map[y][x];
 const unitAt = (x,y) => B.units.find(u=>u.alive && u.x===x && u.y===y);
 const players = () => B.units.filter(u=>u.team==='P'&&u.alive);
 const foes    = () => B.units.filter(u=>u.team==='E'&&u.alive);
+const environmentPassable = (x,y) => inb(x,y)&&TILE[tileChar(x,y)].cost<99;
+const environmentDangerAt = (x,y) => environmentEffectsAt(B.environment,x,y).reduce((sum,item)=>sum+(item.damage||0)+(item.kiDrain||0)+(item.poison||0),0);
 
 function moveRange(u){
   const res=new Map(); res.set(u.x+','+u.y,0);
@@ -383,6 +390,7 @@ function moveRange(u){
     for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
       const nx=x+d[0], ny=y+d[1];
       if(!inb(nx,ny)) continue;
+      if(environmentBlocked(B.environment,nx,ny)) continue;
       let cost=TILE[tileChar(nx,ny)].cost;
       if(cost>=99) continue;
       if(u.type==='경'&&cost>1) cost-=1; /* 경공 특성: 험지 이동비용 -1 */
@@ -395,7 +403,7 @@ function moveRange(u){
   }
   return res;
 }
-function stoppable(u,x,y){ const o=unitAt(x,y); return !o || o===u; }
+function stoppable(u,x,y){ const o=unitAt(x,y); return !environmentBlocked(B.environment,x,y)&&(!o || o===u); }
 
 /* ── 전투 계산 ── */
 function adjAllies(u){
@@ -939,7 +947,7 @@ function pickAttackPos(u,target,mr){
     if(!stoppable(u,x,y)) continue;
     const dd=Math.abs(target.x-x)+Math.abs(target.y-y);
     if(!u.range.includes(dd)) continue;
-    const sc=TILE[tileChar(x,y)].avoid + TILE[tileChar(x,y)].def*10 - mr.get(k)*0.1;
+    const sc=TILE[tileChar(x,y)].avoid + TILE[tileChar(x,y)].def*10 - environmentDangerAt(x,y)*8 - mr.get(k)*0.1;
     if(!best||sc>best.sc) best={x,y,sc};
   }
   return best;
@@ -991,7 +999,7 @@ function chooseEnemyAction(u,{allowBoss=true}={}){
     unit:u,players:players(),moveTiles:mr,ranges:u.range,
     canStop:(x,y)=>stoppable(u,x,y),
     selectSkill:()=>u.skills.find(s=>!SKILLS[s].heal&&u.ki>=SKILLS[s].cost)||null,
-    terrainAt:(x,y)=>TILE[tileChar(x,y)].avoid,
+    terrainAt:(x,y)=>TILE[tileChar(x,y)].avoid-environmentDangerAt(x,y)*8,
     previewStrike:(attacker,target,sid,position)=>{
       const preview=calcStrike(attacker,target,sid),dd=Math.abs(target.x-position.x)+Math.abs(target.y-position.y);
       if(target.range.includes(dd))preview.retaliation=calcStrike(target,attacker,null);
@@ -1091,6 +1099,7 @@ function openMenu(){
   if(!u||!u.alive||u.acted||B.phase!=='P') return;
   const campaign=SESSION.campaign();
   const enemiesNear=foes().filter(e=>u.range.includes(dist(u,e)));
+  const gatesNear=adjacentEnvironmentGates(B.environment,u);
   let html='';
   if(enemiesNear.length) html+=`<button class="btn" onclick="menuAct('attack')">공격</button>`;
   u.skills.forEach((sid,i)=>{
@@ -1112,6 +1121,7 @@ function openMenu(){
   if(campaign){
     html+=`<button class="btn" onclick="menuAct('equip')">장비</button>`;
   }
+  for(const gate of gatesNear)html+=`<button class="btn" onclick="menuAct('gate','${gate.id}')">${gate.label} 파괴 <span style="color:#d9b36c;font-size:12px">${gate.hp}/${gate.maxHp}</span></button>`;
   html+=`<button class="btn" onclick="menuAct('wait')">대기</button>`;
   html+=`<button class="btn" onclick="menuAct('cancel')">취소</button>`;
   const m=document.createElement('div');
@@ -1130,6 +1140,7 @@ function menuAct(act,idx){
   const u=B.sel;
   if(act==='cancel'){ clearSel(); return; }
   if(act==='wait'){ hideMenu(); finishUnit(u); return; }
+  if(act==='gate'){ breakEnvironmentGate(u,idx); return; }
   hideMenu();
   if(act==='tool'){ openToolMenu(u); return; }
   if(act==='equip'){ openEquipModal(u); return; }
@@ -1137,6 +1148,16 @@ function menuAct(act,idx){
   if(act==='skill'){ B.mode='target-skill'; B.skillIdx=idx; B.targets=foes().filter(e=>u.range.includes(dist(u,e))); }
   if(act==='heal'){ B.mode='target-heal'; B.skillIdx=idx; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
   renderBattle();
+}
+
+function breakEnvironmentGate(u,gateId){
+  hideMenu();
+  if(!u||!adjacentEnvironmentGates(B.environment,u).some(gate=>gate.id===gateId))return;
+  const result=damageEnvironmentGate(B.environment,gateId,1);if(!result.changed)return;
+  B.environment=result.environment;SFX.play(result.destroyed?'crit':'hit');
+  fx(result.gate.x,result.gate.y,result.destroyed?'문 파괴!':`내구 ${result.gate.hp}`,'break');
+  log(`${u.name}이(가) <b>${result.gate.label}</b>을(를) 공격했다.${result.destroyed?' 통로가 열렸다.':''}`,true);
+  refreshEnemyIntents();finishUnit(u);
 }
 
 /* ── 전투 예측 ── */
@@ -1185,6 +1206,26 @@ function confirmAttack(){
   combat(p.a,p.d,p.skillId).then(()=>{ if(!B.over) finishUnit(p.a); });
 }
 
+function applyBattleEnvironmentRound(){
+  if(!B?.environment)return [];
+  B.environment=advanceBattleEnvironment(B.environment,{passable:environmentPassable});
+  const effects=resolveEnvironmentEffects(B.environment,B.units,{passable:environmentPassable});
+  for(const effect of effects){
+    const unit=B.units.find(item=>item.uid===effect.uid&&item.alive);if(!unit)continue;
+    if(effect.pushTo){const ox=unit.x,oy=unit.y;unit.x=effect.pushTo.x;unit.y=effect.pushTo.y;fx(unit.x,unit.y,'밀려남','miss');log(`${effect.label}에 휩쓸려 ${unit.name}이(가) 이동했다.`);}
+    if(effect.kiDrain){const drained=Math.min(unit.ki,effect.kiDrain);unit.ki-=drained;if(drained)fx(unit.x,unit.y,`기-${drained}`,'miss');}
+    if(effect.poison&&!unit.poison){unit.poison=effect.poison;fx(unit.x,unit.y,'중독!','label');}
+    if(effect.damage){
+      const before=unit.hp;unit.hp=Math.max(0,unit.hp-effect.damage);const taken=before-unit.hp;
+      const meter=contribution(unit);if(meter)meter.taken+=taken;if(unit.team==='P')B.damageTaken=(B.damageTaken||0)+taken;
+      fx(unit.x,unit.y,`${effect.label} ${taken}`,'miss');
+      if(unit.hp<=0){unit.alive=false;if(unit.team==='P')B.allyLost=true;log(`<b>${unit.name}이(가) ${effect.label} 때문에 전장에서 이탈했다.</b>`,true);}
+    }
+  }
+  if(effects.length)log(`<b>전장 변화</b> — ${effects.map(effect=>effect.label).filter((v,i,a)=>a.indexOf(v)===i).join(' · ')}`,true);
+  return effects;
+}
+
 /* ── 턴 진행 ── */
 async function startPlayerPhase(first){
   if(B.over) return;
@@ -1220,6 +1261,7 @@ async function startPlayerPhase(first){
     }
   }
   poisonTick('P');
+  if(!first){applyBattleEnvironmentRound();if(checkEnd())return;}
   refreshEnemyIntents();
   renderBattle();
   await banner(`아군 페이즈 — ${B.turn}턴`);
@@ -1330,6 +1372,7 @@ function startBattle(){
     timeBase:pickBattleTime(),
     enemyKills:0,guardBreaks:0,bondStrikes:0,martialCounters:0,subdues:0,damageTaken:0,contributions:{},
   };
+  B.environment=createBattleEnvironment(ch.environment||{},{w:B.w,h:B.h});
   const cap=Math.min(ch.spawns.length,(ch.deploy&&ch.deploy.cap)||12);
   const lineup=(G.deploy&&G.deploy.length?G.deploy:G.party).filter(cid=>G.roster[cid]).slice(0,cap);
   lineup.forEach((cid,i)=>{
@@ -1346,6 +1389,8 @@ function startBattle(){
   startBGM('battle');
   renderScreenBattle();
   log(`<b>${ch.title}</b> — 승리 조건: ${activeObjective().text||ch.win.text}`,true);
+  const environmentLine=environmentSummary(B.environment);
+  if(environmentLine.length)log(`<b>전장 환경</b> — ${environmentLine.join(' · ')}. 정보창과 지도 문양을 확인하십시오.`,true);
   const innerLine=players().filter(u=>u.internal).map(u=>`${u.name}·${u.internal.name}`).join(' / ');
   if(innerLine)log(`<b>심법 편성</b> — ${innerLine}`,true);
   const enemyStyles=foes().filter(u=>u.martial).map(u=>`${u.name}·${u.martial.name}`).filter((v,i,a)=>a.indexOf(v)===i).join(' / ');
@@ -1584,6 +1629,25 @@ function renderMinimap(){
   mm.innerHTML=s;
 }
 
+function environmentOverlaySVG(){
+  if(!B?.environment)return '';
+  let s='';
+  for(const hazard of B.environment.hazards)for(const tile of hazard.tiles){
+    const px=tile.x*TS,py=tile.y*TS,label=escHtml(hazard.label);
+    const mark=hazard.type==='fire'
+      ?`<path d="M${px+15} ${py+40} C${px+8} ${py+29},${px+22} ${py+24},${px+20} ${py+12} C${px+35} ${py+22},${px+39} ${py+31},${px+31} ${py+40}Z"/>`
+      :hazard.type==='poison'
+        ?`<circle cx="${px+18}" cy="${py+29}" r="7"/><circle cx="${px+31}" cy="${py+22}" r="9"/><circle cx="${px+37}" cy="${py+34}" r="6"/>`
+        :hazard.type==='current'
+          ?`<path d="M${px+11} ${py+26} H${px+39} M${px+31} ${py+18} L${px+39} ${py+26} L${px+31} ${py+34}"/>`
+          :`<path d="M${px+26} ${py+8} L${px+41} ${py+38} H${px+11}Z"/><path d="M${px+26} ${py+16} V${py+29} M${px+26} ${py+34} V${py+35}"/>`;
+    s+=`<g class="environment-tile env-${hazard.type}" role="img" aria-label="${label}"><title>${label}</title><rect x="${px+3}" y="${py+3}" width="${TS-6}" height="${TS-6}" rx="6"/>${mark}</g>`;
+  }
+  for(const cliff of B.environment.cliffs){const px=cliff.x*TS,py=cliff.y*TS;s+=`<g class="environment-tile env-cliff" role="img" aria-label="절벽 · 진입 불가"><title>절벽 · 진입 불가</title><path d="M${px+7} ${py+12} L${px+20} ${py+42} L${px+27} ${py+23} L${px+36} ${py+42} L${px+45} ${py+10}"/></g>`;}
+  for(const gate of B.environment.gates.filter(item=>item.hp>0)){const px=gate.x*TS,py=gate.y*TS;s+=`<g class="environment-gate" role="img" aria-label="${escHtml(gate.label)} 내구 ${gate.hp}/${gate.maxHp}"><title>${escHtml(gate.label)} · 인접 행동으로 파괴 · 내구 ${gate.hp}/${gate.maxHp}</title><rect x="${px+8}" y="${py+5}" width="${TS-16}" height="${TS-10}" rx="3"/><path d="M${px+14} ${py+8} V${py+43} M${px+26} ${py+8} V${py+43} M${px+38} ${py+8} V${py+43}"/><text x="${px+TS/2}" y="${py+TS-8}">${gate.hp}</text></g>`;}
+  return s;
+}
+
 /* ── 전투 렌더 (svg + 사이드) ── */
 function renderBattle(light){
   if(!B) return;
@@ -1591,6 +1655,7 @@ function renderBattle(light){
   if(!svg) return;
   let s='';
   for(let y=0;y<B.h;y++) for(let x=0;x<B.w;x++) s+=tileSVG(tileChar(x,y),x,y);
+  s+=environmentOverlaySVG();
 
   /* 보물 궤짝 */
   for(const t of (B.treasures||[])){
@@ -1712,7 +1777,9 @@ function bossPatternHTML(u){
 function terrLine(){
   if(!B.tileSel) return '';
   const T=TILE[tileChar(B.tileSel.x,B.tileSel.y)];
-  return `지형: <b>${T.name}</b> — 회피 +${T.avoid} · 방어 +${T.def}${T.heal?' · 매턴 HP 회복':''}`;
+  const effects=environmentEffectsAt(B.environment,B.tileSel.x,B.tileSel.y).map(item=>item.label);
+  const blocked=environmentBlocked(B.environment,B.tileSel.x,B.tileSel.y);
+  return `지형: <b>${T.name}</b> — 회피 +${T.avoid} · 방어 +${T.def}${T.heal?' · 매턴 HP 회복':''}${blocked?' · 진입 불가':''}${effects.length?` · 환경: <b>${effects.join('·')}</b>`:''}`;
 }
 function ucardHTML(u){
   const hpPct=Math.round(u.hp/u.maxhp*100), kiPct=Math.round(u.ki/u.maxki*100);
@@ -1746,12 +1813,14 @@ function ucardHTML(u){
 function infoHTML(ch){
   const objective=activeObjective(), progress=objectiveProgress(objective);
   const progressTxt=progress?`<div class="row"><span>목표 진행</span><b>${progress}</b></div>`:'';
+  const environmentTxt=environmentSummary(B.environment);
   return `
   <button class="pop-x" onclick="toggleInfoPop()">×</button>
   <div class="ch-t">${ch.title}</div>
   <div class="row"><span>턴</span><b>${B.turn}</b></div>
   <div class="row"><span>페이즈</span><b>${B.phase==='P'?'아군':'적군'}</b></div>
   <div class="row"><span>승리</span><b>${objective.text||ch.win.text}</b></div>
+  ${environmentTxt.length?`<div class="row"><span>전장 환경</span><b>${environmentTxt.join(' · ')}</b></div>`:''}
   ${progressTxt}
   <div class="row"><span>패배</span><b>${ch.lose}</b></div>
   <div class="row"><span>병력</span><b>아군 ${players().length} · 적 ${foes().length}</b></div>
@@ -3083,7 +3152,7 @@ function v2BattleDef(n){
     reinforce:n.reinforce, win:n.win, lose:n.lose||'수령이 쓰러지면 패배', defeat:n.defeat||null, pre:[], post:[],
     treasures:n.treasures||[], goldReward:n.goldReward||0, deploy:n.deploy||null,
     learn:n.learn||null, objective:n.objective||null, bossPhases:n.bossPhases||null,
-    sceneTheme:n.sceneTheme||null };
+    sceneTheme:n.sceneTheme||null, environment:n.environment||null };
 }
 function v2Enter(){
   if(!SESSION.campaignState) return;
@@ -3732,6 +3801,10 @@ export const DEBUG = {
   growthRewardsProbe(before,after,roster=[]){return newlyUnlockedInternals(before,after,roster).map(({cid,id,item})=>({cid,id,name:item.name,effectText:internalEffectText(id)}));},
   promotionStatusProbe(cid,campaign,level=99,inventory={}){const promo=CHARS[cid]?.promo,status=promotionStatus(promo,{level,inventory,campaign});return {status,requirements:promotionRequirementParts(promo,{itemName:promo?.item?ITEMS[promo.item]?.name:'',status}),text:promo?promotionEffectText(promo):''};},
   promotionRewardsProbe(before,after,roster=[]){return newlyUnlockedPromotions(before,after,CHARS,roster).map(({cid,promo})=>({cid,cls:promo.cls,text:promotionEffectText(promo)}));},
+  environmentProbe(definition,bounds={w:10,h:8},units=[]){const initial=createBattleEnvironment(definition,bounds),next=advanceBattleEnvironment(initial,{passable:(x,y)=>x>=0&&y>=0&&x<bounds.w&&y<bounds.h});return {initial,next,effects:resolveEnvironmentEffects(next,units,{passable:(x,y)=>x>=0&&y>=0&&x<bounds.w&&y<bounds.h}),summary:environmentSummary(next)};},
+  installEnvironment(definition){if(!B)return null;B.environment=createBattleEnvironment(definition,{w:B.w,h:B.h});refreshEnemyIntents();renderBattle();return deepClone(B.environment);},
+  advanceEnvironment(){if(!B)return null;const effects=applyBattleEnvironmentRound();refreshEnemyIntents();renderBattle();return {effects:deepClone(effects),environment:deepClone(B.environment)};},
+  damageEnvironmentGate(gateId,amount=1){if(!B)return null;const result=damageEnvironmentGate(B.environment,gateId,amount);B.environment=result.environment;refreshEnemyIntents();renderBattle();return deepClone(result);},
   enemyMartialProbe(cid='oyb',context={}){const style=enemyMartialByCid(cid);return {style,counter:enemyMartialCounter(style,context),effectText:enemyMartialEffectText(style)};},
   martialRuleProbe(context){return martialModifiers(context);},
   bossActionProbe(action={},context={}){

@@ -1,6 +1,14 @@
 {
   "campaigns": {
     "sajo": {
+      "s8": {
+        "environment": {
+          "name": "난파선 갑판의 급류",
+          "hazards": [
+            { "id": "deck-current", "type": "current", "label": "우현으로 쏠리는 급류", "tiles": [[5,4],[6,4],[7,4]], "push": [1,0] }
+          ]
+        }
+      },
       "s6": {
         "sceneTheme": "jiangnan",
         "objective": {
@@ -24,6 +32,15 @@
     "sinjo": {
       "s10": {
         "sceneTheme": "xiangyang",
+        "environment": {
+          "name": "불타는 양양 성루",
+          "hazards": [
+            { "id": "xiangyang-fire", "type": "fire", "label": "번지는 성루 불길", "tiles": [[6,5]], "damage": 3, "spreadEvery": 2, "maxTiles": 4 }
+          ],
+          "gates": [
+            { "id": "xiangyang-gate", "x": 8, "y": 5, "hp": 2, "label": "불붙은 성문" }
+          ]
+        },
         "objective": {
           "type": "all",
           "text": "곽도를 격파하고 성루의 곽양을 구출",
@@ -56,10 +73,25 @@
         ]
       },
       "s6a": {
-        "sceneTheme": "guangming"
+        "sceneTheme": "guangming",
+        "environment": {
+          "name": "광명정 지하 독로",
+          "hazards": [
+            { "id": "tunnel-poison", "type": "poison", "label": "밀도에 고인 독무", "tiles": [[7,7],[8,7],[9,7]], "damage": 1, "kiDrain": 2, "poison": 2 }
+          ],
+          "cliffs": [[6,5],[11,5]]
+        }
       }
     },
     "chunryong": {
+      "hj3": {
+        "environment": {
+          "name": "서하 빙고의 낙빙",
+          "hazards": [
+            { "id": "ice-fall", "type": "moving", "label": "천장에서 떨어지는 얼음", "path": [[8,4],[9,4],[10,4],[9,4]], "damage": 4 }
+          ]
+        }
+      },
       "t6": {
         "sceneTheme": "shaolin",
         "objective": {

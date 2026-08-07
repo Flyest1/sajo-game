@@ -12,7 +12,7 @@
     "validate": "node tools/validate_data.mjs",
     "balance": "node tools/balance_sim.mjs",
     "test": "playwright test",
-    "test:smoke": "playwright test tests/smoke.spec.js tests/r20-engine.spec.js tests/r21-progression.spec.js"
+    "test:smoke": "playwright test tests/smoke.spec.js tests/r20-engine.spec.js tests/r21-progression.spec.js tests/r22-environment.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

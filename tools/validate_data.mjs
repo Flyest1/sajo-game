@@ -9,6 +9,7 @@ import {ENEMY_MARTIALS,enemyMartialEffectText} from '../src/enemy-martials.js';
 import {enemyMartialCounter} from '../src/combat-rules.js';
 import {patternTiles} from '../src/boss-actions.js';
 import {newlyUnlockedPromotions,promotionStatus} from '../src/progression.js';
+import {advanceBattleEnvironment,createBattleEnvironment,environmentBlocked,resolveEnvironmentEffects} from '../src/battle-environment.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -70,6 +71,7 @@ const SPECIAL_OBJECTIVES = new Set(['survive','seize','escape','subdue','all','a
 const SCENE_THEMES = new Set(['jianghu','jiangnan','taohua','xiangyang','guangming','shaolin','huashan']);
 const specialCounts = Object.fromEntries([...MAIN_CAMPAIGNS].map(id=>[id,0]));
 const flowStats=[];
+const environmentStats={stages:0,types:new Set()};
 for (const [campId,pack] of Object.entries(STORY_EXPANSIONS.campaigns||{})) {
   const camp=CAMPAIGN_FILES.find(c=>c.id===campId);
   if(!camp){ errs.push(`story expansion unknown campaign ${campId}`); continue; }
@@ -208,6 +210,38 @@ for (const CAMP of CAMPAIGN_FILES) {
         });
       };
       validateObjective(objective);
+      if(n.environment){
+        environmentStats.stages++;
+        const environment=createBattleEnvironment(n.environment,{w:W,h:H});
+        const rawHazards=n.environment.hazards||[],rawCliffs=n.environment.cliffs||[],rawGates=n.environment.gates||[];
+        if(environment.hazards.length!==rawHazards.length||environment.cliffs.length!==rawCliffs.length||environment.gates.length!==rawGates.length)errs.push(`${tag} environment point outside map`);
+        const ids=new Set();
+        for(const hazard of environment.hazards){
+          environmentStats.types.add(hazard.type);if(ids.has(hazard.id))errs.push(`${tag} duplicate environment id ${hazard.id}`);ids.add(hazard.id);
+          const raw=rawHazards.find(item=>(item.id||'')===hazard.id)||{};
+          const rawPoints=hazard.type==='moving'?(raw.path||[]):(raw.tiles||[]);
+          const kept=hazard.type==='moving'?hazard.path:hazard.tiles;
+          if(kept.length!==rawPoints.length||!kept.length)errs.push(`${tag} ${hazard.id} invalid tiles/path`);
+          for(const point of kept)if(blocked(point.x,point.y))errs.push(`${tag} ${hazard.id} on blocked base tile (${point.x},${point.y})`);
+          if(hazard.damage>8||hazard.kiDrain>5||hazard.poison>4||hazard.maxTiles>18)errs.push(`${tag} ${hazard.id} exceeds environment safety cap`);
+          if(hazard.type==='moving'&&hazard.path.some((p,i)=>i&&Math.abs(p.x-hazard.path[i-1].x)+Math.abs(p.y-hazard.path[i-1].y)>1))errs.push(`${tag} ${hazard.id} moving path jumps`);
+        }
+        if(environment.cliffs.length)environmentStats.types.add('cliff');if(environment.gates.length)environmentStats.types.add('gate');
+        const reserved=new Set([...n.spawns,...n.enemies.map(enemy=>[enemy.x,enemy.y])].map(([x,y])=>`${x},${y}`));
+        for(const point of environment.cliffs)if(blocked(point.x,point.y)||reserved.has(`${point.x},${point.y}`))errs.push(`${tag} cliff blocks reserved tile (${point.x},${point.y})`);
+        for(const gate of environment.gates)if(blocked(gate.x,gate.y)||reserved.has(`${gate.x},${gate.y}`))errs.push(`${tag} gate blocks reserved tile (${gate.x},${gate.y})`);
+        const deterministicA=advanceBattleEnvironment(environment,{passable:(x,y)=>!blocked(x,y)}),deterministicB=advanceBattleEnvironment(environment,{passable:(x,y)=>!blocked(x,y)});
+        if(JSON.stringify(deterministicA)!==JSON.stringify(deterministicB))errs.push(`${tag} environment advance is not deterministic`);
+        const probeUnits=[{uid:'P',team:'P',alive:true,x:0,y:0},{uid:'E',team:'E',alive:true,x:0,y:0}];
+        const effects=resolveEnvironmentEffects(environment,probeUnits,{passable:(x,y)=>!blocked(x,y)});
+        if(effects.length===1)errs.push(`${tag} environment discriminates by team`);
+        const cliffKeys=new Set(environment.cliffs.map(point=>`${point.x},${point.y}`)),seen=new Set(n.spawns.map(([x,y])=>`${x},${y}`)),queue=n.spawns.map(([x,y])=>[x,y]);
+        while(queue.length){const [x,y]=queue.shift();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=`${nx},${ny}`;if(!seen.has(k)&&!cliffKeys.has(k)&&!blocked(nx,ny)){seen.add(k);queue.push([nx,ny]);}}}
+        const goalIds=[objective.boss,objective.target,...(objective.objectives||[]).flatMap(item=>[item.boss,item.target])].filter(Boolean),goalUnits=n.enemies.filter(enemy=>goalIds.includes(enemy.cid));
+        for(const enemy of goalUnits)if(![[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen.has(`${enemy.x+dx},${enemy.y+dy}`)))errs.push(`${tag} environment blocks objective target ${enemy.cid}`);
+        const objectiveTiles=[...(objective.tiles||objective.zones||[]),...(objective.objectives||[]).flatMap(item=>item.tiles||item.zones||[])];
+        for(const tile of objectiveTiles){const [x,y]=Array.isArray(tile)?tile:[tile.x,tile.y];if(!seen.has(`${x},${y}`))errs.push(`${tag} environment blocks objective tile (${x},${y})`);}
+      }
       (n.bossPhases||[]).forEach((p,i)=>{
         if(!(p.at>0&&p.at<1)) errs.push(`${tag} bossPhase${i}.at invalid`);
         if(p.target&&!n.enemies.some(e=>e.cid===p.target&&e.boss)) errs.push(`${tag} bossPhase${i} target ${p.target} is not a deployed boss`);
@@ -273,6 +307,8 @@ for(const [cid,meta] of Object.entries(PORTRAITS.characters||{})){
 const specialTotal=Object.values(specialCounts).reduce((sum,n)=>sum+n,0);
 for(const [cid,count] of Object.entries(specialCounts)) if(count<3) errs.push(`${cid}: special battles ${count} < 3`);
 if(specialTotal<12) errs.push(`main campaigns: special battles ${specialTotal} < 12`);
+if(environmentStats.stages<4)errs.push(`R22 environment stages ${environmentStats.stages} < 4`);
+for(const type of ['fire','poison','current','moving','cliff','gate'])if(!environmentStats.types.has(type))errs.push(`R22 environment type missing ${type}`);
 {
   const corePromotionIds=['gj','hy','yg','syn','jmk','jomin','sb','dy','hj','zbt','wjy','ijy'];
   const bonusKeys=new Set(['hp','str','int','def','res','spd','skl','mov','ki']);
@@ -446,6 +482,7 @@ console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 �
 console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
 console.log(`R20.1 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 20종 검사`);
 console.log('R21 핵심 협객 승급 12종 · 원작 사건형 7종 검사');
+console.log(`R22 상호작용 전장 ${environmentStats.stages}개 · 환경 유형 ${environmentStats.types.size}종 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
