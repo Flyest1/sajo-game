@@ -17,6 +17,9 @@ import {
   INTERNALS, HERO_INTERNALS, internalOptions, defaultInternal, internalById, validInternal, internalEffectText,
   internalUnlockState, internalUnlocked, newlyUnlockedInternals,
 } from './internals.js';
+import {
+  newlyUnlockedPromotions, promotionRequirementParts, promotionStatus,
+} from './progression.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
 import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
@@ -2047,9 +2050,11 @@ function sealSVG(ch,color){
     <text x="32" y="45" text-anchor="middle" font-size="34" font-weight="900" fill="${color}" transform="rotate(-5 32 32)">${ch}</text>
   </svg>`;
 }
-function growthRewardsHTML(rewards=[]){
-  if(!rewards.length)return '';
-  return `<section class="growth-rewards"><div class="growth-rewards-head"><span>武學開眼</span><div><b>사건 성장</b><small>이번 이야기에서 새 무학이 열렸습니다</small></div></div><div class="growth-rewards-grid">${rewards.map(({cid,id,item})=>`<article><div class="growth-portrait">${ptSVG(cid,'','awaken')}</div><div><small>${CHARS[cid]?.name||cid} · ${item.kind} · ${item.role}</small><h3>${item.name}</h3><p>${internalEffectText(id)}</p><em>${item.unlock?.label||'원작 사건 완료'}</em></div></article>`).join('')}</div></section>`;
+function growthRewardsHTML(rewards=[],promotions=[]){
+  if(!rewards.length&&!promotions.length)return '';
+  const martialCards=rewards.map(({cid,id,item})=>`<article><div class="growth-portrait">${ptSVG(cid,'','awaken')}</div><div><small>${CHARS[cid]?.name||cid} · ${item.kind} · ${item.role}</small><h3>${item.name}</h3><p>${internalEffectText(id)}</p><em>${item.unlock?.label||'원작 사건 완료'}</em></div></article>`);
+  const promotionCards=promotions.map(({cid,promo})=>`<article class="promotion-awaken"><div class="growth-portrait">${ptSVG(cid,'','awaken')}</div><div><small>${CHARS[cid]?.name||cid} · 승급 계기 개방</small><h3>${promo.cls}</h3><p>${promotionEffectText(promo)}</p><em>거점에서 Lv${promo.lvl} 달성 후 승급 가능</em></div></article>`);
+  return `<section class="growth-rewards"><div class="growth-rewards-head"><span>成長</span><div><b>사건 성장</b><small>이번 이야기에서 새 무학 또는 승급의 계기가 열렸습니다</small></div></div><div class="growth-rewards-grid">${[...martialCards,...promotionCards].join('')}</div></section>`;
 }
 function showVictory(){
   const ch=curCh();
@@ -2083,6 +2088,7 @@ function showVictory(){
     }
     if(!campaign.cleared.includes(campaign.stageId)) campaign.cleared.push(campaign.stageId);
     const growthRewards=newlyUnlockedInternals(beforeGrowth,campaign,campaign.party);
+    const promotionRewards=newlyUnlockedPromotions(beforeGrowth,campaign,CHARS,campaign.party);
     campaign.curBattle=null;
     v2Save();
     const lootTxt=[
@@ -2095,7 +2101,7 @@ function showVictory(){
       ${journeyTrail('aftermath')}
       ${sealSVG('勝','#c0392e')}<h2 style="color:#ffd94a">勝 利</h2>
       <p>${n.title} — 클리어!${learnMsg}${lootTxt?`<br>획득: <b style="color:var(--gold2)">${lootTxt}</b>`:''}<br>소지금 ${campaign.gold}냥</p>
-      ${growthRewardsHTML(growthRewards)}
+      ${growthRewardsHTML(growthRewards,promotionRewards)}
       ${contribHtml}
       <button class="btn" onclick="v2AfterBattle()">계속</button>
     </div>`;
@@ -3309,7 +3315,11 @@ function campUnitHTML(){
     const r=SESSION.campaignState.roster[cid],c=CHARS[cid],promo=c.promo,stats=campLoadoutStats(cid),inner=stats.inner,skills=(SESSION.campaignState.skillLoadouts[cid]||[]).length||Math.min(3,c.skills.length+(SESSION.campaignState.extraSkills[cid]||[]).length);
     let promotion=`<span class="formation-muted">승급 정보 없음</span>`;
     if(SESSION.campaignState.promoted[cid])promotion=`<span class="promoted">${SESSION.campaignState.promoted[cid]} 승급 완료</span>`;
-    else if(promo){const ok=r.lvl>=promo.lvl&&ownedCount(promo.item)>0;promotion=`<button class="btn small" ${ok?'':'disabled'} onclick="v2Promote('${cid}')">승급</button><small>Lv${promo.lvl} + ${ITEMS[promo.item].name} · ${promotionEffectText(promo)}</small>`;}
+    else if(promo){
+      const status=promotionStatus(promo,{level:r.lvl,inventory:SESSION.campaignState.inv,campaign:SESSION.campaignState});
+      const reqs=promotionRequirementParts(promo,{itemName:promo.item?ITEMS[promo.item]?.name:'',status});
+      promotion=`<button class="btn small" ${status.available?'':'disabled'} onclick="v2Promote('${cid}')">승급</button><small class="promotion-detail"><span class="promotion-reqs">${reqs.map(req=>`<i class="${req.met?'met':'unmet'}">${req.met?'✓':'○'} ${req.text}</i>`).join('')}</span><b>${promotionEffectText(promo)}</b></small>`;
+    }
     return `<article class="formation-card" data-cid="${cid}"><header><div class="formation-portrait">${ptSVG(cid)}</div><div><h3>${c.name}</h3><p>Lv.${r.lvl} · ${SESSION.campaignState.promoted[cid]||c.cls} · ${TYPE_NAME[c.type]}</p></div></header>
       <div class="formation-stats">${loadoutDelta('HP',stats.before.hp,stats.after.hp)}${loadoutDelta('공격',stats.before.attack,stats.after.attack)}${loadoutDelta('방어',stats.before.def,stats.after.def)}${loadoutDelta('정신',stats.before.res,stats.after.res)}${loadoutDelta('이동',stats.before.mov,stats.after.mov)}</div>
       <div class="formation-equips"><label>병기<select aria-label="${c.name} 병기" onchange="v2Equip('${cid}','w',this.value)">${campEquipOptions(cid,'w')}</select></label><label>보구<select aria-label="${c.name} 보구" onchange="v2Equip('${cid}','a',this.value)">${campEquipOptions(cid,'a')}</select></label></div>
@@ -3338,8 +3348,9 @@ function v2Equip(cid, slot, id){
 }
 function v2Promote(cid){
   const c=CHARS[cid], promo=c.promo, r=SESSION.campaignState.roster[cid];
-  if(!promo||SESSION.campaignState.promoted[cid]||r.lvl<promo.lvl||(SESSION.campaignState.inv[promo.item]||0)<=0) return;
-  SESSION.campaignState.inv[promo.item]--; if(SESSION.campaignState.inv[promo.item]<=0) delete SESSION.campaignState.inv[promo.item];
+  const status=promotionStatus(promo,{level:r?.lvl||0,inventory:SESSION.campaignState.inv,campaign:SESSION.campaignState,promoted:!!SESSION.campaignState.promoted[cid]});
+  if(!status.available) return;
+  if(promo.item){SESSION.campaignState.inv[promo.item]--; if(SESSION.campaignState.inv[promo.item]<=0) delete SESSION.campaignState.inv[promo.item];}
   for(const k in (promo.bonus||{})) r.stats[k]=(r.stats[k]||0)+promo.bonus[k];
   SESSION.campaignState.promoted[cid]=promo.cls;
   unlockAchv('promote');
@@ -3719,6 +3730,8 @@ export const DEBUG = {
   internalProbe(cid='gj',id=null){const selected=validInternal(cid,id);return {selected,item:internalById(selected),options:internalOptions(cid),effectText:internalEffectText(selected)};},
   internalUnlockProbe(id,campaign){return internalUnlockState(internalById(id),campaign);},
   growthRewardsProbe(before,after,roster=[]){return newlyUnlockedInternals(before,after,roster).map(({cid,id,item})=>({cid,id,name:item.name,effectText:internalEffectText(id)}));},
+  promotionStatusProbe(cid,campaign,level=99,inventory={}){const promo=CHARS[cid]?.promo,status=promotionStatus(promo,{level,inventory,campaign});return {status,requirements:promotionRequirementParts(promo,{itemName:promo?.item?ITEMS[promo.item]?.name:'',status}),text:promo?promotionEffectText(promo):''};},
+  promotionRewardsProbe(before,after,roster=[]){return newlyUnlockedPromotions(before,after,CHARS,roster).map(({cid,promo})=>({cid,cls:promo.cls,text:promotionEffectText(promo)}));},
   enemyMartialProbe(cid='oyb',context={}){const style=enemyMartialByCid(cid);return {style,counter:enemyMartialCounter(style,context),effectText:enemyMartialEffectText(style)};},
   martialRuleProbe(context){return martialModifiers(context);},
   bossActionProbe(action={},context={}){

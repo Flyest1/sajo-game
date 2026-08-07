@@ -463,6 +463,16 @@
    "beard": "stub",
    "bc": "#241c14",
    "brow": "fierce"
+  },
+  "promo": {
+   "lvl": 9,
+   "cls": "의기를 지킨 대협",
+   "unlock": {
+    "campaign": "chunryong",
+    "clearedAny": ["sb3"],
+    "label": "소경호에서 출생과 의리의 갈림을 마주함"
+   },
+   "bonus": {"hp": 6,"str": 3,"def": 2,"res": 1,"skl": 1}
   }
  },
  "yg": {
@@ -557,6 +567,16 @@
    "beard": "full",
    "bc": "#c8c2b4",
    "mouth": "grin"
+  },
+  "promo": {
+   "lvl": 8,
+   "cls": "공명권의 대종사",
+   "unlock": {
+    "campaign": "sajo",
+    "clearedAny": ["s7"],
+    "label": "도화도 구혼 시험에서 공명권과 좌우호박의 경지를 보임"
+   },
+   "bonus": {"hp": 4,"int": 2,"def": 1,"res": 2,"spd": 1,"skl": 2}
   }
  },
  "yaksa": {
@@ -638,6 +658,16 @@
    "robe": "#e8e4da",
    "female": true,
    "mouth": "firm"
+  },
+  "promo": {
+   "lvl": 8,
+   "cls": "옥녀심경 전인",
+   "unlock": {
+    "campaign": "sinjo",
+    "clearedAny": ["s4"],
+    "label": "주백통에게 좌우호박을 익혀 옥녀소심검을 홀로 완성"
+   },
+   "bonus": {"hp": 4,"int": 2,"res": 1,"spd": 2,"skl": 2}
   }
  },
  "jmk": {
@@ -731,6 +761,16 @@
    "female": true,
    "extra": "hairpin",
    "mouth": "smirk"
+  },
+  "promo": {
+   "lvl": 8,
+   "cls": "무림을 읽는 군주",
+   "unlock": {
+    "campaign": "uicheon",
+    "clearedAny": ["s7"],
+    "label": "만안사에서 육대문파의 초식과 인심을 꿰뚫어 봄"
+   },
+   "bonus": {"hp": 4,"int": 2,"res": 1,"spd": 2,"skl": 3}
   }
  },
  "jsam": {
@@ -812,6 +852,16 @@
    "hc": "#241c14",
    "robe": "#5a7ab0",
    "mouth": "smile"
+  },
+  "promo": {
+   "lvl": 8,
+   "cls": "대리 단씨의 고수",
+   "unlock": {
+    "campaign": "chunryong",
+    "clearedAny": ["dy3"],
+    "label": "연자오에서 북명신공·능파미보·육맥신검의 운용을 바로 세움"
+   },
+   "bonus": {"hp": 4,"int": 3,"res": 2,"spd": 2,"skl": 1}
   }
  },
  "hj": {
@@ -851,6 +901,16 @@
    "hc": "#333",
    "robe": "#8a8060",
    "mouth": "smile"
+  },
+  "promo": {
+   "lvl": 8,
+   "cls": "소요파 장문",
+   "unlock": {
+    "campaign": "chunryong",
+    "clearedAny": ["hj2"],
+    "label": "무애자의 전승을 잇고 영취궁의 주인이 됨"
+   },
+   "bonus": {"hp": 6,"int": 3,"def": 1,"res": 2,"skl": 1,"ki": 4}
   }
  },
  "dj": {
@@ -1971,6 +2031,16 @@
    "robe": "#e0d8e8",
    "female": true,
    "mouth": "firm"
+  },
+  "promo": {
+   "lvl": 7,
+   "cls": "고묘파 개조",
+   "unlock": {
+    "campaign": "hwalsa",
+    "clearedAny": ["h2"],
+    "label": "전진 무학을 파훼하는 옥녀심경의 뜻을 세움"
+   },
+   "bonus": {"hp": 4,"int": 2,"res": 1,"spd": 2,"skl": 2,"mov": 1}
   }
  },
  "djh": {

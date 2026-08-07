@@ -8,6 +8,7 @@ import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal,newlyUnlockedI
 import {ENEMY_MARTIALS,enemyMartialEffectText} from '../src/enemy-martials.js';
 import {enemyMartialCounter} from '../src/combat-rules.js';
 import {patternTiles} from '../src/boss-actions.js';
+import {newlyUnlockedPromotions,promotionStatus} from '../src/progression.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -273,9 +274,29 @@ const specialTotal=Object.values(specialCounts).reduce((sum,n)=>sum+n,0);
 for(const [cid,count] of Object.entries(specialCounts)) if(count<3) errs.push(`${cid}: special battles ${count} < 3`);
 if(specialTotal<12) errs.push(`main campaigns: special battles ${specialTotal} < 12`);
 {
+  const corePromotionIds=['gj','hy','yg','syn','jmk','jomin','sb','dy','hj','zbt','wjy','ijy'];
+  const bonusKeys=new Set(['hp','str','int','def','res','spd','skl','mov','ki']);
   for (const cid in CHARS) {
-    const pr = CHARS[cid].promo;
-    if (pr && (!ITEMS[pr.item] || (pr.skill && !SKILLS[pr.skill]))) errs.push(`char ${cid}: promo 참조 오류`);
+    const pr = CHARS[cid].promo;if(!pr)continue;
+    if((pr.item&&!ITEMS[pr.item])||(pr.skill&&!SKILLS[pr.skill])||(!pr.item&&!pr.unlock)) errs.push(`char ${cid}: promo 참조 오류`);
+    if(!Number.isInteger(pr.lvl)||pr.lvl<5||pr.lvl>12)errs.push(`char ${cid}: promo level ${pr.lvl}`);
+    for(const [key,value] of Object.entries(pr.bonus||{}))if(!bonusKeys.has(key)||!Number.isInteger(value)||value<1||value>6)errs.push(`char ${cid}: promo bonus ${key}=${value}`);
+    if(pr.unlock){
+      const camp=campaignById(pr.unlock.campaign);
+      if(!camp)errs.push(`char ${cid}: promo campaign unknown ${pr.unlock.campaign}`);
+      for(const key of ['clearedAny','reachedAny'])for(const stageId of (pr.unlock[key]||[]))if(!camp?.stages?.[stageId])errs.push(`char ${cid}: promo ${key} stage unknown ${stageId}`);
+      if(!(pr.unlock.clearedAny?.length||pr.unlock.reachedAny?.length)||!pr.unlock.label)errs.push(`char ${cid}: promo event rule incomplete`);
+    }
+  }
+  for(const cid of corePromotionIds)if(!CHARS[cid]?.promo)errs.push(`core promotion missing ${cid}`);
+  const eventIds=corePromotionIds.filter(cid=>CHARS[cid].promo.unlock);
+  if(eventIds.length!==7)errs.push(`event promotions ${eventIds.length} != 7`);
+  for(const cid of eventIds){
+    const promo=CHARS[cid].promo,stageId=(promo.unlock.clearedAny||promo.unlock.reachedAny)[0];
+    const before={camp:promo.unlock.campaign,stageId:null,cleared:[]},after={camp:promo.unlock.campaign,stageId,cleared:[stageId]};
+    if(promotionStatus(promo,{level:promo.lvl,inventory:{},campaign:before}).available)errs.push(`char ${cid}: promo unlocked before event`);
+    if(!promotionStatus(promo,{level:promo.lvl,inventory:{},campaign:after}).available)errs.push(`char ${cid}: promo remains locked after event`);
+    if(newlyUnlockedPromotions(before,after,CHARS,[cid]).length!==1)errs.push(`char ${cid}: promo reward transition missing`);
   }
 }
 
@@ -424,6 +445,7 @@ console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).leng
 console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
 console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
 console.log(`R20.1 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 20종 검사`);
+console.log('R21 핵심 협객 승급 12종 · 원작 사건형 7종 검사');
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

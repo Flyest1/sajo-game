@@ -584,3 +584,6 @@ svg text{font-family:'Malgun Gothic',sans-serif;}
     box-shadow:none;border:1px solid var(--line);}
   #info-pop #log{max-height:120px;}
 }
+
+/* R21 사건 승급의 조건 진행도 */
+.promotion-detail{display:grid!important;gap:3px;min-width:0}.promotion-detail>b{color:#d9caa8;font-weight:500}.promotion-reqs{display:flex;gap:5px;flex-wrap:wrap}.promotion-reqs i{font-style:normal;padding:2px 5px;border:1px solid rgba(180,165,135,.25);color:var(--dim);background:rgba(0,0,0,.14)}.promotion-reqs i.met{color:#9fd4c8;border-color:rgba(111,183,161,.35)}.promotion-reqs i.unmet{color:#c8a98a}.promotion-awaken{border-color:rgba(218,166,91,.42)!important}.promotion-awaken h3{color:#efc978!important}
