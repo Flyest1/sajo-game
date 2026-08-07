@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
-  advanceBossPlan,applyBossCounter,bossPlanIntent,createBossActionPlan,patternTiles,
+  advanceBossPlan,applyBossCounter,bossPlanHasTarget,bossPlanIntent,createBossActionPlan,normalizeBossAction,patternTiles,
 } from '../src/boss-actions.js';
 import { resolveBossImpact,resolveGuardHit,resolveHealthHit } from '../src/combat-resolution.js';
 import { chooseEnemyAction } from '../src/enemy-ai.js';
@@ -35,6 +35,9 @@ test('R20 telegraph tiles are the exact execution tiles after a charge turn',()=
   expect(ready.warningKeys).toEqual(first.warningKeys);
   expect(executed.event).toBe('execute');
   expect(executed.execution.tiles.map(tile=>`${tile.x},${tile.y}`)).toEqual(first.warningKeys);
+  expect(normalizeBossAction({cooldown:2}).cooldown).toBe(2);
+  expect(bossPlanHasTarget(plan,[hero])).toBe(true);
+  expect(bossPlanHasTarget(plan,[{...hero,x:0,y:0}])).toBe(false);
 });
 
 test('R19 counter cancels or weakens a pending R20 action without retargeting',()=>{
@@ -79,7 +82,7 @@ test('R20 live telegraph stays readable and executes the warned tiles on desktop
     martials:Object.keys(window.__dbg.ENEMY_MARTIALS).length,
     actionBosses:Object.values(window.__dbg.ENEMY_MARTIALS).filter(style=>style.actions?.length).length,
   }));
-  expect(coverage).toEqual({martials:20,actionBosses:8});
+  expect(coverage).toEqual({martials:20,actionBosses:20});
   await page.evaluate(()=>{
     window.startCampaignV2('sajo',false);window.__dbg.campaignState.stageId='s5';window.__dbg.openCurrentDeploy();
   });
@@ -89,7 +92,7 @@ test('R20 live telegraph stays readable and executes the warned tiles on desktop
   await expect(page.locator('.boss-warning-tile')).toHaveCount(0);
   await page.evaluate(()=>window.__dbg.installBossActions('ygang',[{
     id:'telegraph-proof',name:'예고 일치 시험',charge:{turns:1,label:'시험 축력',stance:'축력'},
-    target:'nearest',shape:{type:'line',range:6,origin:'self'},power:.1,hitBonus:100,
+    target:'nearest',shape:{type:'radius',range:2,origin:'target'},power:.1,hitBonus:100,
     counter:{mode:'weaken',damageMultiplier:.5,shrink:1},
   }]));
   await expect(page.locator('#boss-intent-hud')).toBeVisible();
@@ -107,9 +110,12 @@ test('R20 live telegraph stays readable and executes the warned tiles on desktop
     await window.__dbg.performBossAction('ygang');
     const ready=structuredClone(window.__dbg.B.intents[boss.uid]);
     const state=await window.__dbg.performBossAction('ygang');
-    return {first,ready,last:state.lastExecution};
+    const after=structuredClone(window.__dbg.B.intents[boss.uid]);
+    return {first,ready,last:state.lastExecution,cooldown:state.cooldown,after};
   });
   expect(result.first.kind).toBe('boss-charge');expect(result.ready.kind).toBe('boss-execute');
   expect(result.ready.warningKeys).toEqual(result.first.warningKeys);
   expect(result.last.tiles.map(tile=>`${tile.x},${tile.y}`)).toEqual(result.first.warningKeys);
+  expect(result.cooldown).toBe(1);
+  expect(result.after.bossAction).not.toBe(true);
 });

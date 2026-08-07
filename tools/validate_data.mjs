@@ -7,6 +7,7 @@ import {LUNJIAN_HEROES,LUNJIAN_ROUNDS,TRIALS,makeLunjianBattle} from '../src/cha
 import {INTERNALS,HERO_INTERNALS,internalEffectText,validInternal,newlyUnlockedInternals} from '../src/internals.js';
 import {ENEMY_MARTIALS,enemyMartialEffectText} from '../src/enemy-martials.js';
 import {enemyMartialCounter} from '../src/combat-rules.js';
+import {patternTiles} from '../src/boss-actions.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -401,11 +402,18 @@ const SUPPORTS = J('supports.json');
       if(!actionShapes.has(action.shape?.type)||!(action.shape?.range>=1&&action.shape.range<=6))errs.push(`enemy martial/${cid}: boss action shape invalid`);
       if(action.skill&&!SKILLS[action.skill])errs.push(`enemy martial/${cid}: boss action skill unknown ${action.skill}`);
       if(!['cancel','weaken'].includes(action.counter?.mode))errs.push(`enemy martial/${cid}: boss action counter mode invalid`);
-      if(action.power<.8||action.power>1.3||Math.abs(action.hitBonus||0)>15)errs.push(`enemy martial/${cid}: boss action exceeds safety cap`);
+      if(action.power<.8||action.power>1.2||Math.abs(action.hitBonus||0)>15)errs.push(`enemy martial/${cid}: boss action exceeds safety cap`);
+      if(!Number.isInteger(action.cooldown)||action.cooldown<1||action.cooldown>2)errs.push(`enemy martial/${cid}: boss action cooldown must be 1~2`);
+      const footprint=patternTiles({shape:action.shape,origin:{x:8,y:6},target:{x:5,y:6},bounds:{w:18,h:13}}).length;
+      if(footprint>18)errs.push(`enemy martial/${cid}: boss action footprint ${footprint} exceeds 18 tiles`);
+      const denseParty=[{x:5,y:6},{x:4,y:6},{x:5,y:5},{x:5,y:7}],warning=patternTiles({shape:action.shape,origin:{x:8,y:6},target:{x:5,y:6},bounds:{w:18,h:13}}),warningKeys=new Set(warning.map(tile=>`${tile.x},${tile.y}`));
+      const denseHits=denseParty.filter(tile=>warningKeys.has(`${tile.x},${tile.y}`)).length;
+      if(denseHits>=4&&action.cooldown<2)errs.push(`enemy martial/${cid}: four-target action requires cooldown 2`);
       if(!campaignBosses.has(cid))errs.push(`enemy martial/${cid}: boss action has no campaign boss encounter`);
     }
   }
-  if(actionCount!==8)errs.push(`boss actions ${actionCount} != 8`);
+  if(actionCount!==20)errs.push(`boss actions ${actionCount} != 20`);
+  if(Object.values(ENEMY_MARTIALS).some(style=>!style.actions?.length))errs.push('every enemy martial must have a telegraphed boss action');
   if(CHARS.myeoljeol?.skills?.includes('wolnyeo')||!CHARS.myeoljeol?.skills?.includes('emei'))errs.push('character/myeoljeol: must use 아미검법, not 월녀검법');
   if(!CHARS.geumhwa?.skills?.includes('geumhwaamgi'))errs.push('character/geumhwa: 금화암기 missing');
   if(!CHARS.ichusu?.skills?.includes('baihong'))errs.push('character/ichusu: 백홍장력 missing');
@@ -415,7 +423,7 @@ const SUPPORTS = J('supports.json');
 console.log(`챕터 ${CHAPTERS.length}개 · 캐릭터 ${Object.keys(CHARS).length}명 · 무공 ${Object.keys(SKILLS).length}종 · 인연 ${SUPPORTS.pairs.length}쌍 검사`);
 console.log(`도전 모드 천하논검 ${LUNJIAN_ROUNDS.length}관 · 전투 수수께끼 ${TRIALS.length}제 검사`);
 console.log(`원작 기반 내공·특성 ${Object.keys(INTERNALS).length}종 · 핵심 협객 ${Object.keys(HERO_INTERNALS).length}명 검사`);
-console.log(`R19~R20 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 8종 검사`);
+console.log(`R20.1 주요 적 무학·파훼 ${Object.keys(ENEMY_MARTIALS).length}종 · 예고 행동 20종 검사`);
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }

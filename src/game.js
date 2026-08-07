@@ -23,7 +23,7 @@ import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
 import { ENEMY_MARTIALS, enemyMartialByCid, enemyMartialEffectText } from './enemy-martials.js';
 import {
   advanceBossPlan, applyBossCounter, bossActionDefs as resolveBossActionDefs,
-  bossIntentDescription, bossPlanIntent, bossShapeLabel, createBossActionPlan,
+  bossIntentDescription, bossPlanHasTarget, bossPlanIntent, bossShapeLabel, createBossActionPlan,
   nextBossActionIndex,
 } from './boss-actions.js';
 import {
@@ -359,7 +359,7 @@ function mkEnemyUnit(def){
     lvl:curCh().no*3, exp:0, acted:false, alive:true,
     boss:!!def.boss, wait:def.wait||0, poison:0, martial,
     bossActions:Array.isArray(def.bossActions)?deepClone(def.bossActions):null,
-    bossActionState:{index:0,pending:null},bossStance:null,
+    bossActionState:{index:0,pending:null,cooldown:0},bossStance:null,
     guardMax, guard:guardMax, broken:false, phaseIndex:0};
 }
 
@@ -826,6 +826,7 @@ async function performBossActionTurn(u){
   const actions=bossActionsFor(u),step=advanceBossPlan(pending);
   if(step.event==='cancelled'){
     state.pending=null;state.index=nextBossActionIndex(state.index,actions);u.bossStance=null;
+    state.cooldown=pending.action.cooldown;
     state.lastExecution={planId:pending.id,actionId:pending.action.id,status:'cancelled',tiles:[],hits:[]};
     fx(u.x,u.y,'초식 취소','break');SFX.play('crit');
     log(`<b>${u.name}의 ${pending.action.name}이(가) 간파되어 끊겼다!</b> ${pending.counterReason||pending.action.counter.label}`,true);
@@ -840,6 +841,7 @@ async function performBossActionTurn(u){
   }
   if(step.event==='execute'){
     state.pending=null;state.index=nextBossActionIndex(state.index,actions);u.bossStance=null;
+    state.cooldown=step.execution.action.cooldown;
     await executeBossAction(u,step.execution);return true;
   }
   return false;
@@ -951,12 +953,14 @@ function bossActionsFor(u){
 function ensureBossActionPlan(u){
   const actions=bossActionsFor(u);
   if(!actions.length)return null;
-  u.bossActionState=u.bossActionState||{index:0,pending:null};
+  u.bossActionState=u.bossActionState||{index:0,pending:null,cooldown:0};
   if(!u.bossActionState.pending){
     const index=u.bossActionState.index%actions.length;
-    u.bossActionState.pending=createBossActionPlan({
+    const candidate=createBossActionPlan({
       unit:u,action:actions[index],targets:players(),bounds:{w:B.w,h:B.h},turn:B.turn,sequence:index,
     });
+    if(!bossPlanHasTarget(candidate,players()))return null;
+    u.bossActionState.pending=candidate;
   }
   return u.bossActionState.pending;
 }
@@ -970,6 +974,7 @@ function disruptBossAction(u,reason){
 function chooseBossAction(u){
   /* 대기 중인 보스는 실제 각성 시점에 표적을 고정해야 초기 배치 칸을 향한 낡은 예고가 남지 않는다. */
   if(!u?.bossActionState?.pending&&u.wait&&u.hp===u.maxhp&&!players().some(player=>dist(player,u)<=u.wait))return null;
+  if(!u?.bossActionState?.pending&&(u?.bossActionState?.cooldown||0)>0)return null;
   const plan=ensureBossActionPlan(u);
   return plan?bossPlanIntent(plan):null;
 }
@@ -1264,6 +1269,7 @@ async function enemyPhase(){
     }
     focusUnit(u); /* 행동할 적에게 화면 이동 */
     if(!(SETTINGS.fastEnemy&&SETTINGS.speed>=2)) await aSleep(160);
+    const cooling=!!(!u.bossActionState?.pending&&(u.bossActionState?.cooldown||0)>0);
     const bossIntent=chooseBossAction(u);
     if(bossIntent){
       await performBossActionTurn(u);
@@ -1279,6 +1285,7 @@ async function enemyPhase(){
       }else if(intent.kind==='move'&&(intent.x!==u.x||intent.y!==u.y)){
         const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy);
       }
+      if(cooling)u.bossActionState.cooldown=Math.max(0,u.bossActionState.cooldown-1);
     }
     if(u.alive&&u.broken){ u.guard=u.guardMax; u.broken=false; log(`${u.name}이(가) 호흡을 가다듬어 호신강기를 되찾았다.`); }
   }
@@ -3724,7 +3731,7 @@ export const DEBUG = {
   },
   installBossActions(cid,actions){
     const unit=B?.units.find(item=>item.cid===cid&&item.team==='E');if(!unit)return null;
-    unit.boss=true;unit.wait=0;unit.bossActions=deepClone(actions||[]);unit.bossActionState={index:0,pending:null};
+    unit.boss=true;unit.wait=0;unit.bossActions=deepClone(actions||[]);unit.bossActionState={index:0,pending:null,cooldown:0};
     refreshEnemyIntents();renderBattle();return deepClone(enemyIntent(unit));
   },
   disruptBossAction(cid,reason='간파 시험'){

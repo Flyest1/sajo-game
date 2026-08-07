@@ -12,7 +12,7 @@
  *   target: 'nearest' | 'lowestHp' | 'leader',
  *   shape: { type: 'line'|'cross'|'cone'|'radius', range: 4,
  *            origin: 'self'|'target', spread: .5 },
- *   skill: 'optional-skill-id', power: 1.15, hitBonus: 10,
+ *   skill: 'optional-skill-id', power: 1.15, hitBonus: 10, cooldown: 1,
  *   counter: { mode: 'cancel'|'weaken', damageMultiplier: .55,
  *              shrink: 1, label: '경맥이 흐트러진다' }
  * }
@@ -65,6 +65,7 @@ export function normalizeBossAction(raw={},index=0){
     skill:raw.skill||null,
     power:clamp(num(raw.power,1.15),.1,5),
     hitBonus:clamp(int(raw.hitBonus,10),-50,100),
+    cooldown:clamp(int(raw.cooldown,1),0,4),
     counter:{
       mode,
       damageMultiplier:clamp(num(rawCounter.damageMultiplier??rawCounter.multiplier,.55),0,1),
@@ -202,6 +203,11 @@ export function createBossActionPlan({unit,action,targets=[],bounds,turn=1,seque
 export function bossPlanTiles(plan){
   if(!plan||plan.status==='cancelled')return [];
   return (plan.status==='weakened'?plan.weakenedTiles:plan.tiles)||[];
+}
+
+export function bossPlanHasTarget(plan,targets=[]){
+  const keys=new Set(bossPlanTiles(plan).map(tileKey));
+  return targets.some(target=>target?.alive!==false&&keys.has(tileKey(target)));
 }
 
 export function bossPlanIntent(plan){

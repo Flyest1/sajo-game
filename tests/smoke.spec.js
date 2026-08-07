@@ -651,7 +651,7 @@ test('R19 enemy martial counters are original-based, readable, and attached to b
     miejue:window.__dbg.CHARS.myeoljeol.skills,
   }));
   expect(rules.count).toBe(20);
-  expect(rules.actionCount).toBe(8);
+  expect(rules.actionCount).toBe(20);
   expect(rules.toad.style.name).toBe('합마공·역구음');
   expect(rules.toad.counter.active).toBe(true);
   expect(rules.toadMiss.counter.active).toBe(false);

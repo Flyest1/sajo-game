@@ -7,6 +7,7 @@ import fs from 'fs';
 import {LUNJIAN_ROUNDS,TRIALS} from '../src/challenges.js';
 import {INTERNALS,defaultInternal} from '../src/internals.js';
 import {ENEMY_MARTIALS,enemyMartialByCid} from '../src/enemy-martials.js';
+import {patternTiles} from '../src/boss-actions.js';
 import {martialModifiers} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json');
@@ -210,3 +211,19 @@ for(const [cid,item] of Object.entries(ENEMY_MARTIALS)){
   console.log(`  ${CHARS[cid].name} · ${item.name}: 조건 최대 +${Math.round(peak*100)}% · 회피 ${e.avoid||0} · 반사 ${Math.round((e.reflect||0)*100)}%`);
 }
 console.log(`  총 ${Object.keys(ENEMY_MARTIALS).length}종 · 합산 조건 피해 +30% / 회피 +10 / 반사 15% 안전 상한 통과`);
+
+console.log('\n## R20.1 전조 광역기 — 밀집 4인·재사용 압력');
+const actionFlags=[],bossOrigin={x:8,y:6},targetOrigin={x:5,y:6};
+const clustered=[targetOrigin,{x:4,y:6},{x:5,y:5},{x:5,y:7}];
+for(const [cid,style] of Object.entries(ENEMY_MARTIALS))for(const action of style.actions||[]){
+  const tiles=patternTiles({shape:action.shape,origin:bossOrigin,target:targetOrigin,bounds:{w:18,h:13}});
+  const keys=new Set(tiles.map(tile=>`${tile.x},${tile.y}`));
+  const clusterHits=clustered.filter(tile=>keys.has(`${tile.x},${tile.y}`)).length;
+  const cycle=(action.charge?.turns||0)+1+(action.cooldown||0);
+  console.log(`  ${CHARS[cid].name} · ${action.name}: ${action.shape.type} ${tiles.length}칸 · 밀집 ${clusterHits}/4명 · 위력 ×${action.power.toFixed(2)} · ${cycle}턴 주기`);
+  if(tiles.length>18)actionFlags.push(`${CHARS[cid].name} 범위 ${tiles.length}칸`);
+  if(action.power>1.2)actionFlags.push(`${CHARS[cid].name} 위력 ×${action.power}`);
+  if(clusterHits>=4&&(action.cooldown||0)<2)actionFlags.push(`${CHARS[cid].name} 4인 광역 재사용 과속`);
+}
+if(actionFlags.length)actionFlags.forEach(flag=>console.log(`  - [전조 주의] ${flag}`));
+else console.log('  20종 모두 범위 18칸·위력 ×1.20·밀집 4인 재사용 안전선 통과');
