@@ -27,7 +27,7 @@ import {
 } from './battle-environment.js';
 import { applyBattleVariant } from './campaign-battles.js';
 import { ENDGAME_SEALS, endgameProgress, syncEndgameRecord, endgameBlessing } from './endgame.js';
-import { masteryTierForUses, masteryBonuses, masteryLabelForUses, masteryProgressForUses, masteryEffectFor } from './mastery.js';
+import { MASTERY_STEPS, masteryTierForUses, masteryBonuses, masteryLabelForUses, masteryProgressForUses, masteryEffectFor } from './mastery.js';
 import { movementRange, stoppableTile } from './pathfinding.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
@@ -1175,7 +1175,11 @@ function confirmAttack(){
   const m=document.getElementById('fc-modal'); if(m) m.remove();
   const p=B.pending; B.pending=null;
   hideMenu(); B.mode='idle'; B.targets=null;
-  combat(p.a,p.d,p.skillId).then(()=>{ if(!B.over) finishUnit(p.a); });
+  combat(p.a,p.d,p.skillId).then(()=>{ if(!B.over) finishUnit(p.a); }).catch(error=>{
+    console.error('battle action failed',error);
+    if(!B||B.over)return;
+    B.busy=false;log('<b>기술 처리 중 오류가 발생해 행동을 안전하게 종료했습니다.</b>',true);finishUnit(p.a);
+  });
 }
 
 function applyBattleEnvironmentRound(){

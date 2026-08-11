@@ -17,7 +17,7 @@ const declarations=[...game.matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)].m
 for(const name of declarations){if(seen.has(name))issues.push(`duplicate game function declaration: ${name}`);seen.add(name);}
 const gameLines=game.split(/\r?\n/).length;if(gameLines>3900)issues.push(`game.js ${gameLines} lines exceeds U7 ceiling 3900`);
 for(const file of ['src/mastery.js','src/pathfinding.js','src/runtime.js','src/combat-rules.js','src/combat-resolution.js','src/enemy-ai.js'])if(!fs.existsSync(path.join(root,file)))issues.push(`engine module missing: ${file}`);
-for(const spec of ['r20-engine.spec.js','r21-progression.spec.js','r22-environment.spec.js','r23-campaign-battles.spec.js','r24-graphics.spec.js','r25-endgame.spec.js','u7-completion.spec.js'])if(!pkg.scripts['test:smoke'].includes(spec))issues.push(`test:smoke missing ${spec}`);
+for(const spec of ['hotfix-skill.spec.js','r20-engine.spec.js','r21-progression.spec.js','r22-environment.spec.js','r23-campaign-battles.spec.js','r24-graphics.spec.js','r25-endgame.spec.js','u7-completion.spec.js'])if(!pkg.scripts['test:smoke'].includes(spec))issues.push(`test:smoke missing ${spec}`);
 if(!read('docs/COMPLETION_AUDIT.md').includes('U7 완료'))issues.push('completion audit is not signed off');
 
 const dist=path.join(root,'dist','assets');let chunks=[];
