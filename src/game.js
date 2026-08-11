@@ -27,6 +27,8 @@ import {
 } from './battle-environment.js';
 import { applyBattleVariant } from './campaign-battles.js';
 import { ENDGAME_SEALS, endgameProgress, syncEndgameRecord, endgameBlessing } from './endgame.js';
+import { masteryTierForUses, masteryBonuses, masteryLabelForUses, masteryProgressForUses, masteryEffectFor } from './mastery.js';
+import { movementRange, stoppableTile } from './pathfinding.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
 import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
@@ -123,30 +125,17 @@ function effSpeed(){
 const aSleep = ms => sleep(ms/effSpeed());
 
 /* ── 무공 숙련도 (전 모드 공유, 스킬별 사용 횟수 누적) ── */
-const MASTERY_STEPS = [0, 8, 20, 40, 70]; // 숙련 단계(0~4) 진입 누적 사용 횟수
 let SKILL_USE = profileValue(V3STORE,'mastery',{});
-function masteryTierForUses(n){
-  let t=0; for(let i=MASTERY_STEPS.length-1;i>=0;i--){ if(n>=MASTERY_STEPS[i]){ t=i; break; } }
-  return t;
-}
 function masteryTier(sid){ return masteryTierForUses(SKILL_USE[sid]||0); }
-function masteryLabel(sid){ const t=masteryTier(sid); return t?('숙련 '+['','★','★★','★★★','極'][t]):''; }
+function masteryLabel(sid){ return masteryLabelForUses(SKILL_USE[sid]||0); }
 /* 숙련 보정: 위력 배수 +0.04/단계, 명중 +2/단계, 기 소모 -1/2단계 */
 function masteryMultBonus(sid){ return masteryTier(sid)*0.04; }
 function masteryHitBonus(sid){ return masteryTier(sid)*2; }
-function masteryCost(sid){ const sk=SKILLS[sid]; return Math.max(1, (sk.cost||0) - Math.floor(masteryTier(sid)/2)); }
+function masteryCost(sid){ return masteryBonuses(SKILLS[sid],SKILL_USE[sid]||0).cost; }
 function masteryInfo(sid, uses=SKILL_USE[sid]||0){
-  const sk=SKILLS[sid], tier=masteryTierForUses(uses);
-  const cost=Math.max(1,(sk.cost||0)-Math.floor(tier/2));
-  return {tier,uses,power:sk.heal?0:tier*4,hit:sk.heal?0:tier*2,heal:sk.heal?tier:0,cost,costDown:Math.max(0,(sk.cost||0)-cost)};
+  return masteryBonuses(SKILLS[sid],uses);
 }
-function masteryEffectText(sid){
-  const m=masteryInfo(sid), parts=[];
-  if(m.power) parts.push(`위력 +${m.power}%p`,`명중 +${m.hit}`);
-  if(m.heal) parts.push(`회복 +${m.heal}`);
-  if(m.costDown) parts.push(`기 소모 -${m.costDown}`);
-  return parts.length?parts.join(' · '):'현재 보정 없음';
-}
+function masteryEffectText(sid){ return masteryEffectFor(SKILLS[sid],SKILL_USE[sid]||0); }
 function bumpMastery(sid){
   const before=masteryTier(sid);
   SKILL_USE[sid]=(SKILL_USE[sid]||0)+1;
@@ -383,29 +372,9 @@ const environmentPassable = (x,y) => inb(x,y)&&TILE[tileChar(x,y)].cost<99;
 const environmentDangerAt = (x,y) => environmentEffectsAt(B.environment,x,y).reduce((sum,item)=>sum+(item.damage||0)+(item.kiDrain||0)+(item.poison||0),0);
 
 function moveRange(u){
-  const res=new Map(); res.set(u.x+','+u.y,0);
-  const pq=[[0,u.x,u.y]];
-  while(pq.length){
-    pq.sort((a,b)=>a[0]-b[0]);
-    const [c,x,y]=pq.shift();
-    if(c>(res.get(x+','+y)??Infinity)) continue;
-    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const nx=x+d[0], ny=y+d[1];
-      if(!inb(nx,ny)) continue;
-      if(environmentBlocked(B.environment,nx,ny)) continue;
-      let cost=TILE[tileChar(nx,ny)].cost;
-      if(cost>=99) continue;
-      if(u.type==='경'&&cost>1) cost-=1; /* 경공 특성: 험지 이동비용 -1 */
-      const occ=unitAt(nx,ny);
-      if(occ && occ.team!==u.team) continue;
-      const nc=c+cost;
-      if(nc>u.stats.mov) continue;
-      if(nc<(res.get(nx+','+ny)??Infinity)){ res.set(nx+','+ny,nc); pq.push([nc,nx,ny]); }
-    }
-  }
-  return res;
+  return movementRange({unit:u,map:B.map,tileDefs:TILE,units:B.units,blocked:(x,y)=>environmentBlocked(B.environment,x,y)});
 }
-function stoppable(u,x,y){ const o=unitAt(x,y); return !environmentBlocked(B.environment,x,y)&&(!o || o===u); }
+function stoppable(u,x,y){return stoppableTile({unit:u,x,y,units:B.units,blocked:(tx,ty)=>environmentBlocked(B.environment,tx,ty)});}
 
 /* ── 전투 계산 ── */
 function adjAllies(u){
@@ -1770,9 +1739,7 @@ function statRow(lbl,val,eq){
 }
 /* 숙련도 진행도 텍스트: 12/20 형태 (극이면 極) */
 function masteryProgress(sid){
-  const t=masteryTier(sid), uses=SKILL_USE[sid]||0;
-  if(t>=MASTERY_STEPS.length-1) return `숙련 極 ${uses}회`;
-  return `숙련 ${uses}/${MASTERY_STEPS[t+1]}`;
+  return masteryProgressForUses(SKILL_USE[sid]||0);
 }
 function bossPatternHTML(u){
   if(!u.boss) return '';
@@ -3842,6 +3809,7 @@ export const DEBUG = {
   promotionStatusProbe(cid,campaign,level=99,inventory={}){const promo=CHARS[cid]?.promo,status=promotionStatus(promo,{level,inventory,campaign});return {status,requirements:promotionRequirementParts(promo,{itemName:promo?.item?ITEMS[promo.item]?.name:'',status}),text:promo?promotionEffectText(promo):''};},
   promotionRewardsProbe(before,after,roster=[]){return newlyUnlockedPromotions(before,after,CHARS,roster).map(({cid,promo})=>({cid,cls:promo.cls,text:promotionEffectText(promo)}));},
   environmentProbe(definition,bounds={w:10,h:8},units=[]){const initial=createBattleEnvironment(definition,bounds),next=advanceBattleEnvironment(initial,{passable:(x,y)=>x>=0&&y>=0&&x<bounds.w&&y<bounds.h});return {initial,next,effects:resolveEnvironmentEffects(next,units,{passable:(x,y)=>x>=0&&y>=0&&x<bounds.w&&y<bounds.h}),summary:environmentSummary(next)};},
+  movementProbe(cid=null){if(!B)return [];const unit=B.units.find(item=>item.team==='P'&&item.alive&&(!cid||item.cid===cid));return unit?[...moveRange(unit).entries()]:[];},
   installEnvironment(definition){if(!B)return null;B.environment=createBattleEnvironment(definition,{w:B.w,h:B.h});refreshEnemyIntents();renderBattle();return deepClone(B.environment);},
   advanceEnvironment(){if(!B)return null;const effects=applyBattleEnvironmentRound();refreshEnemyIntents();renderBattle();return {effects:deepClone(effects),environment:deepClone(B.environment)};},
   damageEnvironmentGate(gateId,amount=1){if(!B)return null;const result=damageEnvironmentGate(B.environment,gateId,amount);B.environment=result.environment;refreshEnemyIntents();renderBattle();return deepClone(result);},

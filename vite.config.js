@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // A deployed bundle carries its source revision.  Keeping this in the bundle (rather
 // than in mutable storage) makes it possible to tell a stale PWA shell from main.
 const sourceRevision=(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7);
-const appVersion=`R25-${sourceRevision}`;
+const appVersion=`U7-${sourceRevision}`;
 
 export default defineConfig({
   // GitHub Pages 프로젝트 사이트 경로: https://flyest1.github.io/sajo-game/
@@ -12,6 +12,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsInlineLimit: 8192,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          minSize: 10_000,
+          groups: [
+            {name:'campaign-data',test:/src[\\/]data[\\/]/,priority:3},
+            {name:'game-rules',test:/src[\\/](boss-actions|boss-patterns|battle-environment|battle-objectives|campaign-battles|challenges|combat-resolution|combat-rules|endgame|enemy-ai|enemy-martials|internals|mastery|pathfinding|progression|reputation|roam|runtime|save)\.js$/,priority:2},
+          ],
+        },
+      },
+    },
   },
   server: { host: true },
   define: {
