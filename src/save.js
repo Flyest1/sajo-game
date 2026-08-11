@@ -29,7 +29,7 @@ export function emptyV3Save(){
       battleReports: [],
     },
     campaigns: {},
-    challenges: {endless:{bestWave:0},roam:{},lunjian:{bestRound:0,clears:0,records:[]},trials:{medals:{}}},
+    challenges: {endless:{bestWave:0},roam:{},lunjian:{bestRound:0,clears:0,records:[]},trials:{medals:{}},endgame:{claimed:{},legacyPoints:0,finalClears:0}},
     legacy: {classicV1:null, importedV2:[]},
     lastSession: null,
     checkpoints: emptyCheckpoints(),
@@ -73,7 +73,7 @@ export function normalizeV3(raw){
   }
 
   const challenges=recordOr(base,'challenges',raw.challenges,{});
-  for(const key of ['endless','roam','lunjian','trials']) base.challenges[key]={...base.challenges[key],...recordOr(base,`challenges.${key}`,challenges[key],{})};
+  for(const key of ['endless','roam','lunjian','trials','endgame']) base.challenges[key]={...base.challenges[key],...recordOr(base,`challenges.${key}`,challenges[key],{})};
 
   const legacy=recordOr(base,'legacy',raw.legacy,{});
   base.legacy.classicV1=legacy.classicV1===null||legacy.classicV1===undefined?null:

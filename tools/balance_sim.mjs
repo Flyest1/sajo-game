@@ -11,7 +11,7 @@ import {patternTiles} from '../src/boss-actions.js';
 import {martialModifiers} from '../src/combat-rules.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const CHARS = J('characters.json'), SKILLS = J('skills.json'), TILE = J('tiles.json'), BATTLE_UPDATES = J('battle_updates.json'), BATTLE_EXPANSIONS=J('battle_expansions.json');
-const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json');
+const HWALSA = J('stages_hwalsa.json'), WOLNYEO = J('stages_wolnyeo.json'), JINFINAL=J('stages_jinfinal.json');
 
 const DIFFS = {
   story: { enemy: 0.85 }, std: { enemy: 1.0 }, hero: { enemy: 1.15 },
@@ -256,3 +256,15 @@ for(const [campId,pack] of Object.entries(BATTLE_EXPANSIONS.campaigns||{}))for(c
 if(variantStages!==4||variantBranches!==8)variantFlags.push(`분기 범위 ${variantStages}전투/${variantBranches}분기`);
 if(variantFlags.length)variantFlags.forEach(flag=>console.log(`  - [선택 압력 주의] ${flag}`));
 else console.log('  4전투·8분기 모두 적 보정 15%·추가 적 2명·보상 변동 200 안전 상한 통과');
+
+console.log('\n## R25 무림 종장 — 복합 진결 안전선');
+{
+  const stage=JINFINAL.stages.f2,hazards=stage.environment?.hazards||[],peak=Math.max(0,...hazards.map(item=>(item.damage||0)+(item.kiDrain||0))),phases=stage.bossPhases||[];
+  const types=stage.objective?.objectives?.map(item=>item.type)||[],flags=[];
+  console.log(`  목표 ${types.join(' + ')} · 시공 균열 ${hazards.length}개 · 단일 칸 압력 ${peak} · 보스 변화 ${phases.length}단계`);
+  if(types.join(',')!=='boss,seize,survive')flags.push('복합 목표 구성 불일치');
+  if(hazards.length!==2||peak>4)flags.push(`균열 압력 ${hazards.length}개/최대 ${peak}`);
+  if(phases.length!==2||phases.some(phase=>Object.values(phase.stats||{}).some(value=>value>.3)||(phase.guardRatio||0)>.3))flags.push('보스 단계가 2개 또는 능력 30%·강기 30% 안전선을 벗어남');
+  if(flags.length)flags.forEach(flag=>console.log(`  - [종장 주의] ${flag}`));
+  else console.log('  복합 목표·이동 균열·2단계 보스 모두 종장 안전선 통과');
+}

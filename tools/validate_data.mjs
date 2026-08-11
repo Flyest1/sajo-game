@@ -11,6 +11,7 @@ import {patternTiles} from '../src/boss-actions.js';
 import {newlyUnlockedPromotions,promotionStatus} from '../src/progression.js';
 import {advanceBattleEnvironment,createBattleEnvironment,environmentBlocked,resolveEnvironmentEffects} from '../src/battle-environment.js';
 import {applyBattleVariant,battleVariantConditionMatches} from '../src/campaign-battles.js';
+import {endgameProgress,syncEndgameRecord,endgameBlessing} from '../src/endgame.js';
 const J = f => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const TILE = J('tiles.json'), SKILLS = J('skills.json'), CHARS = J('characters.json'), CHAPTERS = J('chapters.json');
 const PORTRAITS = J('portraits.json');
@@ -398,6 +399,18 @@ for(const campaignId of MAIN_CAMPAIGNS)if(!battleVariantStats.campaigns.has(camp
   for(const pack of Object.values(BATTLE_EXPANSIONS.campaigns||{}))for(const node of Object.values(pack.after||{}).flat())if(node.id?.startsWith('r23_'))r24Themes.add(node.sceneTheme);
   for(const theme of ['palace','coast','grassland'])if(!r24Themes.has(theme))errs.push(`R24 regional scene theme missing ${theme}`);
 }
+{
+  const JINFINAL=campaignById('jinfinal'),finalBattle=JINFINAL?.stages?.f2;
+  const objectiveTypes=finalBattle?.objective?.objectives?.map(item=>item.type)||[];
+  if(finalBattle?.objective?.type!=='all'||objectiveTypes.join(',')!=='boss,seize,survive')errs.push('R25 final objective must combine boss, seize, survive');
+  if((finalBattle?.environment?.hazards||[]).filter(item=>item.type==='moving').length!==2)errs.push('R25 final must have two moving rifts');
+  if((finalBattle?.bossPhases||[]).length!==2)errs.push('R25 final must have two custom boss phases');
+  const campaignClears={sajo:true,sinjo:true,uicheon:true,chunryong:true},trialMedals=Object.fromEntries(Array.from({length:5},(_,i)=>[`seal-${i}`,'silver']));
+  const progress=endgameProgress({campaignClears,lunjian:{bestRound:4},trialMedals});
+  const first=syncEndgameRecord({},progress,1),again=syncEndgameRecord(first.record,progress,2),blessing=endgameBlessing(again.record);
+  if(!progress.ready||progress.completed!==3||first.newlyClaimed.length!==3||again.newlyClaimed.length||again.record.legacyPoints!==3)errs.push('R25 endgame seals are not ready/idempotent');
+  if(blessing.gold!==600||blessing.items.daehwandan!==3)errs.push('R25 endgame blessing mismatch');
+}
 
 /* ── 인연(지원 대화) 검증 ── */
 const SUPPORTS = J('supports.json');
@@ -548,6 +561,7 @@ console.log('R21 핵심 협객 승급 12종 · 원작 사건형 7종 검사');
 console.log(`R22 상호작용 전장 ${environmentStats.stages}개 · 환경 유형 ${environmentStats.types.size}종 검사`);
 console.log(`R23 본편 보강전 ${battleVariantStats.stages}개 · 선택 여파 ${battleVariantStats.branches}분기 검사`);
 console.log('R24 지역 수묵 테마 3종 · 전투 피드백 6문양 · 초상 단일 대체 경로 검사');
+console.log('R25 무림 종장 3인장 · 복합 목표 3종 · 중복 없는 계승 가호 검사');
 console.log(`특수전 ${specialTotal}개 (${Object.entries(specialCounts).map(([id,n])=>`${id} ${n}`).join(' · ')}) · 반실사 초상 ${portraitIds.length}명 · 감정 원화 ${expressionCount}장 검사`);
 console.log(`캠페인 완주 경로 ${flowStats.join(' · ')}`);
 if (errs.length) { console.error('ERRORS:'); errs.forEach(e => console.error(' -', e)); process.exit(1); }
