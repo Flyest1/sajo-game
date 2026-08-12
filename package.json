@@ -13,7 +13,7 @@
     "balance": "node tools/balance_sim.mjs",
     "audit": "node tools/audit_release.mjs",
     "test": "playwright test",
-    "test:smoke": "playwright test tests/smoke.spec.js tests/hotfix-skill.spec.js tests/r20-engine.spec.js tests/r21-progression.spec.js tests/r22-environment.spec.js tests/r23-campaign-battles.spec.js tests/r24-graphics.spec.js tests/r25-endgame.spec.js tests/u7-completion.spec.js"
+    "test:smoke": "playwright test tests/smoke.spec.js tests/hotfix-skill.spec.js tests/r20-engine.spec.js tests/r21-progression.spec.js tests/r22-environment.spec.js tests/r23-campaign-battles.spec.js tests/r24-graphics.spec.js tests/r25-endgame.spec.js tests/r26-stability.spec.js tests/u7-completion.spec.js tests/u8-source.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

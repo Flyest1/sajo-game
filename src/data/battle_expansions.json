@@ -98,6 +98,13 @@
       }]
     }},
     "uicheon": {"after": {
+      "u5_yt_jiuyanger": [{
+        "id":"u8_yt_wangpan","kind":"battle","source":"canon","layout":"field","title":"본편 보강전 五  왕반산도 도룡쟁탈","goldReward":390,"joins":["jchsan","unss"],"joinLevel":2,
+        "enemies":[{"cid":"gwi","x":11,"y":2},{"cid":"gwi","x":14,"y":3},{"cid":"msa","x":12,"y":7},{"cid":"sason","x":15,"y":5,"boss":true,"guard":11,"wait":2}],
+        "win":{"type":"survive","turns":7,"boss":"sason","text":"사손의 사자후 속에서 7턴 생존"},"deploy":{"cap":4,"forced":["jchsan","unss"]},"sceneTheme":"coast",
+        "pre":[{"s":null,"t":"도룡도가 왕반산도 양도대회에 나타나자 천응교와 강호 군웅이 한 섬에 몰렸다."},{"s":"sason","side":"R","t":"도룡도의 비밀을 캐는 자들은 내 사자후부터 견뎌 보아라!"},{"s":"jchsan","side":"L","t":"은 낭자, 도룡도를 차지하려 싸우기보다 다친 사람들을 배로 옮깁시다."},{"s":"unss","side":"L","t":"좋아요. 일곱 번의 사자후가 끝날 때까지 서로의 등을 지켜요."}],
+        "post":[{"s":null,"t":"폭풍은 사손·장취산·은소소를 빙화도로 밀어냈고, 세 사람의 십 년은 어린 장무기의 삶이 되었다."}]
+      }],
       "u6_yt_childhood_road": [{
         "id":"u6b_yt_cold_poison","kind":"battle","source":"canon","layout":"mountain","title":"본편 추가전 一  한독을 품은 아이","goldReward":300,"joins":["jsam"],"joinLevel":2,
         "enemies":[{"cid":"ydg","x":5,"y":3},{"cid":"ydg","x":11,"y":3},{"cid":"mgs","x":4,"y":6},{"cid":"hbo","x":7,"y":2,"boss":true,"guard":8,"wait":2},{"cid":"njg","x":10,"y":2,"boss":true,"guard":8,"wait":2}],
@@ -113,12 +120,33 @@
         "pre":[{"s":"yso","side":"L","t":"광명좌사 양소, 교주의 좌익을 맡겠습니다."},{"s":"fyo","side":"L","t":"우사 범요는 적진의 허실을 끊지."},{"s":"ecj","side":"L","t":"백미응왕 은천정의 늙은 발톱이 아직 무디지 않았다!"},{"s":"wis","side":"L","t":"청익복왕 위일소는 오행기의 빈틈을 메우겠다."},{"s":"jmk","side":"L","t":"명교의 모든 형제여, 서로의 자리를 다투지 말고 광명정을 함께 지킵시다!"}],
         "post":[{"s":"myeoljeol","side":"R","t":"마교라 불린 자들이 서로를 위해 목숨을 거는구나… 오늘은 물러나겠다."},{"s":"jmk","side":"L","t":"이제 명교는 한 사람의 무공이 아니라 모두의 질서로 움직일 것입니다."}]
       }],
+      "u6b_yt_bright_peak_oath": [{
+        "id":"u8_yt_green_manor","kind":"battle","source":"canon","layout":"hall","title":"본편 보강전 六  녹류산장의 함정","goldReward":430,
+        "enemies":[{"cid":"mgb","x":4,"y":2},{"cid":"mgb","x":13,"y":2},{"cid":"mgs","x":5,"y":5},{"cid":"hbo","x":12,"y":5},{"cid":"jomin","x":8,"y":1,"boss":true,"guard":9,"wait":2}],
+        "win":{"type":"subdue","target":"jomin","threshold":0.3,"text":"조민의 함정을 파훼하고 십향연근산 해약 확보"},"deploy":{"cap":7,"forced":["jmk"]},"sceneTheme":"palace",
+        "pre":[{"s":null,"t":"광명정을 내려온 명교 수뇌는 녹류산장의 술과 향에 숨은 십향연근산에 당했다."},{"s":"jomin","side":"R","t":"장 교주, 사람을 해치지 않고도 이 방을 빠져나갈 수 있을까? 해약은 내 손에 있어."},{"s":"jmk","side":"L","t":"함정의 주인을 해쳐 해약을 얻지는 않겠습니다. 대신 당신의 빈틈을 찾아 모두를 데리고 나가겠습니다."}],
+        "post":[{"s":"jomin","side":"R","t":"힘이 있는데도 억지로 빼앗지 않는다… 장무기, 다음 판은 만안사에서 계속하지."},{"s":"jmk","side":"L","t":"육대문파가 사라졌다는 소식도 이 산장과 이어져 있습니다. 대도로 갑시다."}]
+      }],
       "u6_yt_six_sects": [{
         "id":"u6b_yt_six_sect_rescue","kind":"battle","source":"canon","layout":"town","title":"본편 추가전 三  육대문파 구출전","goldReward":460,
         "enemies":[{"cid":"gwi","x":11,"y":2},{"cid":"gwi","x":13,"y":3},{"cid":"mgs","x":12,"y":6},{"cid":"hbo","x":15,"y":4,"boss":true,"guard":9,"wait":2},{"cid":"njg","x":15,"y":8,"wait":1}],
         "win":{"type":"all","text":"현명이로를 제압하고 감옥 문 개방","objectives":[{"type":"boss","boss":"hbo","text":"학필옹 격파"},{"type":"seize","tiles":[[16,1],[16,10]],"text":"남·북 감옥 문 확보"}]},"deploy":{"cap":8,"forced":["jmk","jjy","jsam"]},"sceneTheme":"jianghu",
         "pre":[{"s":"jmk","side":"L","t":"소림·무당·아미·곤륜·공동·화산의 장문인들이 각기 다른 감옥에 갇혔습니다. 두 문을 함께 열어야 합니다."},{"s":"jjy","side":"L","t":"아미 제자들은 북쪽 감옥을 맡겠습니다. 무당은 남쪽 길을 열어 주세요."},{"s":"hbo","side":"R","t":"원수끼리 손을 잡는다 해도 만안사의 문은 열리지 않는다!"}],
         "post":[{"s":"jsam","side":"L","t":"문파의 이름보다 백성을 지키는 뜻이 먼저다. 오늘 육대문파가 그것을 배웠구나."},{"s":"jmk","side":"L","t":"다음에는 서로를 멸하기 위해서가 아니라 천하를 돕기 위해 모입시다."}]
+      }],
+      "u5_yt_return_ship": [{
+        "id":"u8_yt_return_ship","kind":"battle","source":"canon","layout":"field","title":"본편 보강전 七  귀환선의 사라진 도검","goldReward":470,
+        "enemies":[{"cid":"psa","x":11,"y":2},{"cid":"psa","x":14,"y":3},{"cid":"gwi","x":12,"y":7},{"cid":"mgyo","x":15,"y":5,"boss":true,"guard":10,"wait":2}],
+        "win":{"type":"all","text":"침몰선 단서와 생존자 확보","objectives":[{"type":"boss","boss":"mgyo","text":"증거를 없애려는 추격대 격퇴"},{"type":"seize","tiles":[[2,4],[15,8]],"text":"두 선실의 흔적 조사"}]},"deploy":{"cap":7,"forced":["jmk"]},"sceneTheme":"coast",
+        "pre":[{"s":null,"t":"의식을 잃은 밤 뒤 조민과 의천검·도룡도가 사라졌다. 서로 다른 증언만 남은 배에 정체불명의 추격대가 불을 놓았다."},{"s":"jmk","side":"L","t":"누구도 의심만으로 죄인이라 정하지 않겠습니다. 불타기 전에 양쪽 선실의 흔적부터 확보합시다."},{"s":"jjy","side":"L","t":"진실을 찾겠다는 말이 제게 향하더라도 피하지 않겠습니다."}],
+        "post":[{"s":null,"t":"도검이 서로 부딪힌 흔적과 섬을 향한 항로가 드러났다. 진상은 도사대회와 주지약의 선택으로 이어졌다."}]
+      }],
+      "s10": [{
+        "id":"u8_yt_vajra_circle","kind":"battle","source":"canon","layout":"mountain","title":"본편 보강전 八  금강복마권","goldReward":520,
+        "enemies":[{"cid":"sap","x":5,"y":3},{"cid":"sap","x":11,"y":3},{"cid":"sap","x":6,"y":6},{"cid":"mumyeong","x":8,"y":2,"boss":true,"guard":13,"wait":3}],
+        "win":{"type":"survive","turns":8,"boss":"mumyeong","text":"삼도승의 금강복마권을 8턴 견디고 사손에게 도달"},"deploy":{"cap":7,"forced":["jmk","sason"]},"sceneTheme":"shaolin",
+        "pre":[{"s":null,"t":"도사대회 뒤 사손은 소림 삼도승의 금강복마권 안에 갇혔다. 세 노승의 긴 채찍은 한 몸처럼 빈틈을 메웠다."},{"s":"jmk","side":"L","t":"세 분을 쓰러뜨리러 온 것이 아닙니다. 양부님과 성곤의 원한이 끝날 때까지 길을 열어 주십시오."},{"s":"sason","side":"L","t":"무기야, 내 원한 때문에 네가 불문과 새 원한을 만들지는 마라. 버티며 진의 호흡을 읽어라."}],
+        "post":[{"s":null,"t":"금강복마권의 살기가 걷히자 사손과 성곤은 군웅 앞에서 마지막 결착을 맞았다."},{"s":"jmk","side":"L","t":"양부님의 원한은 끝났습니다. 이제 의천과 도룡 안에 남은 선대의 뜻을 확인할 차례입니다."}]
       }],
       "u5_yt_persia": [{
         "id":"r23_yt_persian_fleet","kind":"battle","source":"canon","layout":"field","title":"본편 보강전 四  영사도의 성화진","goldReward":490,

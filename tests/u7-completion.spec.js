@@ -20,13 +20,13 @@ test('U7 pathfinding module keeps terrain, enemy, ally, and environment rules',(
 
 test('U7 live engine boots with split rules and exposes playable movement on desktop and mobile',async({page})=>{
   await page.goto('./');await page.evaluate(()=>localStorage.clear());await page.reload();
-  expect(await page.evaluate(()=>window.__pwa.version)).toMatch(/^U7-/);
+  expect(await page.evaluate(()=>window.__pwa.version)).toMatch(/^U8-/);
   const probe=await page.evaluate(()=>{
     window.startCampaignV2('sajo',false);const campaign=window.__dbg.CAMPAIGNS.sajo,state=window.__dbg.campaignState;
     state.stageId=Object.keys(campaign.stages).find(id=>campaign.stages[id].kind==='battle');window.__dbg.openCurrentDeploy();
     return {campaigns:window.__dbg.DISCOVERED_CAMPAIGN_IDS.length,stage:state.stageId};
   });
-  expect(probe.campaigns).toBe(11);expect(probe.stage).toBeTruthy();
+  expect(probe.campaigns).toBe(13);expect(probe.stage).toBeTruthy();
   await page.getByRole('button',{name:/출 전/}).click();await expect(page.locator('#mapsvg')).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>window.__dbg.movementProbe()?.length||0)).toBeGreaterThan(1);
 });

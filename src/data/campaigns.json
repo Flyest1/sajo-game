@@ -10,7 +10,7 @@
       "id": "legends",
       "name": "강호외전",
       "desc": "원작 단편과 원작의 공백을 확장한 게임 오리지널 이야기",
-      "campaigns": ["wolnyeo", "hwasan", "hwalsa", "pungreung", "hooildam"]
+      "campaigns": ["wolnyeo", "hwasan", "hwasan22", "hwalsa", "pungreung", "uicheon_oejeon", "hooildam"]
     },
     {
       "id": "finale",
@@ -70,6 +70,13 @@
       "order": 60,
       "source": "사조영웅전의 회고"
     },
+    "hwasan22": {
+      "era": "사조 이전부터 신조 이후",
+      "canon": "비공식 이문 선집",
+      "tone": "일곱 인물의 강호",
+      "order": 60.5,
+      "source": "모이자 연재 《화산논검》 46편"
+    },
     "hwalsa": {
       "era": "사조 이전",
       "canon": "원작 공백 기반 창작",
@@ -83,6 +90,13 @@
       "tone": "세대의 등불",
       "order": 62,
       "source": "신조협려·의천도룡기"
+    },
+    "uicheon_oejeon": {
+      "era": "원말명초 이후",
+      "canon": "비공식 이문",
+      "tone": "사라지는 성화",
+      "order": 69,
+      "source": "모이자 연재 《의천도룡기 외전》 7편"
     },
     "hooildam": {
       "era": "명 건국 전후",

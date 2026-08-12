@@ -29,6 +29,8 @@ import { applyBattleVariant } from './campaign-battles.js';
 import { ENDGAME_SEALS, endgameProgress, syncEndgameRecord, endgameBlessing } from './endgame.js';
 import { MASTERY_STEPS, masteryTierForUses, masteryBonuses, masteryLabelForUses, masteryProgressForUses, masteryEffectFor } from './mastery.js';
 import { movementRange, stoppableTile } from './pathfinding.js';
+import { executeBattleAction, runGuardedPlayerAction } from './battle-actions.js';
+import { exerciseSkillFixture, actionFailureFixture } from './r26-debug.js';
 import { martialModifiers, enemyMartialCounter } from './combat-rules.js';
 import { resolveBossImpact, resolveGuardHit, resolveHealthHit } from './combat-resolution.js';
 import { chooseEnemyAction as resolveEnemyAction } from './enemy-ai.js';
@@ -715,7 +717,6 @@ async function applyBossPhase(u){
 
 /* ── 교전(공격+반격+추격) ── */
 async function combat(a,d,skillId){
-  B.busy=true;
   const pre=calcStrike(a,d,skillId);
   const skA=skillId?SKILLS[skillId]:null;
   await strike(a,d,skillId);
@@ -749,7 +750,6 @@ async function combat(a,d,skillId){
     await strike(d,a,null);
     if(checkEnd()) return;
   }
-  B.busy=false;
 }
 
 /* ── R20 보스 범위 초식: 고정된 경고 타일을 그대로 판정 ── */
@@ -832,7 +832,6 @@ async function performBossActionTurn(u){
 
 /* ── 치료 ── */
 async function healAction(a,t,skillId){
-  B.busy=true;
   const sid=skillId||a.skills[0];
   const sk=SKILLS[sid];
   a.ki-=(a.team==='P'?masteryCost(sid):sk.cost);
@@ -848,7 +847,6 @@ async function healAction(a,t,skillId){
   grantExp(a,14);
   renderBattle(true);
   await aSleep(450);
-  B.busy=false;
 }
 
 /* ── 승패 판정: 모든 캠페인이 공유하는 목표 규칙 ── */
@@ -1014,7 +1012,22 @@ function toggleThreats(){
   B.showThreats=!B.showThreats;
   SFX.play('ui'); renderBattle();
 }
-
+function clearBattleActionOverlays(){
+  document.querySelectorAll('.martial-cutin,.boss-reveal,.ink-strike').forEach(element=>element.remove());
+  document.getElementById('fc-modal')?.remove();
+  hideMenu();
+}
+async function runPlayerBattleAction(actor,kind,task){
+  const battle=B;
+  return runGuardedPlayerAction({battle,actor,kind,task,cleanup:clearBattleActionOverlays,
+    onError:error=>{console.error('battle action failed',error);if(B===battle&&!battle.over)log('<b>기술 처리 중 오류가 발생해 행동을 안전하게 종료했습니다.</b>',true);},
+    onFinish:unit=>{if(B===battle)finishUnit(unit);}});
+}
+function usePlayerSkill(actor,target,skillId){
+  const skill=SKILLS[skillId];
+  if(!skill)return Promise.resolve({accepted:false,ok:false,reason:'missing-skill'});
+  return runPlayerBattleAction(actor,skill.heal?'heal':'skill',()=>skill.heal?healAction(actor,target,skillId):combat(actor,target,skillId));
+}
 function onTile(x,y){
   if(!B||B.over||B.phase!=='P') return;
   const u=unitAt(x,y);
@@ -1050,13 +1063,12 @@ function onTile(x,y){
     if(u&&u.team==='P'&&B.targets.includes(u)){
       const a=B.sel, sid=a.skills[B.skillIdx];
       hideMenu(); B.mode='idle';
-      healAction(a,u,sid).then(()=>{ finishUnit(a); });
+      void usePlayerSkill(a,u,sid);
     } else backToMenu();
   }
   else if(B.mode==='menu'){ backToMenu(); }
 }
 function backToMenu(){ B.mode='menu'; B.targets=null; renderBattle(); openMenu(); }
-
 function finishUnit(u){
   v2Pickup(u);
   u.acted=true; B.sel=null; B.orig=null; B.mode='idle'; B.mr=null; B.targets=null;
@@ -1064,7 +1076,6 @@ function finishUnit(u){
   if(checkEnd()) return;
   if(!B.over && players().every(p=>p.acted)) setTimeout(endPlayerPhase,400);
 }
-
 /* ── 액션 메뉴 ── */
 function openMenu(){
   const u=B.sel; hideMenu();
@@ -1121,7 +1132,6 @@ function menuAct(act,idx){
   if(act==='heal'){ B.mode='target-heal'; B.skillIdx=idx; B.targets=players().filter(p=>p!==u&&u.range.includes(dist(u,p))&&p.hp<p.maxhp); }
   renderBattle();
 }
-
 function breakEnvironmentGate(u,gateId){
   hideMenu();
   if(!u||!adjacentEnvironmentGates(B.environment,u).some(gate=>gate.id===gateId))return;
@@ -1131,7 +1141,6 @@ function breakEnvironmentGate(u,gateId){
   log(`${u.name}이(가) <b>${result.gate.label}</b>을(를) 공격했다.${result.destroyed?' 통로가 열렸다.':''}`,true);
   refreshEnemyIntents();finishUnit(u);
 }
-
 /* ── 전투 예측 ── */
 function openForecast(a,d,skillId){
   const my=calcStrike(a,d,skillId);
@@ -1171,17 +1180,14 @@ function cancelForecast(){
   B.pending=null; backToMenu();
 }
 function confirmAttack(){
+  if(!B||B.over||B.phase!=='P'||B.actionLock||!B.pending)return;
   SFX.play('ui');
   const m=document.getElementById('fc-modal'); if(m) m.remove();
   const p=B.pending; B.pending=null;
   hideMenu(); B.mode='idle'; B.targets=null;
-  combat(p.a,p.d,p.skillId).then(()=>{ if(!B.over) finishUnit(p.a); }).catch(error=>{
-    console.error('battle action failed',error);
-    if(!B||B.over)return;
-    B.busy=false;log('<b>기술 처리 중 오류가 발생해 행동을 안전하게 종료했습니다.</b>',true);finishUnit(p.a);
-  });
+  if(p.skillId)void usePlayerSkill(p.a,p.d,p.skillId);
+  else void runPlayerBattleAction(p.a,'attack',()=>combat(p.a,p.d,null));
 }
-
 function applyBattleEnvironmentRound(){
   if(!B?.environment)return [];
   B.environment=advanceBattleEnvironment(B.environment,{passable:environmentPassable});
@@ -1291,23 +1297,32 @@ async function enemyPhase(){
     focusUnit(u); /* 행동할 적에게 화면 이동 */
     if(!(SETTINGS.fastEnemy&&SETTINGS.speed>=2)) await aSleep(160);
     const cooling=!!(!u.bossActionState?.pending&&(u.bossActionState?.cooldown||0)>0);
-    const bossIntent=chooseBossAction(u);
-    if(bossIntent){
-      await performBossActionTurn(u);
-      if(B.over)return;
-    }else{
+    const battle=B;
+    const turnOutcome=await executeBattleAction({battle,actorUid:u.uid,kind:'enemy-turn',busyAfter:true,task:async()=>{
+      const bossIntent=chooseBossAction(u);
+      if(bossIntent){
+        await performBossActionTurn(u);
+        return;
+      }
       const intent=chooseEnemyAction(u,{allowBoss:false});
       if(intent.kind==='attack'){
         const target=B.units.find(x=>x.uid===intent.targetUid&&x.alive);
-        if(!target) continue;
+        if(!target)return;
         if(intent.x!==u.x||intent.y!==u.y){ const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy); }
         await combat(u,target,intent.sid);
-        if(B.over) return;
       }else if(intent.kind==='move'&&(intent.x!==u.x||intent.y!==u.y)){
         const ox=u.x,oy=u.y; u.x=intent.x; u.y=intent.y; await animMove(u,ox,oy);
       }
-      if(cooling)u.bossActionState.cooldown=Math.max(0,u.bossActionState.cooldown-1);
+    }});
+    if(B!==battle)return;
+    if(!turnOutcome.ok){
+      console.error('enemy battle action failed',turnOutcome.error);
+      clearBattleActionOverlays();
+      log(`<b>${u.name}의 행동 처리 오류를 복구하고 다음 적으로 진행합니다.</b>`,true);
+      renderBattle(true);
     }
+    if(B.over)return;
+    if(cooling)u.bossActionState.cooldown=Math.max(0,u.bossActionState.cooldown-1);
     if(u.alive&&u.broken){ u.guard=u.guardMax; u.broken=false; log(`${u.name}이(가) 호흡을 가다듬어 호신강기를 되찾았다.`); }
   }
   if(B&&!B.over) startPlayerPhase(false);
@@ -1340,7 +1355,7 @@ function startBattle(){
     map, w:W, h:map.length,
     units:[], turn:1, phase:'P', mode:'idle',
     sel:null, orig:null, mr:null, targets:null, inspect:null, tileSel:null,
-    busy:true, over:false, log:[], pending:null, reinfDone:[], skillIdx:null, queuedUnit:null, queueInput:true,
+    busy:true, over:false, actionLock:null, log:[], pending:null, reinfDone:[], skillIdx:null, queuedUnit:null, queueInput:true,
     intents:{}, showThreats:true, joints:{},
     diff:ctx.difficulty,
     weather:pickWeather(),
@@ -3844,6 +3859,8 @@ export const DEBUG = {
   },
   inspectUnit(cid){const u=B?.units.find(item=>item.cid===cid);if(!u)return false;UCARD_HIDE=false;B.inspect=u;B.tileSel={x:u.x,y:u.y};renderSide();return true;},
   previewImpactFeedback(){if(!B)return [];const unit=players()[0]||foes()[0];if(!unit)return [];const samples=[['17','damage'],['31','crit'],['+12','heal'],['회피!','miss'],['강기 -4','guard'],['破 파훼!','break']];samples.forEach(([text,kind],index)=>fx(unit.x+(index%3)*.28,unit.y-Math.floor(index/3)*.35,text,kind));return samples.map(([text,kind])=>({text,kind}));},
+  exerciseSkill(sid){return exerciseSkillFixture({battle:B,skills:SKILLS,players:players(),foes:foes(),masteryUses:()=>SKILL_USE,useSkill:usePlayerSkill},sid);},
+  actionFailureProbe(){return actionFailureFixture({battle:B,players:players(),runAction:runPlayerBattleAction});},
   battleReports(){return deepClone(BATTLE_REPORTS);},
   promotionProbe(cid='wjy'){ const p=CHARS[cid]&&CHARS[cid].promo; return p?{...p,text:promotionEffectText(p)}:null; },
   saveValidation(input){ const result=validateV3(input); return {valid:result.valid,issues:result.issues,store:result.store}; },

@@ -20,7 +20,7 @@ if(!errors.length){
   if(sw.includes('portraits/hero/')||sw.includes('portraits/thumb/')) errors.push('portrait library leaked into core precache');
   const jsFiles=fs.readdirSync(path.join(dist,'assets')).filter(file=>file.endsWith('.js'));
   const bundle=jsFiles.map(file=>fs.readFileSync(path.join(dist,'assets',file),'utf8')).join('\n');
-  const expectedVersion=`U7-${(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7)}`;
+  const expectedVersion=`U8-${(process.env.GITHUB_SHA||process.env.APP_REVISION||'local').slice(0,7)}`;
   if(!bundle.includes(expectedVersion)) errors.push(`bundle build identifier mismatch (expected ${expectedVersion})`);
   for(const file of jsFiles){const bytes=fs.statSync(path.join(dist,'assets',file)).size;if(bytes>500*1024)errors.push(`JavaScript chunk exceeds 500 KiB: ${file} (${bytes})`);}
   const totalJs=jsFiles.reduce((sum,file)=>sum+fs.statSync(path.join(dist,'assets',file)).size,0);

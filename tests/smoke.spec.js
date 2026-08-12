@@ -69,7 +69,7 @@ test('campaign JSON files are auto-discovered and manifest registered', async ({
     discovered:window.__dbg.DISCOVERED_CAMPAIGN_IDS,
     registered:Object.keys(window.__dbg.CAMPAIGNS).sort(),
   }));
-  expect(registry.discovered).toHaveLength(11);
+  expect(registry.discovered).toHaveLength(13);
   expect(registry.registered).toEqual([...registry.discovered,'chronicle'].sort());
   expect(registry.discovered).toEqual(expect.arrayContaining(['sajo','sinjo','uicheon','chunryong','wolnyeo','jinfinal']));
 });
@@ -406,7 +406,7 @@ test('PWA build identity and recovery APIs are available without touching saves'
     cache:await window.__pwa.inspectPwaCache(),
     apis:['checkForUpdate','inspectPwaCache','repairPwaCache'].map(name=>typeof window.__pwa[name]),
   }));
-  expect(pwa.version).toMatch(/^U7-/);
+  expect(pwa.version).toMatch(/^U8-/);
   expect(pwa.title).toContain(pwa.version);
   expect(pwa.build).toBe(pwa.version);
   expect(pwa.apis).toEqual(['function','function','function']);

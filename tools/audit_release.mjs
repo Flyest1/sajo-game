@@ -17,8 +17,8 @@ const declarations=[...game.matchAll(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm)].m
 for(const name of declarations){if(seen.has(name))issues.push(`duplicate game function declaration: ${name}`);seen.add(name);}
 const gameLines=game.split(/\r?\n/).length;if(gameLines>3900)issues.push(`game.js ${gameLines} lines exceeds U7 ceiling 3900`);
 for(const file of ['src/mastery.js','src/pathfinding.js','src/runtime.js','src/combat-rules.js','src/combat-resolution.js','src/enemy-ai.js'])if(!fs.existsSync(path.join(root,file)))issues.push(`engine module missing: ${file}`);
-for(const spec of ['hotfix-skill.spec.js','r20-engine.spec.js','r21-progression.spec.js','r22-environment.spec.js','r23-campaign-battles.spec.js','r24-graphics.spec.js','r25-endgame.spec.js','u7-completion.spec.js'])if(!pkg.scripts['test:smoke'].includes(spec))issues.push(`test:smoke missing ${spec}`);
-if(!read('docs/COMPLETION_AUDIT.md').includes('U7 완료'))issues.push('completion audit is not signed off');
+for(const spec of ['hotfix-skill.spec.js','r20-engine.spec.js','r21-progression.spec.js','r22-environment.spec.js','r23-campaign-battles.spec.js','r24-graphics.spec.js','r25-endgame.spec.js','r26-stability.spec.js','u7-completion.spec.js','u8-source.spec.js'])if(!pkg.scripts['test:smoke'].includes(spec))issues.push(`test:smoke missing ${spec}`);
+if(!read('docs/COMPLETION_AUDIT.md').includes('U8 완료'))issues.push('U8 completion audit is not signed off');
 
 const dist=path.join(root,'dist','assets');let chunks=[];
 if(fs.existsSync(dist)){
@@ -28,4 +28,4 @@ if(fs.existsSync(dist)){
 }
 
 if(issues.length){console.error('U7 RELEASE AUDIT FAILED');for(const issue of issues)console.error(' -',issue);process.exit(1);}
-console.log(`U7 RELEASE AUDIT OK · game.js ${gameLines}줄 · 인라인 핸들러 ${handlers.size}개 · JS 청크 ${chunks.length||'빌드 전'}개${chunks.length?` · 최대 ${Math.ceil(Math.max(...chunks.map(item=>item.bytes))/1024)}KiB`:''}`);
+console.log(`U8 RELEASE AUDIT OK · game.js ${gameLines}줄 · 인라인 핸들러 ${handlers.size}개 · JS 청크 ${chunks.length||'빌드 전'}개${chunks.length?` · 최대 ${Math.ceil(Math.max(...chunks.map(item=>item.bytes))/1024)}KiB`:''}`);
